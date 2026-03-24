@@ -1,0 +1,32 @@
+{
+  "project_metadata": {
+    "app_id": "VigilantEar-v1",
+    "owner": "robert@wingdingssocial.com",
+    "environment": "development"
+  },
+  "configurations": [
+    {
+      "key": "noise_threshold_db",
+      "value": 75.5,
+      "type": "float",
+      "description": "Trigger alert if ambient noise exceeds this level."
+    },
+    {
+      "key": "is_active",
+      "value": true,
+      "type": "boolean",
+      "description": "Master toggle for the listener service."
+    },
+    {
+      "key": "alert_email",
+      "value": "robert@wingdingssocial.com",
+      "type": "string",
+      "description": "Destination for critical alerts."
+    }
+  ],
+  "device_status": {
+    "last_sync": "2026-03-28T13:45:00Z",
+    "battery_level": 88,
+    "status": "listening"
+  }
+}

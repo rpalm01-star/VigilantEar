@@ -1,0 +1,538 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		30227F972FB0E88C0000C3B4 /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = 30227F962FB0E88C0000C3B4 /* Localizable.xcstrings */; };
+		302387CB2FB2266F00BDF685 /* MarkdownUI in Frameworks */ = {isa = PBXBuildFile; productRef = 302387CA2FB2266F00BDF685 /* MarkdownUI */; };
+		3023882D2FB243C400BDF685 /* FirebaseCore in Frameworks */ = {isa = PBXBuildFile; productRef = 3023882C2FB243C400BDF685 /* FirebaseCore */; };
+		3023882F2FB243D000BDF685 /* FirebaseFirestore in Frameworks */ = {isa = PBXBuildFile; productRef = 3023882E2FB243D000BDF685 /* FirebaseFirestore */; };
+		3053DCBF2F83718A00241892 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 3053DCAC2F83718A00241892 /* Assets.xcassets */; };
+		3085368C2FAD99B600E7AC60 /* SoundML in Frameworks */ = {isa = PBXBuildFile; productRef = 3085368B2FAD99B600E7AC60 /* SoundML */; };
+		30A396432F908D4800D441A0 /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = 30A396422F908D4800D441A0 /* GoogleService-Info.plist */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		30227F962FB0E88C0000C3B4 /* Localizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = Localizable.xcstrings; sourceTree = "<group>"; };
+		304F73C52F830A8800F67563 /* VigilantEar.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = VigilantEar.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		3053DCAC2F83718A00241892 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		308EF3EB2F875A9400885DCB /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		30A396422F908D4800D441A0 /* GoogleService-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "GoogleService-Info.plist"; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFileSystemSynchronizedRootGroup section */
+		30857FBA2FA43090008C9C1B /* App */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = App;
+			sourceTree = "<group>";
+		};
+		30857FC02FA43096008C9C1B /* AudioEngine */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = AudioEngine;
+			sourceTree = "<group>";
+		};
+		30857FCE2FA4309F008C9C1B /* Core */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = Core;
+			sourceTree = "<group>";
+		};
+		30857FDB2FA430A5008C9C1B /* Logging */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = Logging;
+			sourceTree = "<group>";
+		};
+		30857FE42FA430A9008C9C1B /* Managers */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = Managers;
+			sourceTree = "<group>";
+		};
+		30857FEE2FA430AC008C9C1B /* Models */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = Models;
+			sourceTree = "<group>";
+		};
+		30857FF32FA430AF008C9C1B /* Observers */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = Observers;
+			sourceTree = "<group>";
+		};
+		30857FF92FA430B1008C9C1B /* Physics */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = Physics;
+			sourceTree = "<group>";
+		};
+		30857FFE2FA430B4008C9C1B /* Simulators */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = Simulators;
+			sourceTree = "<group>";
+		};
+		308580002FA430CE008C9C1B /* Views */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = Views;
+			sourceTree = "<group>";
+		};
+/* End PBXFileSystemSynchronizedRootGroup section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		304F73C22F830A8800F67563 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				302387CB2FB2266F00BDF685 /* MarkdownUI in Frameworks */,
+				3023882F2FB243D000BDF685 /* FirebaseFirestore in Frameworks */,
+				3023882D2FB243C400BDF685 /* FirebaseCore in Frameworks */,
+				3085368C2FAD99B600E7AC60 /* SoundML in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		304F73BC2F830A8800F67563 = {
+			isa = PBXGroup;
+			children = (
+				3053DCAD2F83718A00241892 /* VigilantEar */,
+				304F73C62F830A8800F67563 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		304F73C62F830A8800F67563 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				304F73C52F830A8800F67563 /* VigilantEar.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		3053DCAB2F83718A00241892 /* Sources */ = {
+			isa = PBXGroup;
+			children = (
+				30857FBA2FA43090008C9C1B /* App */,
+				30857FC02FA43096008C9C1B /* AudioEngine */,
+				30857FCE2FA4309F008C9C1B /* Core */,
+				30857FDB2FA430A5008C9C1B /* Logging */,
+				30857FE42FA430A9008C9C1B /* Managers */,
+				30857FEE2FA430AC008C9C1B /* Models */,
+				30857FF32FA430AF008C9C1B /* Observers */,
+				30857FF92FA430B1008C9C1B /* Physics */,
+				30857FFE2FA430B4008C9C1B /* Simulators */,
+				308580002FA430CE008C9C1B /* Views */,
+			);
+			path = Sources;
+			sourceTree = "<group>";
+		};
+		3053DCAD2F83718A00241892 /* VigilantEar */ = {
+			isa = PBXGroup;
+			children = (
+				30227F962FB0E88C0000C3B4 /* Localizable.xcstrings */,
+				30A396422F908D4800D441A0 /* GoogleService-Info.plist */,
+				308EF3EB2F875A9400885DCB /* Info.plist */,
+				3053DCAB2F83718A00241892 /* Sources */,
+				3053DCAC2F83718A00241892 /* Assets.xcassets */,
+			);
+			path = VigilantEar;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		304F73C42F830A8800F67563 /* VigilantEar */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 304F73D02F830A8900F67563 /* Build configuration list for PBXNativeTarget "VigilantEar" */;
+			buildPhases = (
+				304F73C12F830A8800F67563 /* Sources */,
+				304F73C22F830A8800F67563 /* Frameworks */,
+				304F73C32F830A8800F67563 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				30857FBA2FA43090008C9C1B /* App */,
+				30857FC02FA43096008C9C1B /* AudioEngine */,
+				30857FCE2FA4309F008C9C1B /* Core */,
+				30857FDB2FA430A5008C9C1B /* Logging */,
+				30857FE42FA430A9008C9C1B /* Managers */,
+				30857FEE2FA430AC008C9C1B /* Models */,
+				30857FF32FA430AF008C9C1B /* Observers */,
+				30857FF92FA430B1008C9C1B /* Physics */,
+				30857FFE2FA430B4008C9C1B /* Simulators */,
+				308580002FA430CE008C9C1B /* Views */,
+			);
+			name = VigilantEar;
+			packageProductDependencies = (
+				3085368B2FAD99B600E7AC60 /* SoundML */,
+				302387CA2FB2266F00BDF685 /* MarkdownUI */,
+				3023882C2FB243C400BDF685 /* FirebaseCore */,
+				3023882E2FB243D000BDF685 /* FirebaseFirestore */,
+			);
+			productName = VigilantEar;
+			productReference = 304F73C52F830A8800F67563 /* VigilantEar.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		304F73BD2F830A8800F67563 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 2640;
+				LastUpgradeCheck = 2640;
+				TargetAttributes = {
+					304F73C42F830A8800F67563 = {
+						CreatedOnToolsVersion = 26.4;
+					};
+				};
+			};
+			buildConfigurationList = 304F73C02F830A8800F67563 /* Build configuration list for PBXProject "VigilantEar" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+				es,
+				"zh-Hans",
+			);
+			mainGroup = 304F73BC2F830A8800F67563;
+			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				3085368A2FAD99B600E7AC60 /* XCRemoteSwiftPackageReference "SoundML" */,
+				302387C92FB2266F00BDF685 /* XCRemoteSwiftPackageReference "swift-markdown-ui" */,
+				302387CC2FB23E2800BDF685 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */,
+			);
+			preferredProjectObjectVersion = 77;
+			productRefGroup = 304F73C62F830A8800F67563 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				304F73C42F830A8800F67563 /* VigilantEar */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		304F73C32F830A8800F67563 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				3053DCBF2F83718A00241892 /* Assets.xcassets in Resources */,
+				30A396432F908D4800D441A0 /* GoogleService-Info.plist in Resources */,
+				30227F972FB0E88C0000C3B4 /* Localizable.xcstrings in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		304F73C12F830A8800F67563 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		304F73CE2F830A8900F67563 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_LOCALIZABILITY_NONLOCALIZED = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEVELOPMENT_TEAM = 99T9ZS3UCQ;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.4;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = iphoneos;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+			};
+			name = Debug;
+		};
+		304F73CF2F830A8900F67563 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_LOCALIZABILITY_NONLOCALIZED = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_TEAM = 99T9ZS3UCQ;
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.4;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				SDKROOT = iphoneos;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		304F73D12F830A8900F67563 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
+				CODE_SIGN_ENTITLEMENTS = VigilantEar/VigilantEar.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 99T9ZS3UCQ;
+				ENABLE_PREVIEWS = NO;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = VigilantEar/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = VigilantEar;
+				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.entertainment";
+				INFOPLIST_KEY_NSLocationAlwaysAndWhenInUseUsageDescription = "VigilantEar needs background location to continuously track your position while monitoring sounds.";
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "VigilantEar uses your location to show where detected sounds are coming from on the map.";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "VigilantEar needs microphone access to detect sounds around you in real time.";
+				INFOPLIST_KEY_NSMotionUsageDescription = "VigilantEar uses the device's motion sensors to determine the real-world direction of detected sounds.";
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UIStatusBarStyle = "";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0.56;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.rpalm01-star.VigilantEar";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_STRICT_MEMORY_SAFETY = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Debug;
+		};
+		304F73D22F830A8900F67563 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
+				CODE_SIGN_ENTITLEMENTS = VigilantEar/VigilantEar.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 99T9ZS3UCQ;
+				ENABLE_PREVIEWS = NO;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = VigilantEar/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = VigilantEar;
+				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.entertainment";
+				INFOPLIST_KEY_NSLocationAlwaysAndWhenInUseUsageDescription = "VigilantEar needs background location to continuously track your position while monitoring sounds.";
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "VigilantEar uses your location to show where detected sounds are coming from on the map.";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "VigilantEar needs microphone access to detect sounds around you in real time.";
+				INFOPLIST_KEY_NSMotionUsageDescription = "VigilantEar uses the device's motion sensors to determine the real-world direction of detected sounds.";
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UIStatusBarStyle = "";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0.56;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.rpalm01-star.VigilantEar";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_STRICT_MEMORY_SAFETY = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		304F73C02F830A8800F67563 /* Build configuration list for PBXProject "VigilantEar" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				304F73CE2F830A8900F67563 /* Debug */,
+				304F73CF2F830A8900F67563 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		304F73D02F830A8900F67563 /* Build configuration list for PBXNativeTarget "VigilantEar" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				304F73D12F830A8900F67563 /* Debug */,
+				304F73D22F830A8900F67563 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		302387C92FB2266F00BDF685 /* XCRemoteSwiftPackageReference "swift-markdown-ui" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/gonzalezreal/swift-markdown-ui";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.4.1;
+			};
+		};
+		302387CC2FB23E2800BDF685 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/firebase/firebase-ios-sdk";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 12.13.0;
+			};
+		};
+		3085368A2FAD99B600E7AC60 /* XCRemoteSwiftPackageReference "SoundML" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/chrisladd/SoundML";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 0.2.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		302387CA2FB2266F00BDF685 /* MarkdownUI */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 302387C92FB2266F00BDF685 /* XCRemoteSwiftPackageReference "swift-markdown-ui" */;
+			productName = MarkdownUI;
+		};
+		3023882C2FB243C400BDF685 /* FirebaseCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 302387CC2FB23E2800BDF685 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseCore;
+		};
+		3023882E2FB243D000BDF685 /* FirebaseFirestore */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 302387CC2FB23E2800BDF685 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseFirestore;
+		};
+		3085368B2FAD99B600E7AC60 /* SoundML */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 3085368A2FAD99B600E7AC60 /* XCRemoteSwiftPackageReference "SoundML" */;
+			productName = SoundML;
+		};
+/* End XCSwiftPackageProductDependency section */
+	};
+	rootObject = 304F73BD2F830A8800F67563 /* Project object */;
+}
