@@ -1,0 +1,36 @@
+# --- Xcode ---
+# Build artifacts
+build/
+DerivedData/
+
+# User-specific settings (Window positions, open tabs, etc.)
+*.xcuserdata
+*.mode1v3
+*.mode2v3
+*.perspectivev3
+
+# Prevent committing the actual Xcode project workspace data
+!default.mode1v3
+!default.mode2v3
+!default.perspectivev3
+
+# --- Swift Package Manager ---
+.build/
+.swiftpm/
+
+# --- Dependency Managers ---
+# If you use CocoaPods (unlikely in 2026, but just in case)
+Pods/
+# If you use Carthage
+Carthage/Build/
+
+# --- macOS System Files ---
+.DS_Store
+*.swp
+*~
+
+# --- Security & API Keys ---
+# This is crucial for your Google Maps SDK integration
+*.env
+secrets.swift
+Keys.plist
