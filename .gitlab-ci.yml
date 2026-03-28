@@ -1,0 +1,21 @@
+stages:
+  - build
+  - test
+
+variables:
+  XCODE_PROJECT: "com.rpalm.vigilantEar/VigilantEar.xcodeproj"
+  XCODE_SCHEME: "VigilantEar"
+
+build_project:
+  stage: build
+  script:
+    - xcodebuild -project "$XCODE_PROJECT" -scheme "$XCODE_SCHEME" build CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO
+  tags:
+    - macos
+
+run_tests:
+  stage: test
+  script:
+    - xcodebuild -project "$XCODE_PROJECT" -scheme "$XCODE_SCHEME" test -destination 'platform=iOS Simulator,name=iPhone 16,OS=18.0'
+  tags:
+    - macos
