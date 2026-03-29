@@ -3,7 +3,7 @@ import Accelerate
 import AVFoundation
 
 class TDOAProcessor {
-    private let micDistance: Double = 0.15 // 15cm approximation for iPhone/Mac array
+    private let micDistance = HardwareCalibration.micBaseline
     private let speedOfSound: Double = 343.0 // meters per second
     
     /// Calculates the Angle of Arrival (θ) in degrees
