@@ -1,50 +1,27 @@
-import Foundation
 import AVFoundation
-import Observation
 
-@Observable
-class MicrophoneManager {
-    private let audioEngine = AVAudioEngine()
-    var currentDecibels: Float = -160.0
+class MicrophoneManager: ObservableObject {
+    private let engine = AVAudioEngine()
+    private let coordinator = AcousticCoordinator()
     
-    // New: Stubs for your Doppler and TDOA math
-    var estimatedFrequency: Double = 0.0
-    var estimatedAngle: Double = 0.0
+    @Published var lastEvent: SoundEvent?
 
-    init() {
-        setupAudioEngine()
-    }
+    func startCapturing() {
+        let inputNode = engine.inputNode
+        let format = inputNode.outputFormat(forBus: 0)
 
-    private func setupAudioEngine() {
-        let inputNode = audioEngine.inputNode
-        let recordingFormat = inputNode.outputFormat(forBus: 0)
-
-        // Install a 'tap' to get raw buffers 10 times a second
-        inputNode.installTap(onBus: 0, bufferSize: 4410, format: recordingFormat) { (buffer, time) in
-            self.analyzeBuffer(buffer)
-        }
-
-        do {
-            try audioEngine.start()
-        } catch {
-            print("Audio Engine failed to start: \(error)")
-        }
-    }
-
-    private func analyzeBuffer(_ buffer: AVAudioPCMBuffer) {
-        // 1. Calculate Decibels
-        let frameLength = UInt32(buffer.frameLength)
-        if let data = buffer.floatChannelData?[0] {
-            var sum: Float = 0
-            for i in 0..<Int(frameLength) {
-                sum += data[i] * data[i]
+        // 4096 is the "Magic Number" for our FFT math
+        inputNode.installTap(onBus: 0, bufferSize: 4096, format: format) { buffer, time in
+            // Move physics to a background thread to keep the UI (Radar) smooth
+            DispatchQueue.global(qos: .userInteractive).async {
+                let event = self.coordinator.processBuffer(buffer, classification: "Unknown", confidence: 0.0)
+                
+                DispatchQueue.main.async {
+                    self.lastEvent = event
+                }
             }
-            let rms = sqrt(sum / Float(frameLength))
-            self.currentDecibels = 20 * log10(rms)
         }
-
-        // 2. TODO: Insert FFT logic for Doppler Effect (Frequency Shift)
         
-        // 3. TODO: Insert Phase Analysis for TDOA (Angle of Arrival)
+        try? engine.start()
     }
 }
