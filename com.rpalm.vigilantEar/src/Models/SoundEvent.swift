@@ -1,6 +1,13 @@
 import Foundation
 import SwiftUI
 
+// In RadarView.swift, apply the blur for ambient blobs
+Circle()
+    .fill(event.color)
+    .opacity(event.isAmbient ? 0.3 : 1.0)
+    .blur(radius: event.isAmbient ? 10 : 0) // The "Blob" effect
+
+
 struct SoundEvent: Identifiable, Codable {
     let id: UUID
     let timestamp: Date
@@ -36,4 +43,10 @@ struct SoundEvent: Identifiable, Codable {
         default: return .gray
         }
     }
+    
+    // Add to the SoundEvent struct
+    var isAmbient: Bool {
+        return confidence < 0.4 || classification == "background_noise"
+    }
+
 }
