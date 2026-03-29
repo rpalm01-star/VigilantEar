@@ -18,7 +18,9 @@ struct RadarView: View {
                 
                 // 2. User Location (The Origin)
                 Circle()
-                    .fill(.white)
+                    .fill(event.color)
+                    .opacity(event.isAmbient ? 0.3 : 1.0)
+                    .blur(radius: event.isAmbient ? 10 : 0) // The "Blob" effect
                     .frame(width: 12, height: 12)
                     .shadow(color: .blue.opacity(0.5), radius: 5)
                 
