@@ -18,6 +18,9 @@ struct SoundEvent: Identifiable, Codable {
     var confidence: Double     // 0.0 to 1.0 (from Core ML)
     var classification: String // "Motorcycle", "Siren", etc.
     
+    // Historical position data
+    var history: [Breadcrumb]
+    
     // Positional Logic (Calculated)
     var angle: Double          // 0 to 360 (TDOA)
     
