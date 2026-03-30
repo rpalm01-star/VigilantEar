@@ -1,3 +1,9 @@
+## Development Setup (No Mac Required Yet)
+This project is now a Swift Package. When you have a Mac:
+1. `git clone` this repo
+2. Open `Package.swift` in Xcode 16+
+3. Build & run on a physical iPhone (iOS 18+)
+
 # VigilantEar 👂🛰️
 
 **VigilantEar** is an iOS-based acoustic research and accessibility tool designed to monitor urban noise pollution and provide real-time directional awareness for the deaf and hard-of-hearing (D/HH) community.
