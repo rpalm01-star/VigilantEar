@@ -1,0 +1,12 @@
+<key>NSMicrophoneUsageDescription</key>
+<string>VigilantEar requires microphone access to monitor ambient noise pollution and detect emergency sirens.</string>
+
+<key>UIBackgroundModes</key>
+<array>
+    <string>audio</string>
+    <string>location</string>
+    <string>processing</string>
+</array>
+
+<key>NSLocationWhenInUseUsageDescription</key>
+<string>VigilantEar uses your location to map noise pollution events to Google Maps for acoustic research.</string>
