@@ -13,9 +13,9 @@ let package = Package(
     targets: [
         .executableTarget(
             name: "VigilantEar",
-            path: "Sources",                                      // keeps your folder layout
-            sources: ["App", "Core", "Features", "Models"],
-            resources: [.process("Info.plist")]
+            path: "Sources",
+            exclude: ["Info.plist"],
+            sources: ["App", "Core", "Features", "Models"]
         ),
         .testTarget(
             name: "VigilantEarTests",
