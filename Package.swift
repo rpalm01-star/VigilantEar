@@ -12,15 +12,18 @@ let package = Package(
     ],
     targets: [
         .executableTarget(
-            name: "VigilantEar",
-            path: "Sources",
-            sources: ["App", "Core", "Features", "Models"],
-            linkerSettings: [
-                .unsafeFlags([
-                    "-sectcreate", "__TEXT", "__info_plist", "Sources/Info.plist"
-                ])
-            ]
-        ),
+                    name: "VigilantEar",
+                    dependencies: [
+                        .product(name: "GoogleMaps", package: "ios-maps-sdk")
+                    ],
+                    path: "Sources",
+                    sources: ["App", "Core", "Features", "Models"],
+                    linkerSettings: [
+                        .unsafeFlags([
+                            "-sectcreate", "__TEXT", "__info_plist", "Sources/Info.plist"
+                        ])
+                    ]
+                ),
         .testTarget(
             name: "VigilantEarTests",
             dependencies: ["VigilantEar"]
