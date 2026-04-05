@@ -37,7 +37,7 @@ $$\Delta t = \frac{d \cdot \cos(\theta)}{v_s}$$
 
 ### Prerequisites
 
-  - **Xcode 26+**
+  - **Xcode 16+**
   - A Mac (Apple Silicon M1-M5) or a Cloud Mac instance.
   - An Apple Developer account (for Background Mode and Critical Alert testing).
 
@@ -47,9 +47,9 @@ $$\Delta t = \frac{d \cdot \cos(\theta)}{v_s}$$
     ```bash
     git clone https://github.com/rpalm01-star/VigilantEar.git
     ```
-2.  Open `Package.swift` in Xcode.
-3.  Ensure the **"Audio, AirPlay, and Picture in Picture"** background mode is enabled in the *Signing & Capabilities* tab.
-4.  Build & run on a physical iPhone (iOS 18+)
+2.  Open `Package.swift` in Xcode 16+ (or later)
+3.  Enable**"Audio, AirPlay, and Picture in Picture"** background mode + Criticl Alerts entitlement.
+4.  Build & run on a physical iPhone 13+ running iOS 18+.
 
 -----
 
