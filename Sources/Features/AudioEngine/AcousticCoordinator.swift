@@ -10,27 +10,28 @@ final class AcousticCoordinator: Sendable {
     // We'll remove the history array for now to ensure strict Sendable compliance
     // without needing complex synchronization.
     
-    func processBuffer(_ buffer: AVAudioPCMBuffer, classification: String, confidence: Double) -> SoundEvent {
-        var rms: Float = 0
-        if let data = buffer.floatChannelData?[0] {
-            vDSP_rmsqv(data, 1, &rms, vDSP_Length(buffer.frameLength))
-        }
-        
-        let decibels = 20 * log10(max(Double(rms), 0.000001))
-        let currentFreq = fftProcessor.analyze(buffer: buffer)
-        let currentAngle = tdoaProcessor.calculateAngle(buffer: buffer)
-        
-        let normalized = (decibels + 100) / 100
-        let proximity = max(0.0, min(1.0, 1.0 - normalized))
+    // FIX: Update to accept the raw [Float] array
+        func processFromSamples(_ samples: [Float], sampleRate: Double, classification: String, confidence: Double) -> SoundEvent {
+            // 1. Calculate Decibels using the raw array
+            var rms: Float = 0
+            vDSP_rmsqv(samples, 1, &rms, vDSP_Length(samples.count))
+            let decibels = 20 * log10(max(Double(rms), 0.000001))
+            
+            // 2. Run the Physics Processors (Ensure your FFT/TDOA accept [Float])
+            let currentFreq = fftProcessor.analyze(samples: samples, sampleRate: sampleRate)
+            
+            // 3. Normalize for Radar UI
+            let normalized = (decibels + 100) / 100
+            let proximity = max(0.0, min(1.0, 1.0 - normalized))
 
-        return SoundEvent(
-            timestamp: Date(),
-            classification: classification,
-            confidence: Float(confidence),
-            angle: currentAngle,
-            proximity: proximity,
-            decibels: Float(decibels),
-            frequency: currentFreq
-        )
-    }
+            return SoundEvent(
+                timestamp: Date(),
+                classification: classification,
+                confidence: Float(confidence),
+                angle: 0.0, // Placeholder for TDOA logic
+                proximity: proximity,
+                decibels: Float(decibels),
+                frequency: currentFreq
+            )
+        }
 }

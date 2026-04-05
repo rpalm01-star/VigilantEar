@@ -3,6 +3,7 @@ import Foundation
 import UIKit
 #endif
 
+@MainActor
 struct HardwareCalibration {
     /// Returns the physical distance (in meters) between the primary mic array
     static var micBaseline: Double {
@@ -15,10 +16,10 @@ struct HardwareCalibration {
         #endif
     }
     
-    /// Returns the device-specific identifier for research logging
     static var deviceModel: String {
         return UIDevice.current.modelName
     }
+
 }
 
 // Extension to get human-readable model names (e.g., "iPhone 15 Pro")

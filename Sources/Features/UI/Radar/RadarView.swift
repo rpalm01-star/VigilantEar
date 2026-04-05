@@ -1,63 +1,97 @@
 import SwiftUI
 
 struct RadarView: View {
+    /// The collection of acoustic events captured by the MicrophoneManager
     let events: [SoundEvent]
     
     var body: some View {
         GeometryReader { geometry in
-            let center = CGPoint(x: geometry.size.width / 2, y: geometry.size.height / 2)
-            let radius = min(geometry.size.width, geometry.size.height) / 2
-            
             ZStack {
-                // 1. Background Grid (Concentric Circles representing dB thresholds)
-                ForEach(1...4, id: \.self) { i in
-                    Circle()
-                        .stroke(Color.gray.opacity(0.15), lineWidth: 1)
-                        .frame(width: (radius * 2) * CGFloat(i) / 4)
-                }
+                // 1. Radar Background (Circular Grids)
+                RadarBackgroundView()
                 
-                // 2. User Origin (The Research Point)
-                Circle()
-                    .fill(.white)
-                    .frame(width: 10, height: 10)
-                    .shadow(color: .blue.opacity(0.8), radius: 4)
+                // 2. Dynamic Sweep Animation
+                RadarSweepView()
                 
-                // 3. Dynamic Acoustic Objects
+                // 3. Acoustic Event Plotting
+                // FIX: Standard ForEach for Identifiable arrays (no '$' or Binding)
                 ForEach(events) { event in
-                    ZStack {
-                        // A. The History Trail (Breadcrumbs)
-                        // Only show trails for high-confidence "Vessels" (Motorcycles/Sirens)
-                        if !event.isAmbient {
-                            ForEach(event.history) { crumb in
-                                Circle()
-                                    .fill(event.color)
-                                    .opacity(crumb.opacity * 0.3)
-                                    .frame(width: event.visualSize * 0.4, height: event.visualSize * 0.4)
-                                    .offset(y: -CGFloat(crumb.radialProx) * radius)
-                                    .rotationEffect(.degrees(crumb.angle))
-                            }
-                        }
-                        
-                        // B. The Active Sound "Head"
-                        Circle()
-                            .fill(event.color.gradient)
-                            .frame(width: event.visualSize, height: event.visualSize)
-                            // Ambient noise gets the "Grey Blob" treatment
-                            .opacity(event.isAmbient ? 0.3 : 1.0)
-                            .blur(radius: event.isAmbient ? 12 : 0)
-                            
-                            // Proximity Mapping: Border (1.0) to Center (0.0)
-                            .offset(y: -CGFloat(event.radialProx) * radius)
-                            .rotationEffect(.degrees(event.angle))
-                            
-                            // Dynamic Animations for M4 120Hz ProMotion
-                            .animation(.smooth(duration: 0.6), value: event.radialProx)
-                            .animation(.spring(response: 0.4, dampingFraction: 0.6), value: event.angle)
+                    // Only render if the event is not classified as ambient noise
+                    if !event.classification.contains("Ambient") {
+                        RadarDotView(
+                            event: event,
+                            size: geometry.size
+                        )
+                        .transition(.opacity.combined(with: .scale))
                     }
                 }
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(Color.black) // High-contrast for research
+            .background(Color.black)
+            .clipShape(Circle())
+            .overlay(Circle().stroke(Color.green.opacity(0.2), lineWidth: 1))
+        }
+        .aspectRatio(1, contentMode: .fit)
+        .padding()
+    }
+}
+
+// MARK: - Subviews
+
+struct RadarDotView: View {
+    let event: SoundEvent
+    let size: CGSize
+    
+    var body: some View {
+        let position = calculatePosition(for: event, in: size)
+        
+        Circle()
+            .fill(event.confidence > 0.8 ? Color.red : Color.yellow)
+            .frame(width: 8, height: 8)
+            .shadow(color: .green, radius: 4)
+            .position(position)
+    }
+    
+    private func calculatePosition(for event: SoundEvent, in size: CGSize) -> CGPoint {
+        let center = CGPoint(x: size.width / 2, y: size.height / 2)
+        let radius = (size.width / 2) * CGFloat(event.proximity)
+        let angle = CGFloat(event.angle) * (.pi / 180)
+        
+        return CGPoint(
+            x: center.x + radius * cos(angle),
+            y: center.y + radius * sin(angle)
+        )
+    }
+}
+
+struct RadarBackgroundView: View {
+    var body: some View {
+        ZStack {
+            ForEach(1...4, id: \.self) { i in
+                Circle()
+                    .stroke(Color.green.opacity(0.15), lineWidth: 1)
+                    .scaleEffect(CGFloat(i) * 0.25)
+            }
+            
+            // Axis Lines
+            Rectangle().fill(Color.green.opacity(0.1)).frame(width: 1)
+            Rectangle().fill(Color.green.opacity(0.1)).frame(height: 1)
+        }
+    }
+}
+
+struct RadarSweepView: View {
+    @State private var rotation: Double = 0
+    
+    var body: some View {
+        AngularGradient(
+            gradient: Gradient(colors: [.green.opacity(0.5), .clear]),
+            center: .center
+        )
+        .rotationEffect(.degrees(rotation))
+        .onAppear {
+            withAnimation(.linear(duration: 4).repeatForever(autoreverses: false)) {
+                rotation = 360
+            }
         }
     }
 }

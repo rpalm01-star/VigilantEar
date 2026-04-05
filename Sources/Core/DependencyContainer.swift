@@ -1,26 +1,29 @@
-import Foundation
 import SwiftUI
 
-@Observable
+/// Main-actor isolated dependency container for VigilantEar services.
 @MainActor
 final class DependencyContainer {
     static let shared = DependencyContainer()
     
-    var acousticCoordinator: AcousticCoordinator?
-    var microphoneManager: MicrophoneManager?
-    var permissionsManager: PermissionsManager?
-    var classificationService: ClassificationService?
+    // Services are initialized on the Main Actor
+    let classificationService = ClassificationService()
+    let microphoneManager = MicrophoneManager()
+    let acousticCoordinator = AcousticCoordinator()
     
     private init() {}
 }
 
-@MainActor
+/// Bridge for the SwiftUI Environment.
 struct DependencyContainerKey: EnvironmentKey {
-    static let defaultValue: DependencyContainer = .shared
+    // FIX: Provide a non-isolated entry point to the MainActor singleton.
+    // This resolves the "conformance crosses into main actor-isolated code" error.
+    static var defaultValue: DependencyContainer {
+        return MainActor.assumeIsolated { .shared }
+    }
 }
 
 extension EnvironmentValues {
-    var dependencies: DependencyContainer {
+    var dependencyContainer: DependencyContainer {
         get { self[DependencyContainerKey.self] }
         set { self[DependencyContainerKey.self] = newValue }
     }

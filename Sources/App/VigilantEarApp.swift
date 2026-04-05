@@ -2,28 +2,14 @@ import SwiftUI
 
 @main
 struct VigilantEarApp: App {
-    
+    // Initialize the container on the Main Actor
     @State private var dependencies = DependencyContainer.shared
-    
+
     var body: some Scene {
         WindowGroup {
             ContentView()
-                .environment(\.dependencies, dependencies)
+                // FIX: Inject using the correct KeyPath to resolve naming mismatches
+                .environment(\.dependencyContainer, dependencies)
         }
-    }
-    
-    init() {
-        let classificationService = ClassificationService()
-        let microphoneManager = MicrophoneManager()
-        let acousticCoordinator = AcousticCoordinator()
-        
-        dependencies.classificationService = classificationService
-        dependencies.microphoneManager = microphoneManager
-        dependencies.acousticCoordinator = acousticCoordinator
-        
-        // Start the audio engine (change this line if your method name is different)
-        microphoneManager.startCapturing()
-        
-        print("✅ VigilantEar services initialized")
     }
 }
