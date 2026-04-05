@@ -16,7 +16,7 @@ final class DependencyContainer {
 
 // MARK: - Environment Key
 struct DependencyContainerKey: EnvironmentKey {
-    static let defaultValue: DependencyContainer = .shared
+    nonisolated(unsafe) static let defaultValue: DependencyContainer = .shared
 }
 
 extension EnvironmentValues {

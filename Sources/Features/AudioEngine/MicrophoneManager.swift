@@ -1,22 +1,29 @@
 import AVFoundation
+import Foundation
 
-class MicrophoneManager: ObservableObject {
-    private let engine = AVAudioEngine()
-    private let coordinator = AcousticCoordinator()
+@MainActor
+@Observable
+final class MicrophoneManager {
     
-    @Published var lastEvent: SoundEvent?
-
+    private let engine = AVAudioEngine()
+    
+    // Injected from DependencyContainer
+    var coordinator: AcousticCoordinator?
+    
+    var lastEvent: SoundEvent?   // ← no @Published needed with @Observable
+    
     func startCapturing() {
+        guard let coordinator = coordinator else {
+            print("❌ MicrophoneManager: coordinator not injected")
+            return
+        }
+        
         let inputNode = engine.inputNode
         let format = inputNode.outputFormat(forBus: 0)
-
-        // 4096 is the "Magic Number" for our FFT math
+        
         inputNode.installTap(onBus: 0, bufferSize: 4096, format: format) { buffer, time in
-            // Move physics to a background thread to keep the UI (Radar) smooth
             DispatchQueue.global(qos: .userInteractive).async {
-                // Feed the same buffer to the live classifier
-                
-                let event = self.coordinator.processBuffer(buffer, classificationService?.analyzeAudioBuffer(buffer, at: time), confidence: 0.0)
+                let event = coordinator.processBuffer(buffer, at: time)
                 
                 DispatchQueue.main.async {
                     self.lastEvent = event
@@ -25,5 +32,6 @@ class MicrophoneManager: ObservableObject {
         }
         
         try? engine.start()
+        print("✅ MicrophoneManager started capturing")
     }
 }
