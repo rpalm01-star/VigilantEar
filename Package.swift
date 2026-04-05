@@ -13,9 +13,9 @@ let package = Package(
     targets: [
         .executableTarget(
             name: "VigilantEar",
-            path: "Sources",                                      // ← tells SPM where to look
-            sources: ["App", "Core", "Features", "Models"],       // ← explicitly list your folders
-            resources: [.process("Info.plist")]                   // ← copies your plist correctly
+            path: "Sources",                                      // keeps your folder layout
+            sources: ["App", "Core", "Features", "Models"],
+            resources: [.process("Info.plist")]
         ),
         .testTarget(
             name: "VigilantEarTests",
