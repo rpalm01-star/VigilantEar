@@ -10,14 +10,19 @@ let package = Package(
     dependencies: [
         // .package(url: "https://github.com/googlemaps/ios-maps-sdk", from: "10.10.0"),  // temporarily disabled
     ],
-    targets: [
-        .executableTarget(
-            name: "VigilantEar"
-            // dependencies: [.product(name: "GoogleMaps", package: "ios-maps-sdk")]  // temporarily disabled
-        ),
-        .testTarget(
-            name: "VigilantEarTests",
-            dependencies: ["VigilantEar"]
-        )
-    ]
+targets: [
+    .executableTarget(
+        name: "VigilantEar",
+        dependencies: [
+            .product(name: "GoogleMaps", package: "ios-maps-sdk")
+        ],
+        path: "Sources",                    // ← This tells SPM to look here
+        sources: ["App", "Core", "Features", "Models"],  // explicitly include your folders
+        resources: [.process("Info.plist")] // optional but good practice
+    ),
+    .testTarget(
+        name: "VigilantEarTests",
+        dependencies: ["VigilantEar"]
+    )
+]
 )
