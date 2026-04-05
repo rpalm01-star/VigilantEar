@@ -1,54 +1,36 @@
+import Foundation
 import Accelerate
 import AVFoundation
-import Foundation
 
-@MainActor
-@Observable
-final class AcousticCoordinator {
-    
-    var lastEvent: SoundEvent?
-    
+// FIX: Add Final and Sendable to allow background processing
+final class AcousticCoordinator: Sendable {
+    private let fftProcessor = FFTProcessor(sampleCount: 4096)
     private let tdoaProcessor = TDOAProcessor()
-    private let fftProcessor: FFTProcessor
-    private let hardwareCalibration = HardwareCalibration()
     
-    // Injected from DependencyContainer
-    var classificationService: ClassificationService?
+    // We'll remove the history array for now to ensure strict Sendable compliance
+    // without needing complex synchronization.
     
-    init() {
-        // 4096 matches the buffer size used in MicrophoneManager
-        self.fftProcessor = FFTProcessor(sampleCount: 4096)
-    }
-    
-    func processBuffer(_ buffer: AVAudioPCMBuffer, at time: AVAudioTime) -> SoundEvent? {
-        
-        // 1. Calculate loudness (RMS → dB)
+    func processBuffer(_ buffer: AVAudioPCMBuffer, classification: String, confidence: Double) -> SoundEvent {
         var rms: Float = 0
-        vDSP_rmsqv(buffer.floatChannelData?[0] ?? [], 1, &rms, vDSP_Length(buffer.frameLength))
-        let db = 20 * log10(max(rms, 0.00001))
+        if let data = buffer.floatChannelData?[0] {
+            vDSP_rmsqv(data, 1, &rms, vDSP_Length(buffer.frameLength))
+        }
         
-        // 2. Direction from TDOA
-        let angle = tdoaProcessor.calculateAngle(from: buffer)
+        let decibels = 20 * log10(max(Double(rms), 0.000001))
+        let currentFreq = fftProcessor.analyze(buffer: buffer)
+        let currentAngle = tdoaProcessor.calculateAngle(buffer: buffer)
         
-        // 3. Dominant frequency (for Doppler)
-        let dominantFreq = fftProcessor.dominantFrequency(from: buffer)
-        
-        // 4. Real classification from SoundAnalysis
-        let classification = classificationService?.currentClassification ?? "Unknown"
-        let confidence = classificationService?.confidence ?? 0.0
-        
-        // 5. Proximity (0.0 = far, 1.0 = very close)
-        let proximity = min(max((db - 60) / 40, 0.0), 1.0)
-        
-        // 6. Create event
-        let event = SoundEvent(
+        let normalized = (decibels + 100) / 100
+        let proximity = max(0.0, min(1.0, 1.0 - normalized))
+
+        return SoundEvent(
+            timestamp: Date(),
             classification: classification,
-            confidence: confidence,
-            angle: angle,
-            proximity: proximity
+            confidence: Float(confidence),
+            angle: currentAngle,
+            proximity: proximity,
+            decibels: Float(decibels),
+            frequency: currentFreq
         )
-        
-        lastEvent = event
-        return event
     }
 }

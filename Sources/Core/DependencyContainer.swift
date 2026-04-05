@@ -2,6 +2,7 @@ import Foundation
 import SwiftUI
 
 @Observable
+@MainActor
 final class DependencyContainer {
     static let shared = DependencyContainer()
     
@@ -13,6 +14,7 @@ final class DependencyContainer {
     private init() {}
 }
 
+@MainActor
 struct DependencyContainerKey: EnvironmentKey {
     static let defaultValue: DependencyContainer = .shared
 }

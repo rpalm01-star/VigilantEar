@@ -2,7 +2,8 @@ import Foundation
 import Accelerate
 import AVFoundation
 
-class FFTProcessor {
+final class FFTProcessor: Sendable {
+    private let sampleCount: Int
     private let log2n: vDSP_Length
     private let fftSetup: FFTSetup
     
@@ -10,6 +11,7 @@ class FFTProcessor {
         // sampleCount should be a power of 2 (e.g., 1024 or 4096)
         self.log2n = vDSP_Length(log2(Double(sampleCount)))
         self.fftSetup = vDSP_create_fftsetup(log2n, FFTRadix(kFFTRadix2))!
+        self.sampleCount = sampleCount
     }
     
     deinit {

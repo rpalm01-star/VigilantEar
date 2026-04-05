@@ -2,7 +2,7 @@ import Foundation
 import Accelerate
 import AVFoundation
 
-class TDOAProcessor {
+final class TDOAProcessor: Sendable {
     private let micDistance = HardwareCalibration.micBaseline
     private let speedOfSound: Double = 343.0 // meters per second
     
