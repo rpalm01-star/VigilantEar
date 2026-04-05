@@ -8,11 +8,14 @@ let package = Package(
         .executable(name: "VigilantEar", targets: ["VigilantEar"])
     ],
     dependencies: [
-        .package(url: "https://github.com/googlemaps/ios-maps-sdk", from: "10.10.0")  // re-enabled
+        .package(url: "https://github.com/googlemaps/ios-maps-sdk", from: "10.10.0")  // latest stable
     ],
     targets: [
         .executableTarget(
             name: "VigilantEar",
+            dependencies: [
+                .product(name: "GoogleMaps", package: "ios-maps-sdk")
+            ],
             path: "Sources",
             exclude: ["Info.plist"],
             sources: ["App", "Core", "Features", "Models"]
