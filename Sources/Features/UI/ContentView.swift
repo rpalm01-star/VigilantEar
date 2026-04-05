@@ -1,17 +1,18 @@
 import SwiftUI
 
 struct ContentView: View {
+    @Environment(\.dependencyContainer) private var dependencies
+    
     var body: some View {
         ZStack {
             Color.black.ignoresSafeArea()
             
-            VStack {
+            VStack(spacing: 20) {
                 Text("VIGILANT EAR")
-                    .font(.largeTitle)
+                    .font(.largeTitle.bold())
                     .foregroundStyle(.green)
-                    .padding()
                 
-                RadarView(events: [])   // safe empty start
+                RadarView(events: [])   // safe for now
                 
                 Text("Microphone ready – make some noise")
                     .foregroundStyle(.green.opacity(0.7))
@@ -22,4 +23,5 @@ struct ContentView: View {
 
 #Preview {
     ContentView()
+        .environment(\.dependencyContainer, DependencyContainer.shared)
 }

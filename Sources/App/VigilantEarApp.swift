@@ -12,7 +12,7 @@ struct VigilantEarApp: App {
     var body: some Scene {
         WindowGroup {
             ContentView()
-                .environment(\.dependencyContainer, dependencies)   // ← THIS WAS MISSING
+                .environment(\.dependencyContainer, dependencies)           // ← THIS WAS MISSING
                 .environmentObject(dependencies.classificationService)
                 .environmentObject(dependencies.microphoneManager)
         }
