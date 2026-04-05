@@ -12,8 +12,10 @@ let package = Package(
     ],
     targets: [
         .executableTarget(
-            name: "VigilantEar"
-            // dependencies: [.product(name: "GoogleMaps", package: "ios-maps-sdk")]  // temporarily disabled
+            name: "VigilantEar",
+            path: "Sources",                                      // ← tells SPM where to look
+            sources: ["App", "Core", "Features", "Models"],       // ← explicitly list your folders
+            resources: [.process("Info.plist")]                   // ← copies your plist correctly
         ),
         .testTarget(
             name: "VigilantEarTests",
