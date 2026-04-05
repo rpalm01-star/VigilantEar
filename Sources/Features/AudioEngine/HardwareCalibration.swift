@@ -1,5 +1,7 @@
 import Foundation
+#if canImport(UIKit)
 import UIKit
+#endif
 
 struct HardwareCalibration {
     /// Returns the physical distance (in meters) between the primary mic array

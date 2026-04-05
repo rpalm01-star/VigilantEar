@@ -1,25 +1,32 @@
-import Observation
 import SwiftUI
 
 @main
-VigilantEarApp()
-    .environment(\.dependencies, DependencyContainer.shared)
-
 struct VigilantEarApp: App {
-
-    // These live for the entire life of the process
-    @State private var permissions = PermissionsManager()
-    @State private var micManager = MicrophoneManager()
+    
+    @State private var dependencies = DependencyContainer.shared
     
     var body: some Scene {
         WindowGroup {
-            if permissions.isMicrophoneAuthorized {
-                // The "Liquid Glass" UI starts here
-                ContentView(micManager: micManager)
-            } else {
-                // Onboarding view to request access
-                PermissionRequestView(permissions: permissions)
-            }
+            ContentView()
+                .environment(\.dependencies, dependencies)
+                .onAppear(perform: setupServices)
         }
+    }
+    
+    private func setupServices() {
+        // Initialize all services
+        let classificationService = ClassificationService()
+        let microphoneManager = MicrophoneManager()
+        let acousticCoordinator = AcousticCoordinator()
+        
+        // Inject into the shared dependency container
+        dependencies.classificationService = classificationService
+        dependencies.microphoneManager = microphoneManager
+        dependencies.acousticCoordinator = acousticCoordinator
+        
+        // Start the audio pipeline
+        microphoneManager.startMonitoring()
+        
+        print("✅ VigilantEar services initialized successfully")
     }
 }

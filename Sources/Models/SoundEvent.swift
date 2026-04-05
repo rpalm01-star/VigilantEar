@@ -1,55 +1,59 @@
-import Foundation
 import SwiftUI
+import CoreLocation
 
-// In RadarView.swift, apply the blur for ambient blobs
-Circle()
-    .fill(event.color)
-    .opacity(event.isAmbient ? 0.3 : 1.0)
-    .blur(radius: event.isAmbient ? 10 : 0) // The "Blob" effect
-
-
-struct SoundEvent: Identifiable, Codable {
-    let id: UUID
+@Observable
+final class SoundEvent: Identifiable {
+    let id = UUID()
     let timestamp: Date
+    let classification: String
+    let confidence: Float
     
-    // Raw Acoustic Data
-    var decibels: Float        // -160 to 0
-    var frequency: Double      // Hz
-    var confidence: Double     // 0.0 to 1.0 (from Core ML)
-    var classification: String // "Motorcycle", "Siren", etc.
+    // Direction & proximity from TDOA + Doppler
+    let angle: Double?          // degrees (0° = straight ahead, positive = clockwise)
+    let proximity: Double       // 0.0 (far) → 1.0 (very close)
     
-    // Historical position data
-    var history: [Breadcrumb]
-    
-    // Positional Logic (Calculated)
-    var angle: Double          // 0 to 360 (TDOA)
-    
-    /// Maps dB to a radial distance from the center (0.0 is center, 1.0 is border)
-    var radialProx: Double {
-        // Normalizing dB to a 0-1 scale where louder is closer (smaller value)
-        let normalized = Double((decibels + 100) / 100) 
-        return max(0.0, min(1.0, 1.0 - normalized))
+    // Computed visualization properties for RadarView
+    var radialProximity: Double {
+        proximity
     }
     
-    /// Maps proximity to visual size (Bigger when closer to center)
     var visualSize: CGFloat {
-        let minSize: CGFloat = 12.0
-        let maxSize: CGFloat = 60.0
-        // As radialProx approaches 0 (center), size approaches maxSize
-        return maxSize - (CGFloat(radialProx) * (maxSize - minSize))
+        CGFloat(20 + (proximity * 60))
     }
     
     var color: Color {
         switch classification.lowercased() {
-        case "siren": return .red
-        case "motorcycle": return .orange
-        default: return .gray
+        case "siren", "emergency", "police":
+            return .red
+        case "motorcycle", "engine", "car":
+            return .orange
+        case "horn", "car_horn":
+            return .yellow
+        default:
+            return .blue
         }
     }
     
-    // Add to the SoundEvent struct
     var isAmbient: Bool {
-        return confidence < 0.4 || classification == "background_noise"
+        confidence < 0.6
     }
-
+    
+    // Optional location (for logging / Google Maps)
+    var location: CLLocationCoordinate2D?
+    
+    init(
+        timestamp: Date = Date(),
+        classification: String,
+        confidence: Float,
+        angle: Double? = nil,
+        proximity: Double,
+        location: CLLocationCoordinate2D? = nil
+    ) {
+        self.timestamp = timestamp
+        self.classification = classification
+        self.confidence = confidence
+        self.angle = angle
+        self.proximity = proximity
+        self.location = location
+    }
 }

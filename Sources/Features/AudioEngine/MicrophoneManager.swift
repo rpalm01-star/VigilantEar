@@ -14,7 +14,9 @@ class MicrophoneManager: ObservableObject {
         inputNode.installTap(onBus: 0, bufferSize: 4096, format: format) { buffer, time in
             // Move physics to a background thread to keep the UI (Radar) smooth
             DispatchQueue.global(qos: .userInteractive).async {
-                let event = self.coordinator.processBuffer(buffer, classification: "Unknown", confidence: 0.0)
+                // Feed the same buffer to the live classifier
+                
+                let event = self.coordinator.processBuffer(buffer, classificationService?.analyzeAudioBuffer(buffer, at: time), confidence: 0.0)
                 
                 DispatchQueue.main.async {
                     self.lastEvent = event

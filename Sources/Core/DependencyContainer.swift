@@ -1,10 +1,3 @@
-//
-//  File.swift
-//  VigilantEar
-//
-//  Created by Robert Palmer on 4/4/26.
-//
-
 import Foundation
 import SwiftUI
 
@@ -15,6 +8,7 @@ final class DependencyContainer {
     var acousticCoordinator: AcousticCoordinator?
     var microphoneManager: MicrophoneManager?
     var permissionsManager: PermissionsManager?
+    var classificationService: ClassificationService?   // ← NEW
     
     private init() {}
 }

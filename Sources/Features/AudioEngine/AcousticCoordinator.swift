@@ -2,6 +2,7 @@ import Foundation
 import AVFoundation
 
 class AcousticCoordinator {
+    var classificationService: ClassificationService?
     private let fftProcessor = FFTProcessor(sampleCount: 4096)
     private let tdoaProcessor = TDOAProcessor()
     
