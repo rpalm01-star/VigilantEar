@@ -6,7 +6,7 @@ import UIKit
 @MainActor
 struct HardwareCalibration {
     /// Returns the physical distance (in meters) between the primary mic array
-    static var micBaseline: Double {
+    nonisolated static var micBaseline: Double {      // ← just add "nonisolated"
         #if targetEnvironment(simulator) || os(macOS)
         // M4 MacBook Air "Studio Quality" 3-mic array spacing
         return 0.20 // ~20cm across the top/side chassis
@@ -16,10 +16,11 @@ struct HardwareCalibration {
         #endif
     }
     
-    static var deviceModel: String {
+    /// Returns the device-specific identifier for research logging
+    @MainActor
+    static var deviceModel: String {                  // ← leave this one alone (it needs MainActor)
         return UIDevice.current.modelName
     }
-
 }
 
 // Extension to get human-readable model names (e.g., "iPhone 15 Pro")
