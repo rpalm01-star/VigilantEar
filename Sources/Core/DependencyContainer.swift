@@ -1,25 +1,27 @@
-// swift-tools-version: 6.0
-import PackageDescription
+import Foundation
+import SwiftUI
 
-let package = Package(
-    name: "VigilantEar",
-    platforms: [.iOS(.v18)],
-    products: [
-        .executable(name: "VigilantEar", targets: ["VigilantEar"])
-    ],
-    dependencies: [
-        .package(url: "https://github.com/googlemaps/ios-maps-sdk", from: "10.10.0")
-    ],
-    targets: [
-        .executableTarget(
-            name: "VigilantEar",
-            dependencies: [
-                .product(name: "GoogleMaps", package: "ios-maps-sdk")
-            ]
-        ),
-        .testTarget(
-            name: "VigilantEarTests",
-            dependencies: ["VigilantEar"]
-        )
-    ]
-)
+@MainActor
+@Observable
+final class DependencyContainer {
+    static let shared = DependencyContainer()
+    
+    var acousticCoordinator: AcousticCoordinator?
+    var microphoneManager: MicrophoneManager?
+    var permissionsManager: PermissionsManager?
+    var classificationService: ClassificationService?
+    
+    private init() {}
+}
+
+// MARK: - Environment Key
+struct DependencyContainerKey: EnvironmentKey {
+    static let defaultValue: DependencyContainer = .shared
+}
+
+extension EnvironmentValues {
+    var dependencies: DependencyContainer {
+        get { self[DependencyContainerKey.self] }
+        set { self[DependencyContainerKey.self] = newValue }
+    }
+}

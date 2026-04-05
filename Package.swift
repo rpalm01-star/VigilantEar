@@ -3,28 +3,21 @@ import PackageDescription
 
 let package = Package(
     name: "VigilantEar",
-    platforms: [
-        .iOS(.v18)          // ← This restricts everything to iOS only
-    ],
+    platforms: [.iOS(.v18)],
     products: [
-        .executable(
-            name: "VigilantEar",
-            targets: ["VigilantEar"]
-        ),
+        .executable(name: "VigilantEar", targets: ["VigilantEar"])
     ],
     dependencies: [
-        .package(url: "https://github.com/googlemaps/ios-maps-sdk", from: "10.10.0"),
+        // .package(url: "https://github.com/googlemaps/ios-maps-sdk", from: "10.10.0"),  // temporarily disabled
     ],
     targets: [
         .executableTarget(
-            name: "VigilantEar",
-            dependencies: [
-                .product(name: "GoogleMaps", package: "ios-maps-sdk")
-            ]
+            name: "VigilantEar"
+            // dependencies: [.product(name: "GoogleMaps", package: "ios-maps-sdk")]  // temporarily disabled
         ),
         .testTarget(
             name: "VigilantEarTests",
             dependencies: ["VigilantEar"]
-        ),
+        )
     ]
 )

@@ -9,24 +9,21 @@ struct VigilantEarApp: App {
         WindowGroup {
             ContentView()
                 .environment(\.dependencies, dependencies)
-                .onAppear(perform: setupServices)
         }
     }
     
-    private func setupServices() {
-        // Initialize all services
+    init() {
         let classificationService = ClassificationService()
         let microphoneManager = MicrophoneManager()
         let acousticCoordinator = AcousticCoordinator()
         
-        // Inject into the shared dependency container
         dependencies.classificationService = classificationService
         dependencies.microphoneManager = microphoneManager
         dependencies.acousticCoordinator = acousticCoordinator
         
-        // Start the audio pipeline
-        microphoneManager.startMonitoring()
+        // Start the audio engine (change this line if your method name is different)
+        microphoneManager.startCapturing()
         
-        print("✅ VigilantEar services initialized successfully")
+        print("✅ VigilantEar services initialized")
     }
 }
