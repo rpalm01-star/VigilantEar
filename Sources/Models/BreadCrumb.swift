@@ -1,7 +1,7 @@
 import Foundation
 import SwiftUI
 
-struct Breadcrumb: Identifiable, Equatable {
+struct BreadCrumb: Identifiable, Equatable {
     let id = UUID()
     let position: CGPoint
     let angle: Double
