@@ -1,9 +1,9 @@
 import Foundation
 
-/// Simple configuration system for VigilantEar
+@MainActor
 @Observable
 final class Configuration {
-    @MainActor static let shared = Configuration()
+    static let shared = Configuration()
     
     private(set) var items: [String: ConfigItem] = [:]
     
@@ -12,11 +12,10 @@ final class Configuration {
     }
     
     private func loadDefaults() {
-        // Default values for the app
-        items["micBaseline"] = ConfigItem(value: 0.12)           // meters between mics
-        items["speedOfSound"] = ConfigItem(value: 343.0)         // m/s
-        items["minDecibelThreshold"] = ConfigItem(value: 75.0)   // dB for alerts
-        items["confidenceThreshold"] = ConfigItem(value: 0.65)   // for classification
+        items["micBaseline"] = ConfigItem(value: 0.12)
+        items["speedOfSound"] = ConfigItem(value: 343.0)
+        items["minDecibelThreshold"] = ConfigItem(value: 75.0)
+        items["confidenceThreshold"] = ConfigItem(value: 0.65)
         items["backgroundModeEnabled"] = ConfigItem(value: true)
     }
     
@@ -33,27 +32,26 @@ final class Configuration {
     }
 }
 
-// MARK: - ConfigItem (self-contained, no external AnyCodable needed)
-
+// MARK: - ConfigItem
 struct ConfigItem: Codable, Equatable {
-    let value: AnyCodable   // lightweight wrapper defined below
+    let value: AnyCodable
     
     init<T>(value: T) {
         self.value = AnyCodable(value)
     }
 }
 
-// MARK: - Lightweight AnyCodable (included so no external dependency)
-
+// MARK: - AnyCodable
 struct AnyCodable: Codable, Equatable {
-    static func == (lhs: AnyCodable, rhs: AnyCodable) -> Bool {
-        <#code#>
-    }
-    
     let value: Any
     
     init<T>(_ value: T) {
         self.value = value
+    }
+    
+    static func == (lhs: AnyCodable, rhs: AnyCodable) -> Bool {
+        // Simple equality for our use case
+        String(describing: lhs.value) == String(describing: rhs.value)
     }
     
     init(from decoder: Decoder) throws {
