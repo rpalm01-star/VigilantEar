@@ -7,8 +7,7 @@ let package = Package(
         .iOS(.v18)
     ],
     products: [
-        // Main library product (Xcode will use this when you open the package)
-        .library(
+        .executable(
             name: "VigilantEar",
             targets: ["VigilantEar"]
         ),
@@ -18,14 +17,13 @@ let package = Package(
         // .package(url: "https://github.com/googlemaps/ios-maps-sdk", from: "8.0.0"),
     ],
     targets: [
-        .target(
+        .executableTarget(   // changed from .target → .executableTarget (important for an app)
             name: "VigilantEar",
-            dependencies: [],
-            resources: [.process("Resources")]  // for future Info.plist, images, etc.
+            // resources line removed — Info.plist is now at target root
+            resources: []
         ),
         .testTarget(
             name: "VigilantEarTests",
             dependencies: ["VigilantEar"]
         ),
-    ]
-)
+    ])

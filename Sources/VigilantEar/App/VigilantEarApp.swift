@@ -1,8 +1,12 @@
-import SwiftUI
 import Observation
+import SwiftUI
 
 @main
+VigilantEarApp()
+    .environment(\.dependencies, DependencyContainer.shared)
+
 struct VigilantEarApp: App {
+
     // These live for the entire life of the process
     @State private var permissions = PermissionsManager()
     @State private var micManager = MicrophoneManager()
