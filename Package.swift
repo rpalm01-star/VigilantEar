@@ -13,12 +13,13 @@ let package = Package(
     targets: [
         .executableTarget(
             name: "VigilantEar",
-            dependencies: [
-                .product(name: "GoogleMaps", package: "ios-maps-sdk")
-            ],
             path: "Sources",
-            exclude: ["Info.plist"],
-            sources: ["App", "Core", "Features", "Models"]
+            sources: ["App", "Core", "Features", "Models"],
+            linkerSettings: [
+                .unsafeFlags([
+                    "-sectcreate", "__TEXT", "__info_plist", "Sources/Info.plist"
+                ])
+            ]
         ),
         .testTarget(
             name: "VigilantEarTests",

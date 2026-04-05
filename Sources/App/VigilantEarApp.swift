@@ -1,20 +1,23 @@
+//
+//  VigilantEarApp.swift
+//  VigilantEar
+//
+//  Created by Robert Palmer on 4/5/26.
+//
+
+
 import SwiftUI
-import GoogleMaps   // ← ADD THIS
+import GoogleMaps   // (if you want Maps later)
 
 @main
 struct VigilantEarApp: App {
-    // Initialize the container on the Main Actor
-    @State private var dependencies = DependencyContainer.shared
-
     init() {
-        GMSServices.provideAPIKey("AIzaSyDbOOoFp_JqjRbAm6OsgFiOc0c9zHLjksI")  // ← PASTE YOUR KEY HERE
+        GMSServices.provideAPIKey("AIzaSyDbOOoFp_JqjRbAm6OsgFiOc0c9zHLjksI")  // paste your real key
     }
 
     var body: some Scene {
         WindowGroup {
-            ContentView()
-                // FIX: Inject using the correct KeyPath to resolve naming mismatches
-                .environment(\.dependencyContainer, dependencies)
+            ContentView()   // this is now your real one from Sources
         }
     }
 }
