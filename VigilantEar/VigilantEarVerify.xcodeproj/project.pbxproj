@@ -50,6 +50,19 @@
 		3053DCAC2F83718A00241892 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedRootGroup section */
+		304438492F8379F400F57539 /* Direction */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = Direction;
+			sourceTree = "<group>";
+		};
+		3044384A2F837A1D00F57539 /* Logging */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = Logging;
+			sourceTree = "<group>";
+		};
+/* End PBXFileSystemSynchronizedRootGroup section */
+
 /* Begin PBXFrameworksBuildPhase section */
 		304F73C22F830A8800F67563 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
@@ -154,6 +167,8 @@
 		3053DCA62F83718A00241892 /* Features */ = {
 			isa = PBXGroup;
 			children = (
+				3044384A2F837A1D00F57539 /* Logging */,
+				304438492F8379F400F57539 /* Direction */,
 				3053DC992F83718A00241892 /* AudioEngine */,
 				3053DC9B2F83718A00241892 /* Classification */,
 				3053DCA52F83718A00241892 /* UI */,
@@ -205,6 +220,10 @@
 			buildRules = (
 			);
 			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				304438492F8379F400F57539 /* Direction */,
+				3044384A2F837A1D00F57539 /* Logging */,
 			);
 			name = VigilantEarVerify;
 			packageProductDependencies = (
