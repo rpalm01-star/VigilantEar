@@ -116,20 +116,6 @@
 			path = Classification;
 			sourceTree = "<group>";
 		};
-		3053DC9C2F83718A00241892 /* Direction */ = {
-			isa = PBXGroup;
-			children = (
-			);
-			path = Direction;
-			sourceTree = "<group>";
-		};
-		3053DC9D2F83718A00241892 /* Logging */ = {
-			isa = PBXGroup;
-			children = (
-			);
-			path = Logging;
-			sourceTree = "<group>";
-		};
 		3053DC9F2F83718A00241892 /* Permission */ = {
 			isa = PBXGroup;
 			children = (
@@ -170,8 +156,6 @@
 			children = (
 				3053DC992F83718A00241892 /* AudioEngine */,
 				3053DC9B2F83718A00241892 /* Classification */,
-				3053DC9C2F83718A00241892 /* Direction */,
-				3053DC9D2F83718A00241892 /* Logging */,
 				3053DCA52F83718A00241892 /* UI */,
 			);
 			path = Features;
