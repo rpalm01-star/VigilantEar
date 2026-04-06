@@ -2,7 +2,7 @@ import SwiftUI
 import GoogleMaps
 
 @main
-struct VigilantEarVerifyApp: App {
+struct VigilantEarApp: App {
     private let dependencies = DependencyContainer.shared
     
     init() {

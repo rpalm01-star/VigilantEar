@@ -18,7 +18,7 @@
 		3053DCB62F83718A00241892 /* PermissionManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3053DC972F83718A00241892 /* PermissionManager.swift */; };
 		3053DCB72F83718A00241892 /* RadarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3053DCA02F83718A00241892 /* RadarView.swift */; };
 		3053DCB82F83718A00241892 /* AcousticCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3053DC932F83718A00241892 /* AcousticCoordinator.swift */; };
-		3053DCB92F83718A00241892 /* VigilantEarVerifyApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3053DC8E2F83718A00241892 /* VigilantEarVerifyApp.swift */; };
+		3053DCB92F83718A00241892 /* VigilantEarApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3053DC8E2F83718A00241892 /* VigilantEarApp.swift */; };
 		3053DCBA2F83718A00241892 /* MicrophoneManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3053DC962F83718A00241892 /* MicrophoneManager.swift */; };
 		3053DCBB2F83718A00241892 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3053DCA42F83718A00241892 /* ContentView.swift */; };
 		3053DCBC2F83718A00241892 /* DependencyContainer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3053DC912F83718A00241892 /* DependencyContainer.swift */; };
@@ -29,8 +29,8 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
-		304F73C52F830A8800F67563 /* VigilantEarVerify.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = VigilantEarVerify.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		3053DC8E2F83718A00241892 /* VigilantEarVerifyApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VigilantEarVerifyApp.swift; sourceTree = "<group>"; };
+		304F73C52F830A8800F67563 /* VigilantEar.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = VigilantEar.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		3053DC8E2F83718A00241892 /* VigilantEarApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VigilantEarApp.swift; sourceTree = "<group>"; };
 		3053DC902F83718A00241892 /* CoreExtensions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoreExtensions.swift; sourceTree = "<group>"; };
 		3053DC912F83718A00241892 /* DependencyContainer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DependencyContainer.swift; sourceTree = "<group>"; };
 		3053DC932F83718A00241892 /* AcousticCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AcousticCoordinator.swift; sourceTree = "<group>"; };
@@ -78,7 +78,7 @@
 		304F73BC2F830A8800F67563 = {
 			isa = PBXGroup;
 			children = (
-				3053DCAD2F83718A00241892 /* VigilantEarVerify */,
+				3053DCAD2F83718A00241892 /* VigilantEar */,
 				304F73C62F830A8800F67563 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -86,7 +86,7 @@
 		304F73C62F830A8800F67563 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				304F73C52F830A8800F67563 /* VigilantEarVerify.app */,
+				304F73C52F830A8800F67563 /* VigilantEar.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -94,7 +94,7 @@
 		3053DC8F2F83718A00241892 /* App */ = {
 			isa = PBXGroup;
 			children = (
-				3053DC8E2F83718A00241892 /* VigilantEarVerifyApp.swift */,
+				3053DC8E2F83718A00241892 /* VigilantEarApp.swift */,
 			);
 			path = App;
 			sourceTree = "<group>";
@@ -197,21 +197,21 @@
 			path = Sources;
 			sourceTree = "<group>";
 		};
-		3053DCAD2F83718A00241892 /* VigilantEarVerify */ = {
+		3053DCAD2F83718A00241892 /* VigilantEar */ = {
 			isa = PBXGroup;
 			children = (
 				3053DCAB2F83718A00241892 /* Sources */,
 				3053DCAC2F83718A00241892 /* Assets.xcassets */,
 			);
-			path = VigilantEarVerify;
+			path = VigilantEar;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		304F73C42F830A8800F67563 /* VigilantEarVerify */ = {
+		304F73C42F830A8800F67563 /* VigilantEar */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 304F73D02F830A8900F67563 /* Build configuration list for PBXNativeTarget "VigilantEarVerify" */;
+			buildConfigurationList = 304F73D02F830A8900F67563 /* Build configuration list for PBXNativeTarget "VigilantEar" */;
 			buildPhases = (
 				304F73C12F830A8800F67563 /* Sources */,
 				304F73C22F830A8800F67563 /* Frameworks */,
@@ -225,12 +225,12 @@
 				304438492F8379F400F57539 /* Direction */,
 				3044384A2F837A1D00F57539 /* Logging */,
 			);
-			name = VigilantEarVerify;
+			name = VigilantEar;
 			packageProductDependencies = (
 				3087D7032F830F3D001AC208 /* GoogleMaps */,
 			);
-			productName = VigilantEarVerify;
-			productReference = 304F73C52F830A8800F67563 /* VigilantEarVerify.app */;
+			productName = VigilantEar;
+			productReference = 304F73C52F830A8800F67563 /* VigilantEar.app */;
 			productType = "com.apple.product-type.application";
 		};
 /* End PBXNativeTarget section */
@@ -248,7 +248,7 @@
 					};
 				};
 			};
-			buildConfigurationList = 304F73C02F830A8800F67563 /* Build configuration list for PBXProject "VigilantEarVerify" */;
+			buildConfigurationList = 304F73C02F830A8800F67563 /* Build configuration list for PBXProject "VigilantEar" */;
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
 			knownRegions = (
@@ -265,7 +265,7 @@
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				304F73C42F830A8800F67563 /* VigilantEarVerify */,
+				304F73C42F830A8800F67563 /* VigilantEar */,
 			);
 		};
 /* End PBXProject section */
@@ -297,7 +297,7 @@
 				3053DCB62F83718A00241892 /* PermissionManager.swift in Sources */,
 				3053DCB72F83718A00241892 /* RadarView.swift in Sources */,
 				3053DCB82F83718A00241892 /* AcousticCoordinator.swift in Sources */,
-				3053DCB92F83718A00241892 /* VigilantEarVerifyApp.swift in Sources */,
+				3053DCB92F83718A00241892 /* VigilantEarApp.swift in Sources */,
 				3053DCBA2F83718A00241892 /* MicrophoneManager.swift in Sources */,
 				3053DCBB2F83718A00241892 /* ContentView.swift in Sources */,
 				3053DCBC2F83718A00241892 /* DependencyContainer.swift in Sources */,
@@ -440,7 +440,7 @@
 				DEVELOPMENT_TEAM = 99T9ZS3UCQ;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_CFBundleDisplayName = VigilantEarVerify;
+				INFOPLIST_KEY_CFBundleDisplayName = VigilantEar;
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "The application uses the millisecond delay between sound captures to calculate distance.";
 				INFOPLIST_KEY_NSMotionUsageDescription = "VigilantEar uses the device's motion sensors to determine the real-world direction of detected sounds.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
@@ -453,7 +453,7 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = "com.rpalm01-star.VigilantEarVerify";
+				PRODUCT_BUNDLE_IDENTIFIER = "com.rpalm01-star.VigilantEar";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
@@ -475,7 +475,7 @@
 				DEVELOPMENT_TEAM = 99T9ZS3UCQ;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_CFBundleDisplayName = VigilantEarVerify;
+				INFOPLIST_KEY_CFBundleDisplayName = VigilantEar;
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "The application uses the millisecond delay between sound captures to calculate distance.";
 				INFOPLIST_KEY_NSMotionUsageDescription = "VigilantEar uses the device's motion sensors to determine the real-world direction of detected sounds.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
@@ -488,7 +488,7 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = "com.rpalm01-star.VigilantEarVerify";
+				PRODUCT_BUNDLE_IDENTIFIER = "com.rpalm01-star.VigilantEar";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
@@ -503,7 +503,7 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		304F73C02F830A8800F67563 /* Build configuration list for PBXProject "VigilantEarVerify" */ = {
+		304F73C02F830A8800F67563 /* Build configuration list for PBXProject "VigilantEar" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				304F73CE2F830A8900F67563 /* Debug */,
@@ -512,7 +512,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		304F73D02F830A8900F67563 /* Build configuration list for PBXNativeTarget "VigilantEarVerify" */ = {
+		304F73D02F830A8900F67563 /* Build configuration list for PBXNativeTarget "VigilantEar" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				304F73D12F830A8900F67563 /* Debug */,
