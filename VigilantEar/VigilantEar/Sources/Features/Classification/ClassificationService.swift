@@ -1,56 +1,74 @@
 import Combine
 import Foundation
 import SoundAnalysis
+import CoreML
 
-/// Main-actor isolated service for classifying acoustic events.
 @MainActor
 final class ClassificationService: ObservableObject {
     @Published var currentClassification: String = "Monitoring..."
     @Published var confidence: Double = 0.0
     
-    // The analyzer is isolated to the MainActor to prevent data races
+    // MARK: - Long-lived Pipeline Properties
     private var analyzer: SNAudioStreamAnalyzer?
+    private let resultsObserver = ClassificationResultsObserver()
+    private let clock = ContinuousClock()
+    private var isPipelineReady = false
     
     func classify(buffer: [Float], sampleRate: Double) {
-        // 1. Convert the raw samples back to a buffer format the analyzer understands
         let format = AVAudioFormat(standardFormatWithSampleRate: sampleRate, channels: 1)!
         guard let pcmBuffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: AVAudioFrameCount(buffer.count)) else { return }
         pcmBuffer.frameLength = pcmBuffer.frameCapacity
         
-        // Copy the samples into the buffer
         for i in 0..<buffer.count {
             pcmBuffer.floatChannelData?[0][i] = buffer[i]
         }
 
-        // 2. Perform analysis on a background task to keep the M4 UI fluid
         Task {
-            do {
-                // Initialize analyzer if needed (using the project's CoreML model)
-                if analyzer == nil {
-                    analyzer = SNAudioStreamAnalyzer(format: format)
-                }
-                
-                // We use a local request to avoid capturing state incorrectly
-                _ = try SNClassifySoundRequest(classifierIdentifier: .version1)
-                
-                // In a real implementation, you'd use a delegate here.
-                // For this targeted fix, we ensure the UI update is hopped back to the MainActor.
-                let results = try await performAnalysis(on: pcmBuffer)
-                
-                if let top = results.first {
-                    // Update UI safely on the MainActor
-                    self.currentClassification = top.identifier
-                    self.confidence = top.confidence
-                }
-            } catch {
-                print("Classification failed: \(error)")
+            let start = clock.now
+            
+            // Internal do-catch inside setupPipeline handles initialization errors
+            if !isPipelineReady {
+                setupPipeline(format: format)
             }
+            
+            // This call does not throw
+            analyzer?.analyze(pcmBuffer, atAudioFramePosition: 0)
+            
+            if let top = resultsObserver.topClassifications.first {
+                self.currentClassification = top.identifier
+                self.confidence = top.confidence
+            }
+            
+            // Use our new automatic telemetry standard
+            PerformanceLogger.log(label: "Neural-Engine", startTime: start, instance: self)
         }
     }
     
-    // Helper to wrap the analysis in a modern async pattern
-    private func performAnalysis(on buffer: AVAudioPCMBuffer) async throws -> [SNClassification] {
-        // This is a simplified wrapper for the SoundAnalysis request
-        return [] // Placeholder for your actual SNResultsObserving logic
+    private func setupPipeline(format: AVAudioFormat) {
+        do {
+            let newAnalyzer = SNAudioStreamAnalyzer(format: format)
+            let request = try SNClassifySoundRequest(classifierIdentifier: .version1)
+            
+            try newAnalyzer.add(request, withObserver: resultsObserver)
+            self.analyzer = newAnalyzer
+            self.isPipelineReady = true
+            print("🚀 ANE Pipeline Primed and Ready")
+        } catch {
+            print("Failed to prime ANE: \(error)")
+        }
+    }
+}
+
+// MARK: - Observer Cache
+class ClassificationResultsObserver: NSObject, SNResultsObserving {
+    var topClassifications: [SNClassification] = []
+    
+    func request(_ request: SNRequest, didProduce results: SNResult) {
+        guard let classificationResult = results as? SNClassificationResult else { return }
+        topClassifications = classificationResult.classifications
+    }
+    
+    func request(_ request: SNRequest, didFailWithError error: Error) {
+        print("Analysis request failed: \(error)")
     }
 }

@@ -37,7 +37,7 @@ final class AcousticCoordinator {
         let isTransient = (rms > rmsBaseline * 1.6) && (rms > 0.025) && (Date().timeIntervalSince(lastEventTime) > cooldownInterval)
         
         // Debug print — copy/paste a few lines from the console when you test
-        print("🎤 RMS: \(String(format: "%.4f", rms)) | Baseline: \(String(format: "%.4f", rmsBaseline)) | Transient: \(isTransient)")
+        //print("🎤 RMS: \(String(format: "%.4f", rms)) | Baseline: \(String(format: "%.4f", rmsBaseline)) | Transient: \(isTransient)")
         
         guard isTransient else {
             return nil  // ignore background noise

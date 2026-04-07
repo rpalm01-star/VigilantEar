@@ -2,7 +2,7 @@ import SwiftUI
 
 struct ContentView: View {
     @EnvironmentObject private var classificationService: ClassificationService
-    @EnvironmentObject private var microphoneManager: MicrophoneManager
+    @EnvironmentObject private var microphoneManager: MicrophoneManager // This is the name we must use [cite: 3]
     
     var body: some View {
         ZStack {
@@ -13,7 +13,8 @@ struct ContentView: View {
                     .font(.largeTitle.bold())
                     .foregroundStyle(.green)
                 
-                RadarView(events: microphoneManager.events)
+                // FIX: Use 'microphoneManager' instead of 'viewModel'
+                RadarView(events: microphoneManager.events, viewModel: microphoneManager)
             }
         }
         .onAppear {

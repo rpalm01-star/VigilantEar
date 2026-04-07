@@ -30,15 +30,22 @@ final class TDOAProcessor: Sendable {
         let total = leftEnergy + rightEnergy
         guard total > 0.0001 else { return lastAngle.value }
         
-        let balance = (rightEnergy - leftEnergy) / total
-        /* let balance = (leftEnergy - rightEnergy) / total */
-        
-        var angle = Double(balance) * 290.0 + Double.random(in: -12...12)
+        // 1. Calculate the raw balance
+        let balance = (leftEnergy - rightEnergy) / total
+
+        // 2. FIX: Map balance (-1.0 to 1.0) to a wide Angular spread.
+        // -1.0 (Right Heavy) -> 90 degrees
+        //  0.0 (Centered)    -> 0 degrees (Top/North)
+        //  1.0 (Left Heavy)  -> -90 degrees
+        var angle = Double(balance) * -90.0
+
+        // 3. Add a smaller jitter so it doesn't look static, but keep it within bounds
+        angle += Double.random(in: -5...5)
         angle = max(-90, min(90, angle))
-        
+
         lastAngle.value = angle
         
-        print("TDOA → balance: \(String(format: "%.3f", balance)), angle: \(String(format: "%.1f", angle))°")
+        //print("TDOA → balance: \(String(format: "%.3f", balance)), angle: \(String(format: "%.1f", angle))°")
         
         return angle
     }
