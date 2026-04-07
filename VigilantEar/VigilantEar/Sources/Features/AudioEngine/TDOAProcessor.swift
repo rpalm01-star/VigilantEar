@@ -30,7 +30,8 @@ final class TDOAProcessor: Sendable {
         let total = leftEnergy + rightEnergy
         guard total > 0.0001 else { return lastAngle.value }
         
-        let balance = (leftEnergy - rightEnergy) / total
+        let balance = (rightEnergy - leftEnergy) / total
+        /* let balance = (leftEnergy - rightEnergy) / total */
         
         var angle = Double(balance) * 290.0 + Double.random(in: -12...12)
         angle = max(-90, min(90, angle))
