@@ -70,14 +70,15 @@ final class MicrophoneManager: NSObject, ObservableObject, CLLocationManagerDele
         
         for range in quadrants {
             for _ in 1...8 {
+                // --- THE FIX: Updated to match the new SwiftData model ---
+                let mockDoppler = Float.random(in: -15.0...15.0)
+                
                 let event = SoundEvent(
                     timestamp: Date(),
-                    classification: "Diagnostic",
-                    confidence: 1.0,
-                    angle: Double.random(in: Double(range.lowerBound)...Double(range.upperBound)),
-                    proximity: Double.random(in: 0.3...0.9),
-                    decibels: -20.0,
-                    frequency: 440.0
+                    threatLabel: "Diagnostic",
+                    bearing: Double.random(in: Double(range.lowerBound)...Double(range.upperBound)),
+                    dopplerRate: mockDoppler,
+                    isApproaching: mockDoppler > 0 // Approaching if the rate is positive
                 )
                 testDots.append(event)
             }

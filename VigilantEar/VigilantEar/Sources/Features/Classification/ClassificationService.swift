@@ -24,7 +24,7 @@ final class ClassificationService: ObservableObject {
         }
 
         Task {
-            let start = clock.now
+            PerformanceLogger.shared.start(task: "Neural-Engine")
             
             // Internal do-catch inside setupPipeline handles initialization errors
             if !isPipelineReady {
@@ -38,9 +38,8 @@ final class ClassificationService: ObservableObject {
                 self.currentClassification = top.identifier
                 self.confidence = top.confidence
             }
-            
-            // Use our new automatic telemetry standard
-            PerformanceLogger.log(label: "Neural-Engine", startTime: start, instance: self)
+
+            PerformanceLogger.shared.stop(task: "Neural-Engine")
         }
     }
     

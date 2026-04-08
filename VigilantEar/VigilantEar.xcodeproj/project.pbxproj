@@ -22,16 +22,16 @@
 		3053DCBA2F83718A00241892 /* MicrophoneManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3053DC962F83718A00241892 /* MicrophoneManager.swift */; };
 		3053DCBB2F83718A00241892 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3053DCA42F83718A00241892 /* ContentView.swift */; };
 		3053DCBC2F83718A00241892 /* DependencyContainer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3053DC912F83718A00241892 /* DependencyContainer.swift */; };
-		3053DCBD2F83718A00241892 /* CoreExtensions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3053DC902F83718A00241892 /* CoreExtensions.swift */; };
 		3053DCBE2F83718A00241892 /* Configuration.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3053DCA82F83718A00241892 /* Configuration.swift */; };
 		3053DCBF2F83718A00241892 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 3053DCAC2F83718A00241892 /* Assets.xcassets */; };
 		3087D7042F830F3D001AC208 /* GoogleMaps in Frameworks */ = {isa = PBXBuildFile; productRef = 3087D7032F830F3D001AC208 /* GoogleMaps */; };
+		30C55CC52F85FB1900D0B984 /* AcousticProcessingPipeline.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30C55CC42F85FB1500D0B984 /* AcousticProcessingPipeline.swift */; };
+		30C55CC92F8601F700D0B984 /* PerformanceLogger.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30C55CC82F8601F700D0B984 /* PerformanceLogger.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
 		304F73C52F830A8800F67563 /* VigilantEar.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = VigilantEar.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		3053DC8E2F83718A00241892 /* VigilantEarApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VigilantEarApp.swift; sourceTree = "<group>"; };
-		3053DC902F83718A00241892 /* CoreExtensions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoreExtensions.swift; sourceTree = "<group>"; };
 		3053DC912F83718A00241892 /* DependencyContainer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DependencyContainer.swift; sourceTree = "<group>"; };
 		3053DC932F83718A00241892 /* AcousticCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AcousticCoordinator.swift; sourceTree = "<group>"; };
 		3053DC942F83718A00241892 /* FFTProcessor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FFTProcessor.swift; sourceTree = "<group>"; };
@@ -48,6 +48,8 @@
 		3053DCA82F83718A00241892 /* Configuration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Configuration.swift; sourceTree = "<group>"; };
 		3053DCA92F83718A00241892 /* SoundEvent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SoundEvent.swift; sourceTree = "<group>"; };
 		3053DCAC2F83718A00241892 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		30C55CC42F85FB1500D0B984 /* AcousticProcessingPipeline.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AcousticProcessingPipeline.swift; sourceTree = "<group>"; };
+		30C55CC82F8601F700D0B984 /* PerformanceLogger.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PerformanceLogger.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -102,7 +104,7 @@
 		3053DC922F83718A00241892 /* Core */ = {
 			isa = PBXGroup;
 			children = (
-				3053DC902F83718A00241892 /* CoreExtensions.swift */,
+				30C55CC82F8601F700D0B984 /* PerformanceLogger.swift */,
 				3053DC912F83718A00241892 /* DependencyContainer.swift */,
 			);
 			path = Core;
@@ -111,6 +113,7 @@
 		3053DC992F83718A00241892 /* AudioEngine */ = {
 			isa = PBXGroup;
 			children = (
+				30C55CC42F85FB1500D0B984 /* AcousticProcessingPipeline.swift */,
 				3053DC932F83718A00241892 /* AcousticCoordinator.swift */,
 				3053DC942F83718A00241892 /* FFTProcessor.swift */,
 				3053DC952F83718A00241892 /* HardwareCalibration.swift */,
@@ -290,6 +293,7 @@
 				3053DCAF2F83718A00241892 /* SoundEvent.swift in Sources */,
 				3053DCB02F83718A00241892 /* BreadCrumb.swift in Sources */,
 				3053DCB12F83718A00241892 /* HardwareCalibration.swift in Sources */,
+				30C55CC52F85FB1900D0B984 /* AcousticProcessingPipeline.swift in Sources */,
 				3053DCB22F83718A00241892 /* ClassificationService.swift in Sources */,
 				3053DCB32F83718A00241892 /* PermissionRequestView.swift in Sources */,
 				3053DCB42F83718A00241892 /* FFTProcessor.swift in Sources */,
@@ -301,8 +305,8 @@
 				3053DCBA2F83718A00241892 /* MicrophoneManager.swift in Sources */,
 				3053DCBB2F83718A00241892 /* ContentView.swift in Sources */,
 				3053DCBC2F83718A00241892 /* DependencyContainer.swift in Sources */,
-				3053DCBD2F83718A00241892 /* CoreExtensions.swift in Sources */,
 				3053DCBE2F83718A00241892 /* Configuration.swift in Sources */,
+				30C55CC92F8601F700D0B984 /* PerformanceLogger.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

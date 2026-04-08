@@ -16,7 +16,8 @@ struct RadarView: View {
                 
                 // 3. Acoustic Event Plotting
                 ForEach(events) { event in
-                    if !event.classification.contains("Ambient") {
+                    // FIXED: Use threatLabel instead of classification
+                    if !event.threatLabel.contains("Ambient") {
                         RadarDotView(
                             event: event,
                             size: geometry.size,
@@ -52,16 +53,19 @@ struct RadarView: View {
         let userHeading: Double
         
         var body: some View {
-            // Apply world-relative offset
-            let relativeAngle = event.angle - userHeading
-            let position = calculatePosition(for: relativeAngle, proximity: event.proximity, in: size)
+            // FIXED: Use 'bearing' instead of 'angle'
+            let relativeAngle = event.bearing - userHeading
+            
+            // Note: Since we removed 'proximity', we plot the dots at a fixed 75% radius
+            // from the center to represent a detected target vector.
+            let position = calculatePosition(for: relativeAngle, proximity: 0.75, in: size)
             
             let age = Date().timeIntervalSince(event.timestamp)
             let opacity = max(0.0, 1.0 - age / 2.5)
             
             Circle()
                 .fill(determineColor())
-                .frame(width: 10, height: 10)
+                .frame(width: 12, height: 12) // Slightly larger to see the color better
                 .shadow(color: determineColor().opacity(0.9), radius: 8)
                 .opacity(opacity)
                 .position(position)
@@ -69,7 +73,8 @@ struct RadarView: View {
         
         private func determineColor() -> Color {
             if isTestMode {
-                let normalizedAngle = Int(event.angle.truncatingRemainder(dividingBy: 360) + 360) % 360
+                // FIXED: Use 'bearing' instead of 'angle'
+                let normalizedAngle = Int(event.bearing.truncatingRemainder(dividingBy: 360) + 360) % 360
                 switch normalizedAngle {
                 case 0..<90:    return .red
                 case 90..<180:  return .green
@@ -82,7 +87,6 @@ struct RadarView: View {
             }
         }
         
-        // FIXED: Added missing parenthesis and closing braces
         private func calculatePosition(for angle: Double, proximity: Double, in size: CGSize) -> CGPoint {
             let center = CGPoint(x: size.width / 2, y: size.height / 2)
             let radius = (size.width / 2) * CGFloat(proximity)
@@ -94,17 +98,14 @@ struct RadarView: View {
             )
         }
         
+        // FIXED: Doppler-based dynamic color
         private func dynamicColor(for event: SoundEvent) -> Color {
-            let freq = Double(event.frequency)
-            let confidence = Double(event.confidence)
-            let hue: Double = {
-                if freq < 200 { return 0.0 }
-                else if freq < 800 { return 0.08 }
-                else if freq < 1500 { return 0.15 }
-                else if freq < 3000 { return 0.55 }
-                else { return 0.75 }
-            }()
-            return Color(hue: hue, saturation: 0.8 + (confidence * 0.2), brightness: 0.9)
+            // Red means it is approaching you. Cyan means it is receding/driving away.
+            if event.isApproaching {
+                return Color.red
+            } else {
+                return Color.cyan
+            }
         }
     }
     
@@ -170,5 +171,4 @@ struct RadarView: View {
             }
         }
     }
-    
 }

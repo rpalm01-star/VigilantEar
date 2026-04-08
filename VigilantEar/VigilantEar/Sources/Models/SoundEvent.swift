@@ -1,13 +1,66 @@
 import Foundation
+import SwiftData
+import CoreLocation
 
-struct SoundEvent: Identifiable {
-    let id = UUID()                     // ← this guarantees every dot is unique
+@Model
+public final class SoundEvent {
     
-    let timestamp: Date
-    let classification: String
-    let confidence: Float
-    let angle: Double
-    let proximity: Double
-    let decibels: Float
-    let frequency: Double
+    // MARK: - Core Identity
+    @Attribute(.unique) public var id: UUID
+    public var timestamp: Date
+    public var threatLabel: String
+    
+    // MARK: - Spatial & Acoustic Metrics
+    /// The calculated Angle of Arrival (AoA) in degrees (0.0 to 180.0)
+    public var bearing: Double
+    
+    /// The rate of frequency change in Hz/sec. Nil if the shift was negligible.
+    public var dopplerRate: Float?
+    
+    /// True if the frequency is blue-shifting (increasing), indicating a collision course.
+    public var isApproaching: Bool
+    
+    // MARK: - GIS Location Data
+    // Stored as optional Doubles because we might detect a threat before the GPS gets a precise lock
+    public var latitude: Double?
+    public var longitude: Double?
+    
+    public init(
+        id: UUID = UUID(),
+        timestamp: Date = .now,
+        threatLabel: String,
+        bearing: Double,
+        dopplerRate: Float? = nil,
+        isApproaching: Bool = false,
+        latitude: Double? = nil,
+        longitude: Double? = nil
+    ) {
+        self.id = id
+        self.timestamp = timestamp
+        self.threatLabel = threatLabel
+        self.bearing = bearing
+        self.dopplerRate = dopplerRate
+        self.isApproaching = isApproaching
+        self.latitude = latitude
+        self.longitude = longitude
+    }
+}
+
+// MARK: - Computed Properties for the UI
+extension SoundEvent {
+    
+    /// Returns a coordinate for the Google Maps SDK
+    @Transient
+    var coordinate: CLLocationCoordinate2D? {
+        guard let lat = latitude, let lon = longitude else { return nil }
+        return CLLocationCoordinate2D(latitude: lat, longitude: lon)
+    }
+    
+    /// Formats the Doppler shift for the UI
+    @Transient
+    var formattedDoppler: String {
+        guard let rate = dopplerRate else { return "Stable" }
+        let direction = isApproaching ? "Approaching" : "Receding"
+        return "\(direction) (\(String(format: "%.1f", rate)) Hz/s)"
+    }
 }

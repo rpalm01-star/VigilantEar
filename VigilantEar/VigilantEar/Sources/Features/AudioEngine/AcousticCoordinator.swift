@@ -10,10 +10,15 @@ final class AcousticCoordinator {
     private let motionManager = CMMotionManager()
     private var currentHeading: Double = 0.0
     
-    // Transient detection settings (made much more sensitive)
+    // Transient detection settings
     private var rmsBaseline: Float = 0.01
     private var lastEventTime = Date.distantPast
-    private let cooldownInterval: TimeInterval = 0.3   // shorter cooldown
+    private let cooldownInterval: TimeInterval = 0.3
+    
+    // --- NEW: Doppler State Tracking ---
+    // Changed to Double to match fftProcessor.analyze output
+    private var previousDominantFrequency: Double?
+    private var previousFrequencyTimestamp: TimeInterval?
     
     init() {
         if motionManager.isDeviceMotionAvailable {
@@ -36,31 +41,56 @@ final class AcousticCoordinator {
         // 3. Much more sensitive transient detection
         let isTransient = (rms > rmsBaseline * 1.6) && (rms > 0.025) && (Date().timeIntervalSince(lastEventTime) > cooldownInterval)
         
-        // Debug print — copy/paste a few lines from the console when you test
-        //print("🎤 RMS: \(String(format: "%.4f", rms)) | Baseline: \(String(format: "%.4f", rmsBaseline)) | Transient: \(isTransient)")
-        
         guard isTransient else {
             return nil  // ignore background noise
         }
         
-        lastEventTime = Date()
+        let currentTime = Date()
+        lastEventTime = currentTime
         
-        // 4. Create a new dot for this sharp event
+        // 4. Calculate Vector with CoreMotion alignment
         let phoneRelativeAngle = tdoaProcessor.calculateAngleFromSamples(samples, sampleRate: sampleRate)
         let worldAngle = phoneRelativeAngle + currentHeading
         
+        // 5. Calculate Frequency & Doppler Shift
+        // currentFreq is a Double
         let currentFreq = fftProcessor.analyze(samples: samples, sampleRate: sampleRate)
-        let decibels = 20 * log10(max(Double(rms), 0.000001))
-        let proximity = max(0.0, min(1.0, 1.0 - (decibels + 100) / 100))
         
+        var dopplerRate: Float? = nil
+        var isApproaching = false
+        
+        let currentTimestamp = currentTime.timeIntervalSince1970
+        
+        if let prevFreq = previousDominantFrequency, let prevTime = previousFrequencyTimestamp {
+            // Keep the math in Double format to prevent the compiler errors
+            let timeDelta = currentTimestamp - prevTime
+            
+            if timeDelta > 0 {
+                let frequencyDelta = currentFreq - prevFreq
+                
+                // Calculate the rate and cast to Float for the SoundEvent model
+                let rate = Float(frequencyDelta / timeDelta)
+                dopplerRate = rate
+                
+                // If pitch is increasing (positive rate), it is approaching.
+                if rate > 5.0 {
+                    isApproaching = true
+                }
+            }
+        }
+        
+        // Save state for next buffer analysis
+        previousDominantFrequency = currentFreq
+        previousFrequencyTimestamp = currentTimestamp
+        
+        // 6. Return the updated SoundEvent matching the SwiftData schema
         return SoundEvent(
-            timestamp: Date(),
-            classification: classification,
-            confidence: Float(confidence),
-            angle: worldAngle,
-            proximity: proximity,
-            decibels: Float(decibels),
-            frequency: currentFreq
+            timestamp: currentTime,
+            threatLabel: classification,
+            bearing: worldAngle,
+            dopplerRate: dopplerRate,
+            isApproaching: isApproaching
+            // latitude and longitude are omitted and will default to nil
         )
     }
     
