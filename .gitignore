@@ -36,3 +36,5 @@ Carthage/Build/
 Secrets.xcconfig
 secrets.swift
 Keys.plist
+UserInterfaceState.xcuserstate
+
