@@ -5,6 +5,7 @@ DerivedData/
 
 # User-specific settings (Window positions, open tabs, etc.)
 *.xcuserdata
+*.xcuserstate
 *.mode1v3
 *.mode2v3
 *.perspectivev3
