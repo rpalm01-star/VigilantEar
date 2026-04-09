@@ -37,4 +37,5 @@ Secrets.xcconfig
 secrets.swift
 Keys.plist
 UserInterfaceState.xcuserstate
+**/*.xcuserstate
 
