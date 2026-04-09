@@ -1,9 +1,9 @@
 import SwiftUI
 
 struct PermissionRequestView: View {
-    @EnvironmentObject private var microphoneManager: MicrophoneManager
-    @EnvironmentObject private var classificationService: ClassificationService
-    
+    @Environment(ClassificationService.self) private var classificationService
+    @Environment(MicrophoneManager.self) private var microphoneManager
+
     var body: some View {
         VStack(spacing: 30) {
             Text("VIGILANT EAR")
@@ -29,6 +29,6 @@ struct PermissionRequestView: View {
 
 #Preview {
     PermissionRequestView()
-        .environmentObject(MicrophoneManager(coordinator: AcousticCoordinator(), classificationService: ClassificationService()))
-        .environmentObject(ClassificationService())
+        .environment(MicrophoneManager(coordinator: AcousticCoordinator(), classificationService: ClassificationService()))
+        .environment(ClassificationService())
 }

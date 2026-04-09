@@ -25,6 +25,9 @@
 		3053DCBE2F83718A00241892 /* Configuration.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3053DCA82F83718A00241892 /* Configuration.swift */; };
 		3053DCBF2F83718A00241892 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 3053DCAC2F83718A00241892 /* Assets.xcassets */; };
 		3087D7042F830F3D001AC208 /* GoogleMaps in Frameworks */ = {isa = PBXBuildFile; productRef = 3087D7032F830F3D001AC208 /* GoogleMaps */; };
+		308EF3E52F87558D00885DCB /* DiagnosticStatus.swift in Sources */ = {isa = PBXBuildFile; fileRef = 308EF3E42F87558D00885DCB /* DiagnosticStatus.swift */; };
+		308EF3E72F8755A300885DCB /* StartupVerificationViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 308EF3E62F8755A300885DCB /* StartupVerificationViewModel.swift */; };
+		308EF3E92F8755BC00885DCB /* StartupVerificationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 308EF3E82F8755BC00885DCB /* StartupVerificationView.swift */; };
 		30C55CC52F85FB1900D0B984 /* AcousticProcessingPipeline.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30C55CC42F85FB1500D0B984 /* AcousticProcessingPipeline.swift */; };
 		30C55CC92F8601F700D0B984 /* PerformanceLogger.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30C55CC82F8601F700D0B984 /* PerformanceLogger.swift */; };
 /* End PBXBuildFile section */
@@ -48,6 +51,11 @@
 		3053DCA82F83718A00241892 /* Configuration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Configuration.swift; sourceTree = "<group>"; };
 		3053DCA92F83718A00241892 /* SoundEvent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SoundEvent.swift; sourceTree = "<group>"; };
 		3053DCAC2F83718A00241892 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		308EF3E42F87558D00885DCB /* DiagnosticStatus.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiagnosticStatus.swift; sourceTree = "<group>"; };
+		308EF3E62F8755A300885DCB /* StartupVerificationViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StartupVerificationViewModel.swift; sourceTree = "<group>"; };
+		308EF3E82F8755BC00885DCB /* StartupVerificationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StartupVerificationView.swift; sourceTree = "<group>"; };
+		308EF3EA2F87595E00885DCB /* Secrets.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Secrets.xcconfig; sourceTree = "<group>"; };
+		308EF3EB2F875A9400885DCB /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		30C55CC42F85FB1500D0B984 /* AcousticProcessingPipeline.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AcousticProcessingPipeline.swift; sourceTree = "<group>"; };
 		30C55CC82F8601F700D0B984 /* PerformanceLogger.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PerformanceLogger.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -80,6 +88,7 @@
 		304F73BC2F830A8800F67563 = {
 			isa = PBXGroup;
 			children = (
+				308EF3EA2F87595E00885DCB /* Secrets.xcconfig */,
 				3053DCAD2F83718A00241892 /* VigilantEar */,
 				304F73C62F830A8800F67563 /* Products */,
 			);
@@ -104,6 +113,7 @@
 		3053DC922F83718A00241892 /* Core */ = {
 			isa = PBXGroup;
 			children = (
+				308EF3E42F87558D00885DCB /* DiagnosticStatus.swift */,
 				30C55CC82F8601F700D0B984 /* PerformanceLogger.swift */,
 				3053DC912F83718A00241892 /* DependencyContainer.swift */,
 			);
@@ -159,6 +169,7 @@
 		3053DCA52F83718A00241892 /* UI */ = {
 			isa = PBXGroup;
 			children = (
+				308EF3E82F8755BC00885DCB /* StartupVerificationView.swift */,
 				3053DC9F2F83718A00241892 /* Permission */,
 				3053DCA12F83718A00241892 /* Radar */,
 				3053DCA32F83718A00241892 /* Settings */,
@@ -182,6 +193,7 @@
 		3053DCAA2F83718A00241892 /* Models */ = {
 			isa = PBXGroup;
 			children = (
+				308EF3E62F8755A300885DCB /* StartupVerificationViewModel.swift */,
 				3053DCA72F83718A00241892 /* BreadCrumb.swift */,
 				3053DCA82F83718A00241892 /* Configuration.swift */,
 				3053DCA92F83718A00241892 /* SoundEvent.swift */,
@@ -203,6 +215,7 @@
 		3053DCAD2F83718A00241892 /* VigilantEar */ = {
 			isa = PBXGroup;
 			children = (
+				308EF3EB2F875A9400885DCB /* Info.plist */,
 				3053DCAB2F83718A00241892 /* Sources */,
 				3053DCAC2F83718A00241892 /* Assets.xcassets */,
 			);
@@ -289,6 +302,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				308EF3E92F8755BC00885DCB /* StartupVerificationView.swift in Sources */,
 				3053DCAE2F83718A00241892 /* SettingsView.swift in Sources */,
 				3053DCAF2F83718A00241892 /* SoundEvent.swift in Sources */,
 				3053DCB02F83718A00241892 /* BreadCrumb.swift in Sources */,
@@ -297,10 +311,12 @@
 				3053DCB22F83718A00241892 /* ClassificationService.swift in Sources */,
 				3053DCB32F83718A00241892 /* PermissionRequestView.swift in Sources */,
 				3053DCB42F83718A00241892 /* FFTProcessor.swift in Sources */,
+				308EF3E72F8755A300885DCB /* StartupVerificationViewModel.swift in Sources */,
 				3053DCB52F83718A00241892 /* TDOAProcessor.swift in Sources */,
 				3053DCB62F83718A00241892 /* PermissionManager.swift in Sources */,
 				3053DCB72F83718A00241892 /* RadarView.swift in Sources */,
 				3053DCB82F83718A00241892 /* AcousticCoordinator.swift in Sources */,
+				308EF3E52F87558D00885DCB /* DiagnosticStatus.swift in Sources */,
 				3053DCB92F83718A00241892 /* VigilantEarApp.swift in Sources */,
 				3053DCBA2F83718A00241892 /* MicrophoneManager.swift in Sources */,
 				3053DCBB2F83718A00241892 /* ContentView.swift in Sources */,
@@ -315,6 +331,7 @@
 /* Begin XCBuildConfiguration section */
 		304F73CE2F830A8900F67563 /* Debug */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = 308EF3EA2F87595E00885DCB /* Secrets.xcconfig */;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
@@ -379,6 +396,7 @@
 		};
 		304F73CF2F830A8900F67563 /* Release */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = 308EF3EA2F87595E00885DCB /* Secrets.xcconfig */;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
@@ -436,6 +454,7 @@
 		};
 		304F73D12F830A8900F67563 /* Debug */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = 308EF3EA2F87595E00885DCB /* Secrets.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
@@ -444,6 +463,7 @@
 				DEVELOPMENT_TEAM = 99T9ZS3UCQ;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = VigilantEar/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = VigilantEar;
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "The application uses the millisecond delay between sound captures to calculate distance.";
 				INFOPLIST_KEY_NSMotionUsageDescription = "VigilantEar uses the device's motion sensors to determine the real-world direction of detected sounds.";
@@ -471,6 +491,7 @@
 		};
 		304F73D22F830A8900F67563 /* Release */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = 308EF3EA2F87595E00885DCB /* Secrets.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
@@ -479,6 +500,7 @@
 				DEVELOPMENT_TEAM = 99T9ZS3UCQ;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = VigilantEar/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = VigilantEar;
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "The application uses the millisecond delay between sound captures to calculate distance.";
 				INFOPLIST_KEY_NSMotionUsageDescription = "VigilantEar uses the device's motion sensors to determine the real-world direction of detected sounds.";

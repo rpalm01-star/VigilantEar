@@ -3,14 +3,17 @@ import Foundation
 import AVFoundation
 import CoreLocation
 import Accelerate
+import Observation
 
-final class MicrophoneManager: NSObject, ObservableObject, CLLocationManagerDelegate {
+@Observable
+class MicrophoneManager: NSObject, CLLocationManagerDelegate {
     
     // MARK: - Published Properties
-    @Published var events: [SoundEvent] = []
-    @Published var isTestMode: Bool = false
-    @Published var currentHeading: Double = 0.0
-    @Published var micWarning: String? = nil
+    var events: [SoundEvent] = []
+    var isTestMode: Bool = false
+    var currentHeading: Double = 0.0
+    var micWarning: String? = nil
+    var latestDetection: String? = nil
     
     // MARK: - Private Properties
     private let coordinator: AcousticCoordinator
@@ -41,7 +44,7 @@ final class MicrophoneManager: NSObject, ObservableObject, CLLocationManagerDele
     }
     
     func locationManager(_ manager: CLLocationManager, didUpdateHeading newHeading: CLHeading) {
-        DispatchQueue.main.async { self.currentHeading = newHeading.magneticHeading }
+        self.currentHeading = newHeading.magneticHeading
     }
     
     @MainActor
@@ -75,28 +78,19 @@ final class MicrophoneManager: NSObject, ObservableObject, CLLocationManagerDele
         self.events = testDots
     }
     
-    // MARK: - Audio Capture (STEREO ARRAY CONFIGURATION)
     func startCapturing() {
         guard !isRunning else { return }
         
         do {
             let session = AVAudioSession.sharedInstance()
-            
-            // 1. Set Category and Mode
             try session.setCategory(.playAndRecord,
                                     mode: .videoRecording,
                                     options: [.defaultToSpeaker, .allowBluetoothHFP])
             
-            // 2. ACTIVATE THE SESSION EARLY!
-            // We must activate the session before changing hardware routes,
-            // otherwise iOS evaluates channel requests against the default mono route and throws -50.
             try session.setActive(true)
-            
-            print("📋 === AVAudioSession FULL DIAGNOSTICS ===")
             
             var stereoConfigured = false
             
-            // 3. Locate built-in mic and configure it
             if let builtInMic = session.availableInputs?.first(where: { $0.portType == .builtInMic }) {
                 try session.setPreferredInput(builtInMic)
                 
@@ -105,13 +99,9 @@ final class MicrophoneManager: NSObject, ObservableObject, CLLocationManagerDele
                         if let supportedPatterns = source.supportedPolarPatterns,
                            supportedPatterns.contains(.stereo) {
                             
-                            // 4. Switch hardware to Stereo
                             try source.setPreferredPolarPattern(.stereo)
                             try builtInMic.setPreferredDataSource(source)
-                            print("✅ Selected \(source.dataSourceName) dataSource with Stereo Polar Pattern")
                             stereoConfigured = true
-                            
-                            // 5. Set orientation mapping
                             try session.setPreferredInputOrientation(.portrait)
                             break
                         }
@@ -119,34 +109,23 @@ final class MicrophoneManager: NSObject, ObservableObject, CLLocationManagerDele
                 }
             }
             
-            if !stereoConfigured {
-                print("⚠️ Could not find a dataSource supporting the stereo polar pattern.")
-            }
-            
-            // 6. NOW ask for 2 channels. Because the session is active and routed to a stereo source,
-            // maximumInputNumberOfChannels is now 2, and this will succeed.
             if stereoConfigured {
                 try session.setPreferredInputNumberOfChannels(2)
-                print("✅ Successfully requested 2 input channels")
             } else {
-                print("⚠️ Falling back to 1 channel request to prevent crash.")
                 try session.setPreferredInputNumberOfChannels(1)
             }
             
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in
-                guard let self = self else { return }
-                self.startAudioTap()
+                self?.startAudioTap()
             }
             
         } catch {
             print("Failed to start audio engine: \(error)")
         }
     }
+
     private func startAudioTap() {
         let inputNode = audioEngine.inputNode
-        let hardwareFormat = inputNode.inputFormat(forBus: 0)
-        
-        print("🎤 Hardware input format: \(hardwareFormat.channelCount) channels @ \(hardwareFormat.sampleRate) Hz")
         
         if tapInstalled { inputNode.removeTap(onBus: 0) }
         
@@ -158,47 +137,59 @@ final class MicrophoneManager: NSObject, ObservableObject, CLLocationManagerDele
             let frameLength = Int(buffer.frameLength)
             let channelCount = buffer.format.channelCount
             
-            print("🔍 Tap received — channels: \(channelCount), frames: \(frameLength)")
-            
             if let channelData = buffer.floatChannelData {
                 let mic1Samples = Array(UnsafeBufferPointer(start: channelData[0], count: frameLength))
                 let mic2Samples = (channelCount >= 2)
                 ? Array(UnsafeBufferPointer(start: channelData[1], count: frameLength))
                 : mic1Samples
                 
-                let rms1 = self.rms(of: mic1Samples)
-                let rms2 = self.rms(of: mic2Samples)
+                let rms1 = self.calculateRMS(of: mic1Samples)
+                let rms2 = self.calculateRMS(of: mic2Samples)
                 
-                print("   📊 RMS mic1 (bottom): \(String(format: "%.6f", rms1)) | mic2 (top): \(String(format: "%.6f", rms2))")
-                
-                DispatchQueue.main.async {
+                // Mic Health Check
+                Task { @MainActor in
                     if rms2 < 0.0001 && rms1 > 0.01 {
-                        self.micWarning = "⚠️ Top microphone still silent – only bottom mic active"
+                        self.micWarning = "⚠️ Top microphone still silent"
                     } else {
                         self.micWarning = nil
                     }
                 }
                 
-                let samples = mic1Samples
-                
+                // Core Processing Logic
                 Task { @MainActor in
                     if let newEvent = self.coordinator.processFromSamples(
-                        samples,
+                        mic1Samples,
                         sampleRate: buffer.format.sampleRate,
-                        classification: "Analyzing...",
+                        classification: self.classificationService.currentClassification,
                         confidence: 0.0
                     ) {
+                        print("🎯 GATE PASSED! RMS: \(rms1)")
+
+                        let label = newEvent.threatLabel
+                        let displayRMS = rms1
+
+                        // 1. Update live array
                         self.realTimeEvents.append(newEvent)
                         if self.realTimeEvents.count > 8 { self.realTimeEvents.removeFirst() }
                         if !self.isTestMode { self.events = self.realTimeEvents }
+
+                        // 2. Update HUD
+                        self.latestDetection = "\(label): \(String(format: "%.3f", displayRMS)) RMS"
+
+                        // 3. Auto-clear HUD after 3 seconds
+                        try? await Task.sleep(for: .seconds(3))
+                        if self.latestDetection?.contains(label) == true {
+                            self.latestDetection = nil
+                        }
                     }
                     
+                    // Housekeeping & Classification
                     let now = Date()
                     self.realTimeEvents.removeAll { now.timeIntervalSince($0.timestamp) > 2.5 }
                     if !self.isTestMode {
                         self.events.removeAll { now.timeIntervalSince($0.timestamp) > 2.5 }
                     }
-                    self.classificationService.classify(buffer: samples, sampleRate: buffer.format.sampleRate)
+                    self.classificationService.classify(buffer: mic1Samples, sampleRate: buffer.format.sampleRate)
                 }
             }
         }
@@ -209,10 +200,10 @@ final class MicrophoneManager: NSObject, ObservableObject, CLLocationManagerDele
         print("✅ MicrophoneManager started successfully")
     }
     
-    private func rms(of signal: [Float]) -> Float {
-        var rms: Float = 0
-        vDSP_rmsqv(signal, 1, &rms, vDSP_Length(signal.count))
-        return rms
+    private func calculateRMS(of signal: [Float]) -> Float {
+        var val: Float = 0
+        vDSP_rmsqv(signal, 1, &val, vDSP_Length(signal.count))
+        return val
     }
     
     func stopCapturing() {
@@ -224,7 +215,6 @@ final class MicrophoneManager: NSObject, ObservableObject, CLLocationManagerDele
             tapInstalled = false
         }
         isRunning = false
-        print("MicrophoneManager stopped")
     }
     
     deinit { stopCapturing() }

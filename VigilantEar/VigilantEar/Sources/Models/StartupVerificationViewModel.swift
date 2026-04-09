@@ -1,3 +1,11 @@
+//
+//  StartupVerificationViewModel.swift
+//  VigilantEar
+//
+//  Created by Robert Palmer on 4/8/26.
+//
+
+
 import Foundation
 import AVFoundation
 import CoreML

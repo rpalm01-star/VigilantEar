@@ -3,10 +3,11 @@ import Foundation
 import SoundAnalysis
 import CoreML
 
+@Observable
 @MainActor
-final class ClassificationService: ObservableObject {
-    @Published var currentClassification: String = "Monitoring..."
-    @Published var confidence: Double = 0.0
+final class ClassificationService {
+    var currentClassification: String = "Monitoring..."
+    var confidence: Double = 0.0
     
     // MARK: - Long-lived Pipeline Properties
     private var analyzer: SNAudioStreamAnalyzer?
@@ -22,7 +23,7 @@ final class ClassificationService: ObservableObject {
         for i in 0..<buffer.count {
             pcmBuffer.floatChannelData?[0][i] = buffer[i]
         }
-
+        
         Task {
             PerformanceLogger.shared.start(task: "Neural-Engine")
             
@@ -38,7 +39,7 @@ final class ClassificationService: ObservableObject {
                 self.currentClassification = top.identifier
                 self.confidence = top.confidence
             }
-
+            
             PerformanceLogger.shared.stop(task: "Neural-Engine")
         }
     }

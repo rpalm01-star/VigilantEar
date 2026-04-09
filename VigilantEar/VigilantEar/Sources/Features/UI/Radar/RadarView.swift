@@ -1,8 +1,7 @@
 import SwiftUI
 
 struct RadarView: View {
-    let events: [SoundEvent]
-    @ObservedObject var viewModel: MicrophoneManager
+    @Environment(MicrophoneManager.self) private var viewModel
     
     var body: some View {
         GeometryReader { geometry in
@@ -15,7 +14,7 @@ struct RadarView: View {
                 RadarSweepView()
                 
                 // 3. Acoustic Event Plotting
-                ForEach(events) { event in
+                ForEach(viewModel.events) { event in
                     // FIXED: Use threatLabel instead of classification
                     if !event.threatLabel.contains("Ambient") {
                         RadarDotView(
