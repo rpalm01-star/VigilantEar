@@ -3,6 +3,7 @@ import Observation
 import CoreML
 import UserNotifications
 import AVFAudio
+import UserNotifications
 
 enum VerificationStatus {
     case pending, running, passed, failed
@@ -81,21 +82,33 @@ class StartupVerificationViewModel {
     
     private func configureAndVerifyChannels(_ session: AVAudioSession) async -> VerificationStatus {
         do {
-            // Updated 'allowBluetooth' to 'allowBluetoothHFP' for Swift 6 compliance
-            try session.setCategory(
-                .playAndRecord,
-                mode: .measurement,
-                options: [.allowBluetoothHFP, .defaultToSpeaker]
-            )
-            // Force the orientation to use the built-in wide stereo field
-            try session.setPreferredInputOrientation(.landscapeRight)
+            // 1. Set the category and mode exactly like our functional audio engine
+            try session.setCategory(.playAndRecord, mode: .videoRecording, options: [.allowBluetoothHFP, .defaultToSpeaker])
+            
+            // 2. We must select a stereo-capable data source to stop the mono-summing
+            if let availableInputs = session.availableInputs,
+               let builtInMic = availableInputs.first(where: { $0.portType == .builtInMic }) {
+                
+                try session.setPreferredInput(builtInMic)
+                
+                // Force the 'Front' or 'Back' orientation to enable stereo
+                if let stereoDataSource = builtInMic.dataSources?.first(where: { 
+                    $0.selectedOrientation == .front || $0.selectedOrientation == .back 
+                }) {
+                    try session.setPreferredInputOrientation(.landscapeRight) // Helps TDOA separation
+                    try session.setPreferredDataSource(stereoDataSource)
+                }
+            }
+            
             try session.setActive(true)
-            
+    
             let channelCount = session.inputNumberOfChannels
-            print("Hardware reported \(channelCount) channels.") // VigilantEar needs 2+
+            print("Hardware reported \(channelCount) channels.") 
             
-            return session.inputNumberOfChannels >= 2 ? .passed : .failed
+            // VigilantEar requires 2+ channels for TDOA
+            return channelCount >= 2 ? .passed : .failed
         } catch {
+            print("Audio Session Configuration Failed: \(error.localizedDescription)")
             return .failed
         }
     }
@@ -114,16 +127,31 @@ class StartupVerificationViewModel {
     
     private func checkEntitlements() async -> VerificationStatus {
         let center = UNUserNotificationCenter.current()
+        
+        // 1. Check current settings
         let settings = await center.notificationSettings()
         
-        // Check for the specific Critical Alert authorization
+        // 2. If already enabled, we are good
         if settings.criticalAlertSetting == .enabled {
             return .passed
-        } else {
-            // You might want to trigger a permission request here if it's .notDetermined
-            return .failed
         }
         
+        // 3. If not determined or denied, trigger the request
+        do {
+            // You MUST include .criticalAlert in the options list 
+            let granted = try await center.requestAuthorization(options: [.alert, .sound, .badge, .criticalAlert])
+            
+            if granted {
+                // Re-check specifically for the critical alert bit
+                let newSettings = await center.notificationSettings()
+                return newSettings.criticalAlertSetting == .enabled ? .passed : .failed
+            } else {
+                return .failed
+            }
+        } catch {
+            print("Notification Auth Error: \(error.localizedDescription)")
+            return .failed
+        }
     }
     
     private func checkStorage() async -> VerificationStatus {
