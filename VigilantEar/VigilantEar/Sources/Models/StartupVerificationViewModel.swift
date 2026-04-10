@@ -126,6 +126,11 @@ class StartupVerificationViewModel {
     }
     
     private func checkEntitlements() async -> VerificationStatus {
+        #if DEBUG
+            // While waiting for Apple's approval, we'll force a pass in Debug mode
+            print("DEBUG: Bypassing Critical Alert check while awaiting Apple approval.")
+            return .passed 
+        #else
         let center = UNUserNotificationCenter.current()
         
         // 1. Check current settings
