@@ -43,7 +43,7 @@ class StartupVerificationViewModel {
         await withTaskGroup(of: (VerificationType, VerificationStatus).self) { group in
             group.addTask { await (.micArray, self.checkMicArray()) }
             group.addTask { await (.neuralEngine, self.checkNeuralEngine()) }
-            //group.addTask { await (.criticalAlerts, self.checkEntitlements()) }
+            group.addTask { await (.criticalAlerts, self.checkEntitlements()) }
             group.addTask { await (.storage, self.checkStorage()) }
             
             for await (type, status) in group {
@@ -82,33 +82,49 @@ class StartupVerificationViewModel {
     
     private func configureAndVerifyChannels(_ session: AVAudioSession) async -> VerificationStatus {
         do {
-            // 1. Set the category and mode exactly like our functional audio engine
+            // 1. Setup the high-fidelity recording environment
             try session.setCategory(.playAndRecord, mode: .videoRecording, options: [.allowBluetoothHFP, .defaultToSpeaker])
             
-            // 2. We must select a stereo-capable data source to stop the mono-summing
-            if let availableInputs = session.availableInputs,
-               let builtInMic = availableInputs.first(where: { $0.portType == .builtInMic }) {
-                
-                try session.setPreferredInput(builtInMic)
-                
-                // Force the 'Front' or 'Back' orientation to enable stereo
-                if let stereoDataSource = builtInMic.dataSources?.first(where: { 
-                    $0.selectedOrientation == .front || $0.selectedOrientation == .back 
-                }) {
-                    try session.setPreferredInputOrientation(.landscapeRight) // Helps TDOA separation
-                    try session.setPreferredDataSource(stereoDataSource)
+            // 2. Safely grab the built-in mic
+            guard let inputs = session.availableInputs,
+                  let builtInMic = inputs.first(where: { $0.portType == .builtInMic }) else {
+                return .failed
+            }
+            
+            // 3. Find a data source that likes to point Front or Back
+            var stereoSource: AVAudioSessionDataSourceDescription? = nil
+            if let sources = builtInMic.dataSources {
+                for source in sources {
+                    // Use 'orientation' to find the right physical mic
+                    if source.orientation == AVAudioSession.Orientation.front || source.orientation == AVAudioSession.Orientation.back {
+                        stereoSource = source
+                        
+                        // Extra Credit: Tell the mic to use a Stereo polar pattern if available
+                        if let patterns = source.supportedPolarPatterns,
+                           patterns.contains(.stereo) {
+                            try source.setPreferredPolarPattern(.stereo)
+                        }
+                        break
+                    }
                 }
             }
             
-            try session.setActive(true)
-    
-            let channelCount = session.inputNumberOfChannels
-            print("Hardware reported \(channelCount) channels.") 
+            // 4. Apply the configuration
+            if let targetSource = stereoSource {
+                try builtInMic.setPreferredDataSource(targetSource)
+                try session.setPreferredInput(builtInMic)
+                try session.setPreferredInputOrientation(.landscapeRight)
+            }
             
-            // VigilantEar requires 2+ channels for TDOA
+            try session.setActive(true)
+
+            // 5. The Moment of Truth for VigilantEar
+            let channelCount = session.inputNumberOfChannels
+            print("DEBUG: Hardware reported \(channelCount) channels.")
+            
             return channelCount >= 2 ? .passed : .failed
         } catch {
-            print("Audio Session Configuration Failed: \(error.localizedDescription)")
+            print("DEBUG: Audio Session Configuration Failed: \(error.localizedDescription)")
             return .failed
         }
     }
@@ -126,11 +142,11 @@ class StartupVerificationViewModel {
     }
     
     private func checkEntitlements() async -> VerificationStatus {
-        #if DEBUG
-            // While waiting for Apple's approval, we'll force a pass in Debug mode
-            print("DEBUG: Bypassing Critical Alert check while awaiting Apple approval.")
-            return .passed 
-        #else
+#if DEBUG
+        // While waiting for Apple's approval, we'll force a pass in Debug mode
+        print("DEBUG: Bypassing Critical Alert check while awaiting Apple approval.")
+        return .passed
+#else
         let center = UNUserNotificationCenter.current()
         
         // 1. Check current settings
@@ -143,7 +159,7 @@ class StartupVerificationViewModel {
         
         // 3. If not determined or denied, trigger the request
         do {
-            // You MUST include .criticalAlert in the options list 
+            // You MUST include .criticalAlert in the options list
             let granted = try await center.requestAuthorization(options: [.alert, .sound, .badge, .criticalAlert])
             
             if granted {
@@ -157,6 +173,7 @@ class StartupVerificationViewModel {
             print("Notification Auth Error: \(error.localizedDescription)")
             return .failed
         }
+#endif
     }
     
     private func checkStorage() async -> VerificationStatus {

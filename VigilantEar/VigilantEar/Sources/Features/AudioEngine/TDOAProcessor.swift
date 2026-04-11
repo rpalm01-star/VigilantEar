@@ -11,7 +11,7 @@ final class TDOAProcessor: Sendable {
         let samples = Array(UnsafeBufferPointer(start: channelData[0], count: frameLength))
         
         // FIX: Use assumeIsolated to bridge the MainActor hardware settings
-        let micBaseline = MainActor.assumeIsolated { HardwareCalibration.micBaseline }
+        let micBaseline = HardwareCalibration.micBaseline
         let speedOfSound = 343.0
         let maxDelaySamples = Int((micBaseline / speedOfSound) * buffer.format.sampleRate)
         

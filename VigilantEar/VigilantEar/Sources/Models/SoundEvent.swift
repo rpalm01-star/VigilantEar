@@ -14,6 +14,9 @@ public final class SoundEvent {
     /// The calculated Angle of Arrival (AoA) in degrees (0.0 to 180.0)
     public var bearing: Double
     
+    // The distance from the reference point
+    public var distance: Double
+    
     /// The rate of frequency change in Hz/sec. Nil if the shift was negligible.
     public var dopplerRate: Float?
     
@@ -30,6 +33,7 @@ public final class SoundEvent {
         timestamp: Date = .now,
         threatLabel: String,
         bearing: Double,
+        distance: Double,
         dopplerRate: Float? = nil,
         isApproaching: Bool = false,
         latitude: Double? = nil,
@@ -39,6 +43,7 @@ public final class SoundEvent {
         self.timestamp = timestamp
         self.threatLabel = threatLabel
         self.bearing = bearing
+        self.distance = distance
         self.dopplerRate = dopplerRate
         self.isApproaching = isApproaching
         self.latitude = latitude

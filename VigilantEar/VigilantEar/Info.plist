@@ -7,6 +7,12 @@
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>remote-notification</string>
+		<string>processing</string>
 	</array>
+	<key>UISupportedInterfaceOrientations</key>
+   	<array>
+     		<string>UIInterfaceOrientationPortrait</string>
+   	</array>
 </dict>
 </plist>
+

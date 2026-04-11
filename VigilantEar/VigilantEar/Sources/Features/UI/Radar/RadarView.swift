@@ -15,17 +15,14 @@ struct RadarView: View {
                 
                 // 3. Acoustic Event Plotting
                 ForEach(viewModel.events) { event in
-                    // FIXED: Use threatLabel instead of classification
-                    if !event.threatLabel.contains("Ambient") {
-                        RadarDotView(
-                            event: event,
-                            size: geometry.size,
-                            isTestMode: viewModel.isTestMode,
-                            userHeading: viewModel.currentHeading
-                        )
-                        .transition(.opacity.combined(with: .scale))
-                        .id(event.id)
-                    }
+                    RadarDotView(
+                        event: event,
+                        size: geometry.size,
+                        isTestMode: viewModel.isTestMode,
+                        userHeading: viewModel.currentHeading
+                    )
+                    .transition(.opacity.combined(with: .scale))
+                    .id(event.timestamp)
                 }
             }
             .background(Color.black)
@@ -44,7 +41,6 @@ struct RadarView: View {
     }
     
     // MARK: - Sub-Views
-    
     struct RadarDotView: View {
         let event: SoundEvent
         let size: CGSize
@@ -52,22 +48,24 @@ struct RadarView: View {
         let userHeading: Double
         
         var body: some View {
-            // FIXED: Use 'bearing' instead of 'angle'
+            // Use the event's internal distance. If it's missing, default to 0.75
+            // so it stays on the 3rd ring until we update the SoundEvent model.
+            let eventDistance = event.distance
+            
             let relativeAngle = event.bearing - userHeading
             
-            // Note: Since we removed 'proximity', we plot the dots at a fixed 75% radius
-            // from the center to represent a detected target vector.
-            let position = calculatePosition(for: relativeAngle, proximity: 0.75, in: size)
+            // Pass eventDistance instead of a hardcoded 0.75
+            let position = calculatePosition(for: relativeAngle, proximity: eventDistance, in: size)
             
             let age = Date().timeIntervalSince(event.timestamp)
             let opacity = max(0.0, 1.0 - age / 2.5)
             
             Circle()
                 .fill(determineColor())
-                .frame(width: 12, height: 12) // Slightly larger to see the color better
+                .frame(width: 12, height: 12)
                 .shadow(color: determineColor().opacity(0.9), radius: 8)
                 .opacity(opacity)
-                .position(position)
+                .position(position) // This uses the CGPoint from calculatePosition
         }
         
         private func determineColor() -> Color {
@@ -88,12 +86,17 @@ struct RadarView: View {
         
         private func calculatePosition(for angle: Double, proximity: Double, in size: CGSize) -> CGPoint {
             let center = CGPoint(x: size.width / 2, y: size.height / 2)
-            let radius = (size.width / 2) * CGFloat(proximity)
-            let angleInRadians = (CGFloat(angle) * .pi / 180)
+            
+            // The maximum radius is half the width of the view
+            let maxRadius = size.width / 2
+            let actualRadius = maxRadius * CGFloat(proximity)
+            
+            // Adjust angle so 0 degrees is North/Up
+            let adjustedAngle = CGFloat(angle - 90) * .pi / 180
             
             return CGPoint(
-                x: center.x + radius * cos(angleInRadians),
-                y: center.y - radius * sin(angleInRadians)
+                x: center.x + actualRadius * cos(adjustedAngle),
+                y: center.y + actualRadius * sin(adjustedAngle)
             )
         }
         
@@ -170,4 +173,5 @@ struct RadarView: View {
             }
         }
     }
+    
 }
