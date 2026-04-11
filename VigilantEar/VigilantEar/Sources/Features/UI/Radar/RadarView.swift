@@ -1,177 +1,148 @@
 import SwiftUI
+import CoreHaptics
 
 struct RadarView: View {
-    @Environment(MicrophoneManager.self) private var viewModel
+    @Environment(MicrophoneManager.self) private var micManager
+    
+    @State private var sweepAngle: Double = 0
+    @State private var engine: CHHapticEngine?
     
     var body: some View {
         GeometryReader { geometry in
-            ZStack {
-                // 1. Radar Background (Grid) - Rotates with compass
-                RadarBackgroundView()
-                    .rotationEffect(.degrees(-viewModel.currentHeading))
+            Canvas { ctx, size in
+                let center = CGPoint(x: size.width / 2, y: size.height / 2)
+                let radius = min(size.width, size.height) / 2.1
                 
-                // 2. Dynamic Sweep Animation
-                RadarSweepView()
+                // Background rings + labels (rotate with heading)
+                drawRadarGrid(ctx: ctx, center: center, radius: radius, heading: micManager.currentHeading)
                 
-                // 3. Acoustic Event Plotting
-                ForEach(viewModel.events) { event in
-                    RadarDotView(
-                        event: event,
-                        size: geometry.size,
-                        isTestMode: viewModel.isTestMode,
-                        userHeading: viewModel.currentHeading
+                // Clean sweep line
+                drawSweep(ctx: ctx, center: center, radius: radius, angle: sweepAngle)
+                
+                // Dots
+                for event in micManager.events {
+                    let relativeAngle = (event.bearing - micManager.currentHeading).truncatingRemainder(dividingBy: 360)
+                    let dotPos = polarToCartesian(angle: relativeAngle, radius: radius * CGFloat(event.distance), center: center)
+                    
+                    let age = Date().timeIntervalSince(event.timestamp)
+                    let opacity = max(0.0, 1.0 - age / 5.0)
+                    let color = event.isApproaching ? Color.red : Color.cyan
+                    
+                    ctx.opacity = opacity
+                    
+                    ctx.fill(
+                        Path { $0.addEllipse(in: CGRect(origin: dotPos, size: CGSize(width: 26, height: 26))) },
+                        with: .color(color)
                     )
-                    .transition(.opacity.combined(with: .scale))
-                    .id(event.timestamp)
+                    ctx.fill(
+                        Path { $0.addEllipse(in: CGRect(origin: dotPos, size: CGSize(width: 40, height: 40))) },
+                        with: .color(color.opacity(0.4))
+                    )
                 }
             }
             .background(Color.black)
             .clipShape(Circle())
-            .overlay(Circle().stroke(Color.green.opacity(0.2), lineWidth: 1))
+            .overlay(Circle().stroke(Color.green.opacity(0.3), lineWidth: 3))
             .contentShape(Circle())
+            
+            // Test mode banner
+            .overlay(alignment: .top) {
+                if micManager.isTestMode {
+                    Text("TEST MODE ON — DOUBLE-TAP TO EXIT")
+                        .font(.caption2.monospaced().bold())
+                        .foregroundStyle(.yellow)
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 6)
+                        .background(.black.opacity(0.75))
+                        .clipShape(RoundedRectangle(cornerRadius: 20))
+                        .padding(.top, 12)
+                }
+            }
+            
             .gesture(
                 TapGesture(count: 2)
-                    .onEnded {
-                        viewModel.toggleTestMode()
-                    }
+                    .onEnded { micManager.toggleTestMode() }
             )
+            .onAppear {
+                startHapticEngine()
+                withAnimation(.linear(duration: 3.0).repeatForever(autoreverses: false)) {
+                    sweepAngle = 360
+                }
+            }
         }
         .aspectRatio(1, contentMode: .fit)
         .padding()
     }
     
-    // MARK: - Sub-Views
-    struct RadarDotView: View {
-        let event: SoundEvent
-        let size: CGSize
-        let isTestMode: Bool
-        let userHeading: Double
-        
-        var body: some View {
-            // Use the event's internal distance. If it's missing, default to 0.75
-            // so it stays on the 3rd ring until we update the SoundEvent model.
-            let eventDistance = event.distance
-            
-            let relativeAngle = event.bearing - userHeading
-            
-            // Pass eventDistance instead of a hardcoded 0.75
-            let position = calculatePosition(for: relativeAngle, proximity: eventDistance, in: size)
-            
-            let age = Date().timeIntervalSince(event.timestamp)
-            let opacity = max(0.0, 1.0 - age / 2.5)
-            
-            Circle()
-                .fill(determineColor())
-                .frame(width: 12, height: 12)
-                .shadow(color: determineColor().opacity(0.9), radius: 8)
-                .opacity(opacity)
-                .position(position) // This uses the CGPoint from calculatePosition
+    private func drawRadarGrid(ctx: GraphicsContext, center: CGPoint, radius: CGFloat, heading: Double) {
+        // Rings
+        for i in 1...4 {
+            let r = radius * CGFloat(i) / 4
+            let rect = CGRect(x: center.x - r, y: center.y - r, width: r * 2, height: r * 2)
+            ctx.stroke(Path { $0.addEllipse(in: rect) }, with: .color(.green.opacity(0.15)), lineWidth: 1)
         }
         
-        private func determineColor() -> Color {
-            if isTestMode {
-                // FIXED: Use 'bearing' instead of 'angle'
-                let normalizedAngle = Int(event.bearing.truncatingRemainder(dividingBy: 360) + 360) % 360
-                switch normalizedAngle {
-                case 0..<90:    return .red
-                case 90..<180:  return .green
-                case 180..<270: return .yellow
-                case 270..<360: return .blue
-                default:        return .white
-                }
-            } else {
-                return dynamicColor(for: event)
-            }
-        }
+        // Thin crosshairs (rotated correctly)
+        let rot = -heading * .pi / 180
+        let v1 = rotatePoint(center, by: rot, radius: -radius)
+        let v2 = rotatePoint(center, by: rot, radius: radius)
+        ctx.stroke(Path { $0.move(to: v1); $0.addLine(to: v2) }, with: .color(.green.opacity(0.3)), lineWidth: 1)
         
-        private func calculatePosition(for angle: Double, proximity: Double, in size: CGSize) -> CGPoint {
-            let center = CGPoint(x: size.width / 2, y: size.height / 2)
-            
-            // The maximum radius is half the width of the view
-            let maxRadius = size.width / 2
-            let actualRadius = maxRadius * CGFloat(proximity)
-            
-            // Adjust angle so 0 degrees is North/Up
-            let adjustedAngle = CGFloat(angle - 90) * .pi / 180
-            
-            return CGPoint(
-                x: center.x + actualRadius * cos(adjustedAngle),
-                y: center.y + actualRadius * sin(adjustedAngle)
-            )
-        }
+        let h1 = rotatePoint(center, by: rot + .pi/2, radius: -radius)
+        let h2 = rotatePoint(center, by: rot + .pi/2, radius: radius)
+        ctx.stroke(Path { $0.move(to: h1); $0.addLine(to: h2) }, with: .color(.green.opacity(0.3)), lineWidth: 1)
         
-        // FIXED: Doppler-based dynamic color
-        private func dynamicColor(for event: SoundEvent) -> Color {
-            // Red means it is approaching you. Cyan means it is receding/driving away.
-            if event.isApproaching {
-                return Color.red
-            } else {
-                return Color.cyan
-            }
-        }
-    }
-    
-    struct RadarBackgroundView: View {
-        var body: some View {
-            ZStack {
-                // 1. Circular Grid Lines
-                ForEach(1...4, id: \.self) { i in
-                    Circle()
-                        .stroke(Color.green.opacity(0.15), lineWidth: 1)
-                        .scaleEffect(CGFloat(i) * 0.25)
-                }
-                
-                // 2. Axis Lines (N-S and E-W)
-                Rectangle().fill(Color.green.opacity(0.3)).frame(width: 1)
-                Rectangle().fill(Color.green.opacity(0.1)).frame(height: 1)
-                
-                // 3. Directional "Indicator Pods" pushed to the outer-outer orbit
-                Group {
-                    DirectionPod(label: "N").offset(y: -190)
-                    DirectionPod(label: "S").offset(y: 190)
-                    DirectionPod(label: "E").offset(x: 190)
-                    DirectionPod(label: "W").offset(x: -190)
-                }
-            }
-        }
-    }
-    
-    struct DirectionPod: View {
-        let label: String
-        
-        var body: some View {
-            ZStack {
-                // The "Pod" Circle
-                Circle()
-                    .fill(Color.black) // Masks the grid line underneath
-                    .frame(width: 24, height: 24)
-                
-                Circle()
-                    .stroke(Color.green.opacity(0.6), lineWidth: 1.5)
-                    .frame(width: 24, height: 24)
-                
-                // The Letter
+        // Cardinal labels
+        let labels = [("N", -90.0), ("E", 0.0), ("S", 90.0), ("W", 180.0)]
+        for (label, deg) in labels {
+            let angle = Angle.degrees(deg - heading)
+            let pos = polarToCartesian(angle: angle.degrees, radius: radius + 32, center: center)
+            ctx.draw(
                 Text(label)
-                    .font(.system(size: 12, weight: .black, design: .monospaced))
-                    .foregroundStyle(.green)
-            }
-        }
-    }
-    
-    struct RadarSweepView: View {
-        @State private var rotation: Double = 0
-        var body: some View {
-            AngularGradient(
-                gradient: Gradient(colors: [.green.opacity(0.5), .clear]),
-                center: .center
+                    .font(.system(size: 14, weight: .black, design: .monospaced))
+                    .foregroundColor(.green),
+                at: pos,
+                anchor: .center
             )
-            .rotationEffect(.degrees(rotation))
-            .onAppear {
-                withAnimation(.linear(duration: 4).repeatForever(autoreverses: false)) {
-                    rotation = 360
-                }
-            }
         }
     }
     
+    private func drawSweep(ctx: GraphicsContext, center: CGPoint, radius: CGFloat, angle: Double) {
+        let path = Path { path in
+            path.move(to: center)
+            let end = polarToCartesian(angle: angle - 90, radius: radius, center: center)
+            path.addLine(to: end)
+        }
+        ctx.stroke(path, with: .color(.green), lineWidth: 2.5)
+    }
+    
+    private func polarToCartesian(angle: Double, radius: CGFloat, center: CGPoint) -> CGPoint {
+        let rad = (angle - 90) * .pi / 180
+        return CGPoint(x: center.x + radius * cos(rad), y: center.y + radius * sin(rad))
+    }
+    
+    private func rotatePoint(_ center: CGPoint, by angle: Double, radius: CGFloat) -> CGPoint {
+        let rad = angle
+        return CGPoint(x: center.x + radius * cos(rad), y: center.y + radius * sin(rad))
+    }
+    
+    private func startHapticEngine() {
+        do {
+            engine = try CHHapticEngine()
+            try engine?.start()
+        } catch {}
+    }
+    
+    private func triggerDirectionalHaptic() {
+        guard let engine else { return }
+        let pattern = CHHapticEvent(eventType: .hapticTransient, parameters: [
+            CHHapticEventParameter(parameterID: .hapticIntensity, value: 0.8),
+            CHHapticEventParameter(parameterID: .hapticSharpness, value: 1.0)
+        ], relativeTime: 0)
+        
+        do {
+            let player = try engine.makePlayer(with: CHHapticPattern(events: [pattern], parameters: []))
+            try player.start(atTime: 0)
+        } catch {}
+    }
 }

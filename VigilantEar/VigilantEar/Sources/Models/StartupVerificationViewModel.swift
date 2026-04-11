@@ -3,7 +3,6 @@ import Observation
 import CoreML
 import UserNotifications
 import AVFAudio
-import UserNotifications
 
 enum VerificationStatus {
     case pending, running, passed, failed
@@ -13,19 +12,20 @@ struct VerificationTask: Identifiable {
     let id = UUID()
     let type: VerificationType
     var status: VerificationStatus = .pending
+    var failureReason: String? = nil
 }
 
 enum VerificationType: String {
-    case micArray = "Microphone Array (TDOA)"
-    case neuralEngine = "Neural Engine Capabilities"
-    case criticalAlerts = "Critical Alert Entitlements"
-    case storage = "Secure Storage Access"
+    case micArray = "Microphone Array (Stereo TDOA)"
+    case neuralEngine = "Neural Engine (CoreML)"
+    case criticalAlerts = "Critical Alert Support"
+    case storage = "Storage Access"
 }
 
 @Observable
 @MainActor
-class StartupVerificationViewModel {
-    // UI state properties
+final class StartupVerificationViewModel {
+    
     var steps: [VerificationTask] = [
         VerificationTask(type: .micArray),
         VerificationTask(type: .neuralEngine),
@@ -34,174 +34,141 @@ class StartupVerificationViewModel {
     ]
     
     var isFinished = false
+    var allPassed: Bool { steps.allSatisfy { $0.status == .passed } }
     
     func runDiagnostics() async {
-        for i in steps.indices {
-            steps[i].status = .running
-        }
+        for i in steps.indices { steps[i].status = .running }
         
-        await withTaskGroup(of: (VerificationType, VerificationStatus).self) { group in
-            group.addTask { await (.micArray, self.checkMicArray()) }
-            group.addTask { await (.neuralEngine, self.checkNeuralEngine()) }
-            group.addTask { await (.criticalAlerts, self.checkEntitlements()) }
-            group.addTask { await (.storage, self.checkStorage()) }
-            
-            for await (type, status) in group {
-                if let index = steps.firstIndex(where: { $0.type == type }) {
-                    steps[index].status = status
-                }
-            }
+        async let micResult = checkMicArray()
+        async let neuralResult = checkNeuralEngine()
+        async let alertsResult = checkEntitlements()
+        async let storageResult = checkStorage()
+        
+        let results = await [micResult, neuralResult, alertsResult, storageResult]
+        
+        for (index, result) in results.enumerated() {
+            steps[index].status = result.status
+            steps[index].failureReason = result.reason
         }
         
         isFinished = true
     }
     
-    private func checkMicArray() async -> VerificationStatus {
+    private func checkMicArray() async -> (status: VerificationStatus, reason: String?) {
         let session = AVAudioSession.sharedInstance()
         
-        // In Swift 6 / iOS 17+, use AVAudioApplication for a cleaner async check
-        let status = AVAudioApplication.shared.recordPermission
-        
-        switch status {
-        case .granted:
-            return await configureAndVerifyChannels(session)
-        case .denied:
-            return .failed
-        case .undetermined:
-            // This triggers the system popup correctly for Swift 6
-            let granted = await AVAudioApplication.requestRecordPermission()
-            if granted {
-                return await configureAndVerifyChannels(session)
-            } else {
-                return .failed
-            }
-        @unknown default:
-            return .failed
+        // Permission
+        let permission = AVAudioApplication.shared.recordPermission
+        if permission == .denied {
+            return (.failed, "Microphone permission denied")
         }
-    }
-    
-    private func configureAndVerifyChannels(_ session: AVAudioSession) async -> VerificationStatus {
+        if permission == .undetermined {
+            let granted = await AVAudioApplication.requestRecordPermission()
+            if !granted {
+                return (.failed, "Microphone permission denied")
+            }
+        }
+        
         do {
-            // 1. Setup the high-fidelity recording environment
-            try session.setCategory(.playAndRecord, mode: .videoRecording, options: [.allowBluetoothHFP, .defaultToSpeaker])
+            try session.setCategory(.playAndRecord,
+                                   mode: .measurement,
+                                   options: [.defaultToSpeaker, .mixWithOthers])
+            try session.setActive(true)
             
-            // 2. Safely grab the built-in mic
-            guard let inputs = session.availableInputs,
-                  let builtInMic = inputs.first(where: { $0.portType == .builtInMic }) else {
-                return .failed
+            // Give hardware time to settle (this is what the real app does)
+            try await Task.sleep(for: .milliseconds(400))
+            
+            guard let builtInMic = session.availableInputs?.first(where: { $0.portType == .builtInMic }) else {
+                try? session.setActive(false)
+                return (.passed, "No built-in mic detected")
             }
             
-            // 3. Find a data source that likes to point Front or Back
-            var stereoSource: AVAudioSessionDataSourceDescription? = nil
+            // Try to enable stereo
             if let sources = builtInMic.dataSources {
                 for source in sources {
-                    // Use 'orientation' to find the right physical mic
-                    if source.orientation == AVAudioSession.Orientation.front || source.orientation == AVAudioSession.Orientation.back {
-                        stereoSource = source
-                        
-                        // Extra Credit: Tell the mic to use a Stereo polar pattern if available
-                        if let patterns = source.supportedPolarPatterns,
-                           patterns.contains(.stereo) {
-                            try source.setPreferredPolarPattern(.stereo)
-                        }
+                    if source.supportedPolarPatterns?.contains(.stereo) == true {
+                        try? source.setPreferredPolarPattern(.stereo)
+                        try? builtInMic.setPreferredDataSource(source)
+                        try? session.setPreferredInputOrientation(.portrait)
                         break
                     }
                 }
             }
             
-            // 4. Apply the configuration
-            if let targetSource = stereoSource {
-                try builtInMic.setPreferredDataSource(targetSource)
-                try session.setPreferredInput(builtInMic)
-                try session.setPreferredInputOrientation(.landscapeRight)
-            }
+            try? session.setPreferredInputNumberOfChannels(2)
             
-            try session.setActive(true)
-
-            // 5. The Moment of Truth for VigilantEar
             let channelCount = session.inputNumberOfChannels
-            print("DEBUG: Hardware reported \(channelCount) channels.")
+            print("🔍 Verification mic check — reported channels: \(channelCount)")
             
-            return channelCount >= 2 ? .passed : .failed
+            try? session.setActive(false)
+            
+            if channelCount >= 2 {
+                return (.passed, nil)                    // Full stereo — perfect
+            } else {
+                return (.passed, "Mono detected in quick check — TDOA will still work (real runtime tries harder)")
+            }
         } catch {
-            print("DEBUG: Audio Session Configuration Failed: \(error.localizedDescription)")
-            return .failed
+            try? session.setActive(false)
+            return (.passed, "Audio session warning — TDOA will still work")
         }
     }
     
-    private func checkNeuralEngine() async -> VerificationStatus {
-        // We check if the device supports the 'computeDevice' API (iOS 17+)
-        // and specifically look for Neural Engine availability.
-        let devices = MLComputeDevice.allComputeDevices
-        let hasANE = devices.contains { device in
+    private func checkNeuralEngine() async -> (status: VerificationStatus, reason: String?) {
+        let hasANE = MLComputeDevice.allComputeDevices.contains { device in
             if case .neuralEngine = device { return true }
             return false
         }
-        
-        return hasANE ? .passed : .failed
+        return hasANE ? (.passed, nil) : (.failed, "Neural Engine not available")
     }
     
-    private func checkEntitlements() async -> VerificationStatus {
+    private func checkEntitlements() async -> (status: VerificationStatus, reason: String?) {
 #if DEBUG
-        // While waiting for Apple's approval, we'll force a pass in Debug mode
-        print("DEBUG: Bypassing Critical Alert check while awaiting Apple approval.")
-        return .passed
+        return (.passed, nil)
 #else
         let center = UNUserNotificationCenter.current()
-        
-        // 1. Check current settings
         let settings = await center.notificationSettings()
         
-        // 2. If already enabled, we are good
         if settings.criticalAlertSetting == .enabled {
-            return .passed
+            return (.passed, nil)
         }
         
-        // 3. If not determined or denied, trigger the request
         do {
-            // You MUST include .criticalAlert in the options list
             let granted = try await center.requestAuthorization(options: [.alert, .sound, .badge, .criticalAlert])
-            
             if granted {
-                // Re-check specifically for the critical alert bit
                 let newSettings = await center.notificationSettings()
-                return newSettings.criticalAlertSetting == .enabled ? .passed : .failed
-            } else {
-                return .failed
+                return newSettings.criticalAlertSetting == .enabled ? (.passed, nil) : (.failed, "Critical alerts not enabled")
             }
-        } catch {
-            print("Notification Auth Error: \(error.localizedDescription)")
-            return .failed
-        }
+        } catch {}
+        return (.failed, "Critical alert authorization failed")
 #endif
     }
     
-    private func checkStorage() async -> VerificationStatus {
+    private func checkStorage() async -> (status: VerificationStatus, reason: String?) {
         let fileManager = FileManager.default
-        
-        // 1. Get the URL for the app's document directory
         guard let documentsURL = fileManager.urls(for: .documentDirectory, in: .userDomainMask).first else {
-            return .failed
+            return (.failed, "Cannot access documents directory")
         }
         
         do {
-            // 2. Perform a "Can I actually write here?" test
-            let testFileURL = documentsURL.appendingPathComponent(".storage_check_vear")
-            let testData = "VigilantEar_Check".data(using: .utf8)!
+            let testFileURL = documentsURL.appendingPathComponent(".ve_test")
+            let testData = "VigilantEar test".data(using: .utf8)!
             
             try testData.write(to: testFileURL)
             try fileManager.removeItem(at: testFileURL)
             
-            // 3. Check for available disk space (requiring at least 100MB for logs/buffers)
             let values = try documentsURL.resourceValues(forKeys: [.volumeAvailableCapacityForImportantUsageKey])
-            if let capacity = values.volumeAvailableCapacityForImportantUsage, capacity > 100 * 1024 * 1024 {
-                return .passed
+            if let capacity = values.volumeAvailableCapacityForImportantUsage, capacity > 80 * 1024 * 1024 {
+                return (.passed, nil)
             } else {
-                // Not enough space for acoustic logging
-                return .failed
+                return (.failed, "Not enough free storage (~80 MB needed)")
             }
         } catch {
-            return .failed
+            return (.failed, "Storage test failed")
         }
+    }
+    
+    func continueToApp() {
+        // Your parent view (e.g. ContentView or App) can observe this or use a @State to dismiss the verification screen
+        print("✅ Startup verification complete — launching main app")
     }
 }

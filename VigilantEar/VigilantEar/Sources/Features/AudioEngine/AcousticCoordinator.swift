@@ -7,23 +7,84 @@ final class AcousticCoordinator: NSObject {
     
     static let bufferSize = 4096
     
-    private let tdoaProcessor = TDOAProcessor()
-    private let fftProcessor = FFTProcessor(sampleCount: AcousticCoordinator.bufferSize)
+    private let tdoaProcessor = TDOAProcessor()           // temporary fallback only
+    private let fftProcessor = FFTProcessor(fftSize: AcousticCoordinator.bufferSize)
     
-    // MARK: - Constants & Calibration
     private let sampleRate: Double = 44100.0
-    private let cooldownInterval: TimeInterval = 0.05 // 50ms for high-speed tracking
+    private let cooldownInterval: TimeInterval = 0.05
+    private let micDistanceMeters: Double = 0.14          // ← iPhone mic spacing (calibrate later)
     
-    // MARK: - State Persistence
     private var lastEventTime = Date.distantPast
     private var smoothedBearing: Double?
     private var smoothedProximity: Double?
     
-    // Doppler State
-    private var previousDominantFrequency: Double?
-    private var previousFrequencyTimestamp: Double?
+    // Doppler EMA baseline
+    private var baselineFreq: Double = 0.0
+    private let alpha: Double = 0.1
     
-    // MARK: - Processing Flow
+    // MARK: - Unified Stereo Path (preferred)
+    func processStereoBuffer(
+        left: [Float],
+        right: [Float],
+        sampleRate: Double,
+        classification: String,
+        currentRMS: Float
+    ) -> SoundEvent? {
+        
+        let now = Date()
+        let floor: Float = 0.01
+        
+        guard currentRMS > floor * 1.001,
+              now.timeIntervalSince(lastEventTime) > cooldownInterval else { return nil }
+        
+        // === TDOA (GCC-PHAT) ===
+        let tdoaResult = fftProcessor.computeTDOA(left: left, right: right, sampleRate: sampleRate)
+        let phoneRelativeAngle: Double = if let (delay, _) = tdoaResult {
+            asin((delay * 343.0) / micDistanceMeters) * (180.0 / .pi)
+        } else {
+            tdoaProcessor.calculateAngleFromSamples(left, sampleRate: sampleRate) // fallback
+        }
+        
+        // Adaptive smoothing
+        let ratio = Double(currentRMS / floor)
+        let bearingSmoothing = ratio < 3.0 ? 0.95 : 0.70
+        if let last = smoothedBearing {
+            smoothedBearing = (last * bearingSmoothing) + (phoneRelativeAngle * (1 - bearingSmoothing))
+        } else {
+            smoothedBearing = phoneRelativeAngle
+        }
+        let finalBearing = smoothedBearing ?? phoneRelativeAngle
+        
+        // Proximity (logarithmic)
+        let dbAboveFloor = 20 * log10(max(1.0, ratio))
+        let finalProximity = min(0.95, max(0.05, 1.0 - (dbAboveFloor / 60.0)))
+        
+        // === DOPPLER (EMA + velocity) ===
+        let (currentFreq, conf) = fftProcessor.analyze(samples: left, sampleRate: sampleRate)
+        guard conf > 0.6 else {
+            lastEventTime = now
+            return nil
+        }
+        
+        if abs(currentFreq - baselineFreq) < 10 {
+            baselineFreq = alpha * currentFreq + (1 - alpha) * baselineFreq
+        }
+        
+        let deltaF = currentFreq - baselineFreq
+        let velocityMS = 343.0 * (deltaF / baselineFreq)
+        let isApproaching = velocityMS > 0
+        
+        lastEventTime = now
+        
+        return SoundEvent(
+            timestamp: now,
+            threatLabel: classification,
+            bearing: finalBearing,
+            distance: finalProximity,
+            dopplerRate: Float(velocityMS),
+            isApproaching: isApproaching
+        )
+    }
     
     func processFromSamples(
         _ samples: [Float],
@@ -34,76 +95,49 @@ final class AcousticCoordinator: NSObject {
     ) -> SoundEvent? {
         
         let now = Date()
-        let floor: Float = 0.01 // Your calibrated 'Sweet Spot' floor
+        let floor: Float = 0.01
         
-        // 1. SENSITIVITY GATE: 1% above floor allows for long "tails" on whistles
-        guard currentRMS > floor * 1.001 else { return nil }
+        // Only create events for meaningful sounds (ignore "Monitoring...")
+        guard classification != "Monitoring..." else { return nil }
         
-        // 2. COOLDOWN: Prevents CPU thrashing while allowing fluid movement
+        guard currentRMS > floor * 0.15 else { return nil }
         guard now.timeIntervalSince(lastEventTime) > cooldownInterval else { return nil }
         
-        // --- BEARING (TDOA) ---
-        let phoneRelativeAngle = tdoaProcessor.calculateAngleFromSamples(samples, sampleRate: sampleRate)
-        // Note: Replace 0.0 with currentHeading if passed from Manager,
-        // or add a heading property to this class.
-        let worldAngle = phoneRelativeAngle
+        // Mono fallback — center the dot for now
+        let finalBearing: Double = 0.0
         
-        // Adaptive Smoothing: If signal is weak (Ratio < 3), freeze position more strictly
         let ratio = Double(currentRMS / floor)
-        let bearingSmoothing = ratio < 3.0 ? 0.95 : 0.70
+        let finalProximity = min(0.95, max(0.05, 1.0 - (20 * log10(max(1.0, ratio)) / 60.0)))
         
-        if let lastSmooth = smoothedBearing {
-            smoothedBearing = (lastSmooth * bearingSmoothing) + (worldAngle * (1.0 - bearingSmoothing))
-        } else {
-            smoothedBearing = worldAngle
-        }
-        let finalBearing = smoothedBearing ?? worldAngle
+        let (currentFreq, _) = fftProcessor.analyze(samples: samples, sampleRate: sampleRate)
         
-        // Logarithmic distance: The more 'dB' above the floor, the closer it gets.
-        // This handles a whisper and a siren in the same math.
-        let dbAboveFloor = 20 * log10(max(1.0, ratio))
-        let maxDbRange: Double = 60.0 // Adjust this: Lower = more sensitive, Higher = less sensitive
-        let finalProximity = min(0.95, max(0.05, 1.0 - (dbAboveFloor / maxDbRange)))
-        
-        // --- DOPPLER (FREQUENCY SHIFT) ---
-        let currentFreq = fftProcessor.analyze(samples: samples, sampleRate: sampleRate)
-        var dopplerRate: Float? = nil
-        var isApproaching = false
-        let currentTimestamp = now.timeIntervalSince1970
-        
-        if let prevFreq = previousDominantFrequency, let prevTime = previousFrequencyTimestamp {
-            let timeDelta = currentTimestamp - prevTime
-            if timeDelta > 0 && timeDelta < 2.0 { // 2s window for frequency memory
-                let frequencyDelta = currentFreq - prevFreq
-                let rate = Float(frequencyDelta / timeDelta)
-                dopplerRate = rate
-                
-                // If frequency is rising, object is approaching
-                if rate > 5.0 { isApproaching = true }
-            }
+        if abs(currentFreq - baselineFreq) < 10 {
+            baselineFreq = alpha * currentFreq + (1 - alpha) * baselineFreq
         }
         
-        // Update Doppler State
-        self.previousDominantFrequency = currentFreq
-        self.previousFrequencyTimestamp = currentTimestamp
-        self.lastEventTime = now
+        let deltaF = currentFreq - baselineFreq
+        let velocityMS = 343.0 * (deltaF / (baselineFreq > 0 ? baselineFreq : 440.0))
+        let isApproaching = velocityMS > 0
         
-        // 3. GENERATE EVENT
-        return SoundEvent(
+        lastEventTime = now
+        
+        let event = SoundEvent(
             timestamp: now,
             threatLabel: classification,
             bearing: finalBearing,
             distance: finalProximity,
-            dopplerRate: dopplerRate,
+            dopplerRate: Float(velocityMS),
             isApproaching: isApproaching
         )
+        
+        print("📦 CREATED REAL EVENT → '\(classification)' @ \(String(format: "%.0f", finalBearing))° | RMS=\(String(format: "%.4f", currentRMS))")
+        
+        return event
     }
-    
-    // Reset state when a sound disappears
+
     func resetSmoothing() {
         smoothedBearing = nil
         smoothedProximity = nil
-        previousDominantFrequency = nil
-        previousFrequencyTimestamp = nil
+        baselineFreq = 0.0
     }
 }

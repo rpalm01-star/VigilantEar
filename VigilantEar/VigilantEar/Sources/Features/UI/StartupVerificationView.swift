@@ -7,16 +7,33 @@ struct StartupVerificationView: View {
         VStack(spacing: 30) {
             headerSection
             
-            // Fixed: No '$' prefix needed for ForEach with @Observable
             List(viewModel.steps) { step in
                 VerificationRow(step: step)
             }
             .listStyle(.plain)
-            .frame(maxHeight: 300)
+            .frame(maxHeight: 340)
             
             if !viewModel.isFinished {
-                ProgressView("Running Diagnostics...")
+                ProgressView("Running hardware diagnostics...")
                     .padding()
+            } else if viewModel.allPassed {
+                Text("✅ All systems ready!")
+                    .font(.title3.bold())
+                    .foregroundStyle(.green)
+            } else {
+                Text("⚠️ Some checks failed.\nThe app may have limited functionality.")
+                    .font(.subheadline)
+                    .foregroundStyle(.orange)
+                    .multilineTextAlignment(.center)
+            }
+            
+            if viewModel.isFinished {
+                Button("Continue to App") {
+                    viewModel.continueToApp()
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(!viewModel.allPassed)
+                .padding(.top, 10)
             }
         }
         .padding()
@@ -31,7 +48,7 @@ struct StartupVerificationView: View {
         VStack(spacing: 10) {
             Image(systemName: "waveform.circle.fill")
                 .font(.system(size: 60))
-                .foregroundColor(.blue)
+                .foregroundStyle(.blue)
             
             Text("VigilantEar")
                 .font(.largeTitle.bold())
@@ -52,8 +69,14 @@ struct VerificationRow: View {
             Text(step.type.rawValue)
             Spacer()
             statusIcon
+            if let reason = step.failureReason {
+                Text(reason)
+                    .font(.caption)
+                    .foregroundStyle(.red)
+                    .padding(.leading, 8)
+            }
         }
-        .padding(.vertical, 4)
+        .padding(.vertical, 6)
     }
     
     @ViewBuilder

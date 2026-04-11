@@ -8,14 +8,15 @@ import Observation
 @Observable
 class MicrophoneManager: NSObject, CLLocationManagerDelegate {
     
-    // MARK: - State Properties
     var events: [SoundEvent] = []
     var isTestMode: Bool = false
     var currentHeading: Double = 0.0
     var micWarning: String? = nil
     var latestDetection: String? = nil
     
-    // MARK: - Private Properties
+    /// Public status for UI (green listening dot)
+    public var isListening: Bool { isRunning }
+    
     private let coordinator: AcousticCoordinator
     private let classificationService: ClassificationService
     private let locationManager = CLLocationManager()
@@ -25,7 +26,6 @@ class MicrophoneManager: NSObject, CLLocationManagerDelegate {
     private var isRunning = false
     private var realTimeEvents: [SoundEvent] = []
     
-    // MARK: - Initialization
     init(coordinator: AcousticCoordinator, classificationService: ClassificationService) {
         self.coordinator = coordinator
         self.classificationService = classificationService
@@ -48,58 +48,41 @@ class MicrophoneManager: NSObject, CLLocationManagerDelegate {
         }
     }
     
-    // MARK: - Audio Engine Control
-    
     func startCapturing() {
         guard !isRunning else { return }
         
         let session = AVAudioSession.sharedInstance()
         do {
-            // 1. ATOMIC SETUP: Set category and mode in a single call to prevent -50 errors.
-            // We use .measurement for raw data, and .defaultToSpeaker to ensure we don't get 'phone call' volume.
             try session.setCategory(.playAndRecord, mode: .measurement, options: [.defaultToSpeaker, .mixWithOthers])
-            
-            // 2. ACTIVATE FIRST: Hardware properties cannot be changed until the session is 'Live'.
             try session.setActive(true, options: .notifyOthersOnDeactivation)
-            
-            // 3. HARDWARE CONFIG: Now that session is active, request Stereo.
             configureHardwareForStereo(session: session)
             
-            // 4. START ENGINE: Short delay to let the hardware 'settle' into stereo mode.
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
                 self?.startAudioTap()
             }
-            
             print("✅ Audio Session Active (Measurement Mode)")
         } catch {
             print("❌ Audio Session Critical Failure: \(error)")
-            // If .measurement fails, the hardware might not support it; fallback to .default
-            try? session.setMode(.default)
-            try? session.setActive(true)
         }
     }
     
     private func configureHardwareForStereo(session: AVAudioSession) {
         guard let builtInMic = session.availableInputs?.first(where: { $0.portType == .builtInMic }) else { return }
-        
         do {
             try session.setPreferredInput(builtInMic)
             if let sources = builtInMic.dataSources {
-                // Find the data source that supports Stereo (usually Front or Back mic)
                 for source in sources {
                     if source.supportedPolarPatterns?.contains(.stereo) == true {
                         try source.setPreferredPolarPattern(.stereo)
                         try builtInMic.setPreferredDataSource(source)
-                        // Align the L/R channels to the phone's physical portrait orientation
                         try session.setPreferredInputOrientation(.portrait)
                         break
                     }
                 }
             }
-            // Explicitly request 2 channels for TDOA math
             try session.setPreferredInputNumberOfChannels(2)
         } catch {
-            print("⚠️ Hardware Stereo Config failed (Non-critical): \(error)")
+            print("⚠️ Hardware Stereo Config failed (non-critical): \(error)")
         }
     }
     
@@ -107,7 +90,6 @@ class MicrophoneManager: NSObject, CLLocationManagerDelegate {
         let inputNode = audioEngine.inputNode
         if tapInstalled { inputNode.removeTap(onBus: 0) }
         
-        // FIX: Match hardware format EXACTLY to prevent -50 Error during tap installation.
         let hardwareFormat = inputNode.inputFormat(forBus: 0)
         
         inputNode.installTap(onBus: 0, bufferSize: 4096, format: hardwareFormat) { [weak self] buffer, _ in
@@ -116,25 +98,39 @@ class MicrophoneManager: NSObject, CLLocationManagerDelegate {
             let frameLength = Int(buffer.frameLength)
             guard let channelData = buffer.floatChannelData else { return }
             
-            // Extract Mic 1 (Left) samples
-            let mic1Samples = Array(UnsafeBufferPointer(start: channelData[0], count: frameLength))
-            let rms1 = self.calculateRMS(of: mic1Samples)
+            let leftSamples = Array(UnsafeBufferPointer(start: channelData[0], count: frameLength))
+            let rms = self.calculateRMS(of: leftSamples)
             
-            // Process (Background Thread)
-            if let newEvent = self.coordinator.processFromSamples(
-                mic1Samples,
-                sampleRate: buffer.format.sampleRate,
-                classification: self.classificationService.currentClassification,
-                confidence: 0.0,
-                currentRMS: rms1
-            ) {
-                // UI (Main Actor)
+            // === STEREO PATH (real TDOA + Doppler) ===
+            var newEvent: SoundEvent?
+            if buffer.format.channelCount >= 2 {
+                let rightSamples = Array(UnsafeBufferPointer(start: channelData[1], count: frameLength))
+                newEvent = self.coordinator.processStereoBuffer(
+                    left: leftSamples,
+                    right: rightSamples,
+                    sampleRate: buffer.format.sampleRate,
+                    classification: self.classificationService.currentClassification,
+                    currentRMS: rms
+                )
+            } else {
+                // fallback mono
+                newEvent = self.coordinator.processFromSamples(
+                    leftSamples,
+                    sampleRate: buffer.format.sampleRate,
+                    classification: self.classificationService.currentClassification,
+                    confidence: 0.0,
+                    currentRMS: rms
+                )
+            }
+            
+            if let event = newEvent {
                 Task { @MainActor in
-                    self.processNewEvent(newEvent, rms1: rms1)
+                    self.processNewEvent(event, rms1: rms)
                 }
             }
             
-            self.classificationService.classify(buffer: mic1Samples, sampleRate: buffer.format.sampleRate)
+            // Classification still runs on left channel (fastest)
+            self.classificationService.classify(buffer: leftSamples, sampleRate: buffer.format.sampleRate)
         }
         
         tapInstalled = true
@@ -143,7 +139,7 @@ class MicrophoneManager: NSObject, CLLocationManagerDelegate {
             audioEngine.prepare()
             try audioEngine.start()
             isRunning = true
-            print("✅ Audio Engine Flowing")
+            print("✅ Audio Engine Flowing (Stereo TDOA enabled)")
         } catch {
             print("❌ Engine Start Failed: \(error)")
         }
@@ -152,25 +148,20 @@ class MicrophoneManager: NSObject, CLLocationManagerDelegate {
     @MainActor
     private func processNewEvent(_ event: SoundEvent, rms1: Float) {
         let now = Date()
-        
-        // Use a combination of Label and Bearing to identify a 'unique' source
-        // This allows a Whistle at 10° and a Bell at 90° to be two separate dots.
         if let index = self.realTimeEvents.firstIndex(where: {
             $0.threatLabel == event.threatLabel && abs($0.bearing - event.bearing) < 20.0
         }) {
             self.realTimeEvents[index].bearing = event.bearing
             self.realTimeEvents[index].distance = event.distance
             self.realTimeEvents[index].timestamp = now
+            self.realTimeEvents[index].dopplerRate = event.dopplerRate
+            self.realTimeEvents[index].isApproaching = event.isApproaching
         } else {
             self.realTimeEvents.append(event)
         }
-        
-        // Keep dots on screen for 5 seconds of silence
         self.realTimeEvents.removeAll { now.timeIntervalSince($0.timestamp) > 5.0 }
         self.events = self.realTimeEvents
     }
-
-    // MARK: - Utilities
     
     private func calculateRMS(of signal: [Float]) -> Float {
         var val: Float = 0
@@ -192,33 +183,40 @@ class MicrophoneManager: NSObject, CLLocationManagerDelegate {
     @MainActor
     func toggleTestMode() {
         isTestMode.toggle()
+        
         if isTestMode {
             runQuadrantTest()
+            print("✅ TEST MODE ON — \(events.count) dots")
         } else {
+            // Switch back to real events only
             self.events = realTimeEvents
+            print("✅ TEST MODE OFF — real events: \(realTimeEvents.count) dots")
         }
     }
-    
+
     @MainActor
     private func runQuadrantTest() {
         var testDots: [SoundEvent] = []
         let quadrants = [0...89, 90...179, 180...269, 270...359]
+        
         for range in quadrants {
-            for _ in 1...10 {
-                let mockDoppler = Float.random(in: -15.0...15.0)
+            for _ in 1...8 {
+                let mockDoppler = Float.random(in: -20.0...20.0)
                 let event = SoundEvent(
                     timestamp: Date(),
-                    threatLabel: "Diagnostic",
+                    threatLabel: "TEST",
                     bearing: Double.random(in: Double(range.lowerBound)...Double(range.upperBound)),
-                    distance: Double.random(in: 0.1...0.9),
+                    distance: Double.random(in: 0.25...0.85),
                     dopplerRate: mockDoppler,
                     isApproaching: mockDoppler > 0
                 )
                 testDots.append(event)
             }
         }
-        self.events = testDots
+        
+        self.events = testDots          // only temporary
+        // DO NOT touch realTimeEvents here
+        print("📍 Test mode: created \(testDots.count) dots")
     }
-    
     deinit { stopCapturing() }
 }
