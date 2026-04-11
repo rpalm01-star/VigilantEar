@@ -13,11 +13,20 @@ struct RadarView: View {
                 let center = CGPoint(x: size.width / 2, y: size.height / 2)
                 let radius = min(size.width, size.height) / 2.1
                 
-                // Background rings + labels (rotate with heading)
-                drawRadarGrid(ctx: ctx, center: center, radius: radius, heading: micManager.currentHeading)
+                // Only rings
+                for i in 1...4 {
+                    let r = radius * CGFloat(i) / 4
+                    let rect = CGRect(x: center.x - r, y: center.y - r, width: r * 2, height: r * 2)
+                    ctx.stroke(Path { $0.addEllipse(in: rect) }, with: .color(.green.opacity(0.15)), lineWidth: 1)
+                }
                 
-                // Clean sweep line
-                drawSweep(ctx: ctx, center: center, radius: radius, angle: sweepAngle)
+                // Clean sweep
+                let sweepPath = Path { path in
+                    path.move(to: center)
+                    let end = polarToCartesian(angle: sweepAngle, radius: radius, center: center)
+                    path.addLine(to: end)
+                }
+                ctx.stroke(sweepPath, with: .color(.green), lineWidth: 2.5)
                 
                 // Dots
                 for event in micManager.events {
@@ -45,7 +54,6 @@ struct RadarView: View {
             .overlay(Circle().stroke(Color.green.opacity(0.3), lineWidth: 3))
             .contentShape(Circle())
             
-            // Test mode banner
             .overlay(alignment: .top) {
                 if micManager.isTestMode {
                     Text("TEST MODE ON — DOUBLE-TAP TO EXIT")
@@ -74,55 +82,8 @@ struct RadarView: View {
         .padding()
     }
     
-    private func drawRadarGrid(ctx: GraphicsContext, center: CGPoint, radius: CGFloat, heading: Double) {
-        // Rings
-        for i in 1...4 {
-            let r = radius * CGFloat(i) / 4
-            let rect = CGRect(x: center.x - r, y: center.y - r, width: r * 2, height: r * 2)
-            ctx.stroke(Path { $0.addEllipse(in: rect) }, with: .color(.green.opacity(0.15)), lineWidth: 1)
-        }
-        
-        // Thin crosshairs (rotated correctly)
-        let rot = -heading * .pi / 180
-        let v1 = rotatePoint(center, by: rot, radius: -radius)
-        let v2 = rotatePoint(center, by: rot, radius: radius)
-        ctx.stroke(Path { $0.move(to: v1); $0.addLine(to: v2) }, with: .color(.green.opacity(0.3)), lineWidth: 1)
-        
-        let h1 = rotatePoint(center, by: rot + .pi/2, radius: -radius)
-        let h2 = rotatePoint(center, by: rot + .pi/2, radius: radius)
-        ctx.stroke(Path { $0.move(to: h1); $0.addLine(to: h2) }, with: .color(.green.opacity(0.3)), lineWidth: 1)
-        
-        // Cardinal labels
-        let labels = [("N", -90.0), ("E", 0.0), ("S", 90.0), ("W", 180.0)]
-        for (label, deg) in labels {
-            let angle = Angle.degrees(deg - heading)
-            let pos = polarToCartesian(angle: angle.degrees, radius: radius + 32, center: center)
-            ctx.draw(
-                Text(label)
-                    .font(.system(size: 14, weight: .black, design: .monospaced))
-                    .foregroundColor(.green),
-                at: pos,
-                anchor: .center
-            )
-        }
-    }
-    
-    private func drawSweep(ctx: GraphicsContext, center: CGPoint, radius: CGFloat, angle: Double) {
-        let path = Path { path in
-            path.move(to: center)
-            let end = polarToCartesian(angle: angle - 90, radius: radius, center: center)
-            path.addLine(to: end)
-        }
-        ctx.stroke(path, with: .color(.green), lineWidth: 2.5)
-    }
-    
     private func polarToCartesian(angle: Double, radius: CGFloat, center: CGPoint) -> CGPoint {
         let rad = (angle - 90) * .pi / 180
-        return CGPoint(x: center.x + radius * cos(rad), y: center.y + radius * sin(rad))
-    }
-    
-    private func rotatePoint(_ center: CGPoint, by angle: Double, radius: CGFloat) -> CGPoint {
-        let rad = angle
         return CGPoint(x: center.x + radius * cos(rad), y: center.y + radius * sin(rad))
     }
     
