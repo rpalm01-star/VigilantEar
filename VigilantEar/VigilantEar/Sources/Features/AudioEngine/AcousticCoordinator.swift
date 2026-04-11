@@ -7,22 +7,18 @@ final class AcousticCoordinator: NSObject {
     
     static let bufferSize = 4096
     
-    private let tdoaProcessor = TDOAProcessor()           // temporary fallback only
     private let fftProcessor = FFTProcessor(fftSize: AcousticCoordinator.bufferSize)
     
     private let sampleRate: Double = 44100.0
     private let cooldownInterval: TimeInterval = 0.05
-    private let micDistanceMeters: Double = 0.14          // ← iPhone mic spacing (calibrate later)
     
     private var lastEventTime = Date.distantPast
     private var smoothedBearing: Double?
-    private var smoothedProximity: Double?
     
-    // Doppler EMA baseline
     private var baselineFreq: Double = 0.0
     private let alpha: Double = 0.1
     
-    // MARK: - Unified Stereo Path (preferred)
+    // MARK: - Unified Stereo Path
     func processStereoBuffer(
         left: [Float],
         right: [Float],
@@ -32,60 +28,94 @@ final class AcousticCoordinator: NSObject {
     ) -> SoundEvent? {
         
         let now = Date()
-        let floor: Float = 0.01
+        let floor: Float = 0.005
         
         guard currentRMS > floor * 1.001,
               now.timeIntervalSince(lastEventTime) > cooldownInterval else { return nil }
         
-        // === TDOA (GCC-PHAT) ===
-        let tdoaResult = fftProcessor.computeTDOA(left: left, right: right, sampleRate: sampleRate)
-        let phoneRelativeAngle: Double = if let (delay, _) = tdoaResult {
-            asin((delay * 343.0) / micDistanceMeters) * (180.0 / .pi)
+        // === 1. ILD GEOMETRY (Apple's DSP Panning) ===
+        // We calculate the independent power of the Left and Right channels
+        var leftRMS: Float = 0
+        vDSP_rmsqv(left, 1, &leftRMS, vDSP_Length(left.count))
+        
+        var rightRMS: Float = 0
+        vDSP_rmsqv(right, 1, &rightRMS, vDSP_Length(right.count))
+        
+        let totalPower = leftRMS + rightRMS
+        let rawAngle: Double
+        
+        if totalPower > 0.0001 {
+            // Balance ranges from -1.0 (All Left) to 1.0 (All Right)
+            let balance = Double((rightRMS - leftRMS) / totalPower)
+            
+            // Map that balance to our 180-degree radar dome (-90° to 90°)
+            // We multiply by an aggressive 150.0 to counteract Apple's center-heavy DSP mixing
+            rawAngle = max(-90.0, min(90.0, balance * 150.0))
         } else {
-            tdoaProcessor.calculateAngleFromSamples(left, sampleRate: sampleRate) // fallback
+            rawAngle = 0.0
         }
         
         // Adaptive smoothing
-        let ratio = Double(currentRMS / floor)
-        let bearingSmoothing = ratio < 3.0 ? 0.95 : 0.70
+        let energyRatio = Double(currentRMS / floor)
+        let bearingSmoothing = energyRatio < 3.0 ? 0.90 : 0.60
         if let last = smoothedBearing {
-            smoothedBearing = (last * bearingSmoothing) + (phoneRelativeAngle * (1 - bearingSmoothing))
+            smoothedBearing = (last * bearingSmoothing) + (rawAngle * (1 - bearingSmoothing))
         } else {
-            smoothedBearing = phoneRelativeAngle
+            smoothedBearing = rawAngle
         }
-        let finalBearing = smoothedBearing ?? phoneRelativeAngle
+        let finalBearing = smoothedBearing ?? rawAngle
         
-        // Proximity (logarithmic)
-        let dbAboveFloor = 20 * log10(max(1.0, ratio))
-        let finalProximity = min(0.95, max(0.05, 1.0 - (dbAboveFloor / 60.0)))
+        // === 2. UI ENERGY ===
+        let ceiling: Float = 0.15
+        let usableRMS = max(0.0, currentRMS - floor)
+        let normalizedEnergy = min(1.0, max(0.2, usableRMS / ceiling))
         
-        // === DOPPLER (EMA + velocity) ===
+        // === 3. DOPPLER VELOCITY ===
         let (currentFreq, conf) = fftProcessor.analyze(samples: left, sampleRate: sampleRate)
-        guard conf > 0.6 else {
-            lastEventTime = now
-            return nil
+        let velocityMS: Double
+        
+        if conf > 0.3 {
+            if baselineFreq == 0.0 {
+                baselineFreq = currentFreq
+            } else if abs(currentFreq - baselineFreq) < 10 {
+                baselineFreq = alpha * currentFreq + (1 - alpha) * baselineFreq
+            }
+            let deltaF = currentFreq - baselineFreq
+            velocityMS = 343.0 * (deltaF / baselineFreq)
+        } else {
+            velocityMS = 0.0
         }
         
-        if abs(currentFreq - baselineFreq) < 10 {
-            baselineFreq = alpha * currentFreq + (1 - alpha) * baselineFreq
-        }
-        
-        let deltaF = currentFreq - baselineFreq
-        let velocityMS = 343.0 * (deltaF / baselineFreq)
         let isApproaching = velocityMS > 0
+        
+        // === 4. HYBRID DISTANCE (Volume + Doppler) ===
+        // 1. Base Distance: Loud sounds plot closer to the center, quiet sounds plot near the edge.
+        // We use the normalizedEnergy we already calculated (0.2 to 1.0)
+        // A maximum energy (1.0) plots at 0.2 radius. Minimum energy plots at 0.9 radius.
+        let baseRadius = 0.9 - (Double(normalizedEnergy) * 0.7)
+        
+        // 2. Doppler Modifier: If the object is actually driving towards us, pull it even closer.
+        let approachFactor = isApproaching ? (Double(velocityMS) / 50.0) : 0.0
+        
+        // Combine them, keeping a safety buffer so it doesn't cross dead-center (0.0)
+        let finalProximity = max(0.05, baseRadius - approachFactor)
         
         lastEventTime = now
         
+        let finalLabel = classification == "Monitoring..." ? "Acoustic Event" : classification
+        
         return SoundEvent(
             timestamp: now,
-            threatLabel: classification,
+            threatLabel: finalLabel,
             bearing: finalBearing,
             distance: finalProximity,
+            energy: normalizedEnergy,
             dopplerRate: Float(velocityMS),
             isApproaching: isApproaching
         )
     }
     
+    // MARK: - Mono Fallback
     func processFromSamples(
         _ samples: [Float],
         sampleRate: Double,
@@ -95,49 +125,63 @@ final class AcousticCoordinator: NSObject {
     ) -> SoundEvent? {
         
         let now = Date()
-        let floor: Float = 0.01
+        let floor: Float = 0.005
         
-        // Only create events for meaningful sounds (ignore "Monitoring...")
-        guard classification != "Monitoring..." else { return nil }
-        
-        guard currentRMS > floor * 0.15 else { return nil }
+        guard currentRMS > floor * 1.5 else { return nil }
         guard now.timeIntervalSince(lastEventTime) > cooldownInterval else { return nil }
         
-        // Mono fallback — center the dot for now
         let finalBearing: Double = 0.0
         
-        let ratio = Double(currentRMS / floor)
-        let finalProximity = min(0.95, max(0.05, 1.0 - (20 * log10(max(1.0, ratio)) / 60.0)))
+        let ceiling: Float = 0.15
+        let usableRMS = max(0.0, currentRMS - floor)
+        let normalizedEnergy = min(1.0, max(0.2, usableRMS / ceiling))
         
-        let (currentFreq, _) = fftProcessor.analyze(samples: samples, sampleRate: sampleRate)
+        let (currentFreq, conf) = fftProcessor.analyze(samples: samples, sampleRate: sampleRate)
+        let velocityMS: Double
         
-        if abs(currentFreq - baselineFreq) < 10 {
-            baselineFreq = alpha * currentFreq + (1 - alpha) * baselineFreq
+        if conf > 0.3 {
+            if baselineFreq == 0.0 {
+                baselineFreq = currentFreq
+            } else if abs(currentFreq - baselineFreq) < 10 {
+                baselineFreq = alpha * currentFreq + (1 - alpha) * baselineFreq
+            }
+            let deltaF = currentFreq - baselineFreq
+            velocityMS = 343.0 * (deltaF / (baselineFreq > 0 ? baselineFreq : 440.0))
+        } else {
+            velocityMS = 0.0
         }
         
-        let deltaF = currentFreq - baselineFreq
-        let velocityMS = 343.0 * (deltaF / (baselineFreq > 0 ? baselineFreq : 440.0))
         let isApproaching = velocityMS > 0
+        
+        // === 4. HYBRID DISTANCE (Volume + Doppler) ===
+        // 1. Base Distance: Loud sounds plot closer to the center, quiet sounds plot near the edge.
+        // We use the normalizedEnergy we already calculated (0.2 to 1.0)
+        // A maximum energy (1.0) plots at 0.2 radius. Minimum energy plots at 0.9 radius.
+        let baseRadius = 0.9 - (Double(normalizedEnergy) * 0.7)
+        
+        // 2. Doppler Modifier: If the object is actually driving towards us, pull it even closer.
+        let approachFactor = isApproaching ? (Double(velocityMS) / 50.0) : 0.0
+        
+        // Combine them, keeping a safety buffer so it doesn't cross dead-center (0.0)
+        let finalProximity = max(0.05, baseRadius - approachFactor)
         
         lastEventTime = now
         
-        let event = SoundEvent(
+        let finalLabel = classification == "Monitoring..." ? "Acoustic Event" : classification
+        
+        return SoundEvent(
             timestamp: now,
-            threatLabel: classification,
+            threatLabel: finalLabel,
             bearing: finalBearing,
             distance: finalProximity,
+            energy: normalizedEnergy,
             dopplerRate: Float(velocityMS),
             isApproaching: isApproaching
         )
-        
-        print("📦 CREATED REAL EVENT → '\(classification)' @ \(String(format: "%.0f", finalBearing))° | RMS=\(String(format: "%.4f", currentRMS))")
-        
-        return event
     }
-
+    
     func resetSmoothing() {
         smoothedBearing = nil
-        smoothedProximity = nil
         baselineFreq = 0.0
     }
 }

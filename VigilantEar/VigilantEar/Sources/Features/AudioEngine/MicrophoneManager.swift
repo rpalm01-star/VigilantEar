@@ -53,14 +53,16 @@ class MicrophoneManager: NSObject, CLLocationManagerDelegate {
         
         let session = AVAudioSession.sharedInstance()
         do {
-            try session.setCategory(.playAndRecord, mode: .measurement, options: [.defaultToSpeaker, .mixWithOthers])
+            // FIX: Must use .videoRecording to allow the 16 Pro Max stereo DSP to function
+            try session.setCategory(.playAndRecord, mode: .videoRecording, options: [.defaultToSpeaker, .mixWithOthers])
             try session.setActive(true, options: .notifyOthersOnDeactivation)
+            
             configureHardwareForStereo(session: session)
             
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
                 self?.startAudioTap()
             }
-            print("✅ Audio Session Active (Measurement Mode)")
+            print("✅ Audio Session Active (VideoRecording Mode for Spatial DSP)")
         } catch {
             print("❌ Audio Session Critical Failure: \(error)")
         }
@@ -73,16 +75,19 @@ class MicrophoneManager: NSObject, CLLocationManagerDelegate {
             if let sources = builtInMic.dataSources {
                 for source in sources {
                     if source.supportedPolarPatterns?.contains(.stereo) == true {
-                        try source.setPreferredPolarPattern(.stereo)
                         try builtInMic.setPreferredDataSource(source)
-                        try session.setPreferredInputOrientation(.portrait)
+                        
+                        // FIX: We MUST use landscape to physically align the mics Left/Right
+                        try session.setPreferredInputOrientation(.landscapeRight)
+                        
+                        try source.setPreferredPolarPattern(.stereo)
                         break
                     }
                 }
             }
             try session.setPreferredInputNumberOfChannels(2)
         } catch {
-            print("⚠️ Hardware Stereo Config failed (non-critical): \(error)")
+            print("⚠️ Hardware Stereo Config failed: \(error)")
         }
     }
     
@@ -98,7 +103,28 @@ class MicrophoneManager: NSObject, CLLocationManagerDelegate {
             let frameLength = Int(buffer.frameLength)
             guard let channelData = buffer.floatChannelData else { return }
             
+            // --- 🕵️‍♂️ THE WIRETAP ---
+            // We use a random number just to sample the logs so we don't crash Xcode with print statements
+            if Int.random(in: 1...30) == 1 {
+                let channels = buffer.format.channelCount
+                if channels == 1 {
+                    print("🚨 TRAP: iOS forced 1 Channel (Mono Fallback triggered)")
+                } else if channels >= 2 {
+                    // Check if Apple's DSP is perfectly copying Left to Right
+                    let leftSample = channelData[0][500]
+                    let rightSample = channelData[1][500]
+                    if leftSample == rightSample {
+                        print("🚨 TRAP: iOS forced 2 Channels, but they are IDENTICAL (Dual-Mono DSP)")
+                    } else {
+                        print("✅ SUCCESS: iOS is feeding true independent Stereo channels!")
+                    }
+                }
+            }
+            // ------------------------
+            
             let leftSamples = Array(UnsafeBufferPointer(start: channelData[0], count: frameLength))
+            // ... (rest of the tap logic continues below)
+            
             let rms = self.calculateRMS(of: leftSamples)
             
             // === STEREO PATH (real TDOA + Doppler) ===
@@ -153,6 +179,10 @@ class MicrophoneManager: NSObject, CLLocationManagerDelegate {
         }) {
             self.realTimeEvents[index].bearing = event.bearing
             self.realTimeEvents[index].distance = event.distance
+            
+            // FIX: We must update the energy so the UI dot shrinks as the sound fades
+            self.realTimeEvents[index].energy = event.energy
+            
             self.realTimeEvents[index].timestamp = now
             self.realTimeEvents[index].dopplerRate = event.dopplerRate
             self.realTimeEvents[index].isApproaching = event.isApproaching
@@ -193,7 +223,7 @@ class MicrophoneManager: NSObject, CLLocationManagerDelegate {
             print("✅ TEST MODE OFF — real events: \(realTimeEvents.count) dots")
         }
     }
-
+    
     @MainActor
     private func runQuadrantTest() {
         var testDots: [SoundEvent] = []
@@ -202,11 +232,17 @@ class MicrophoneManager: NSObject, CLLocationManagerDelegate {
         for range in quadrants {
             for _ in 1...8 {
                 let mockDoppler = Float.random(in: -20.0...20.0)
+                
+                // Randomize their age between 0 and 4.5 seconds old
+                // so they don't all vanish at the exact same millisecond
+                let randomAge = Double.random(in: 0...4.5)
+                
                 let event = SoundEvent(
-                    timestamp: Date(),
+                    timestamp: Date().addingTimeInterval(-randomAge),
                     threatLabel: "TEST",
                     bearing: Double.random(in: Double(range.lowerBound)...Double(range.upperBound)),
                     distance: Double.random(in: 0.25...0.85),
+                    energy: Float.random(in: 0.4...1.0), // Boosted minimum test size
                     dopplerRate: mockDoppler,
                     isApproaching: mockDoppler > 0
                 )
@@ -214,9 +250,9 @@ class MicrophoneManager: NSObject, CLLocationManagerDelegate {
             }
         }
         
-        self.events = testDots          // only temporary
-        // DO NOT touch realTimeEvents here
-        print("📍 Test mode: created \(testDots.count) dots")
+        self.events = testDots
+        print("📍 Test mode: created \(testDots.count) staggered dots")
     }
+    
     deinit { stopCapturing() }
 }

@@ -27,14 +27,6 @@ struct StartupVerificationView: View {
                     .multilineTextAlignment(.center)
             }
             
-            if viewModel.isFinished {
-                Button("Continue to App") {
-                    viewModel.continueToApp()
-                }
-                .buttonStyle(.borderedProminent)
-                .disabled(!viewModel.allPassed)
-                .padding(.top, 10)
-            }
         }
         .padding()
         .onAppear {

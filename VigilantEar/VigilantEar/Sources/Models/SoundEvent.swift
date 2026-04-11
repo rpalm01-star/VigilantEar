@@ -11,19 +11,24 @@ public final class SoundEvent {
     public var threatLabel: String
     
     // MARK: - Spatial & Acoustic Metrics
-    /// The calculated Angle of Arrival (AoA) in degrees (0.0 to 180.0)
+    
+    /// The calculated Angle of Arrival (AoA) in degrees (-90.0 to 90.0)
     public var bearing: Double
     
-    // The distance from the reference point
+    /// The physical distance of the threat, driven dynamically by Doppler velocity
     public var distance: Double
     
-    /// The rate of frequency change in Hz/sec. Nil if the shift was negligible.
+    /// The normalized RMS energy (0.0 to 1.0) used for UI scale and opacity fading
+    public var energy: Float
+    
+    /// The relative velocity in meters per second (m/s). Nil if the shift was negligible.
     public var dopplerRate: Float?
     
     /// True if the frequency is blue-shifting (increasing), indicating a collision course.
     public var isApproaching: Bool
     
     // MARK: - GIS Location Data
+    
     // Stored as optional Doubles because we might detect a threat before the GPS gets a precise lock
     public var latitude: Double?
     public var longitude: Double?
@@ -34,6 +39,7 @@ public final class SoundEvent {
         threatLabel: String,
         bearing: Double,
         distance: Double,
+        energy: Float,
         dopplerRate: Float? = nil,
         isApproaching: Bool = false,
         latitude: Double? = nil,
@@ -44,6 +50,7 @@ public final class SoundEvent {
         self.threatLabel = threatLabel
         self.bearing = bearing
         self.distance = distance
+        self.energy = energy
         self.dopplerRate = dopplerRate
         self.isApproaching = isApproaching
         self.latitude = latitude
@@ -61,11 +68,13 @@ extension SoundEvent {
         return CLLocationCoordinate2D(latitude: lat, longitude: lon)
     }
     
-    /// Formats the Doppler shift for the UI
+    /// Formats the Doppler velocity for the UI
     @Transient
     var formattedDoppler: String {
-        guard let rate = dopplerRate else { return "Stable" }
+        guard let rate = dopplerRate, abs(rate) > 0.1 else { return "Stationary" }
         let direction = isApproaching ? "Approaching" : "Receding"
-        return "\(direction) (\(String(format: "%.1f", rate)) Hz/s)"
+        
+        // Formatted to show meters per second
+        return "\(direction) (\(String(format: "%.1f", abs(rate))) m/s)"
     }
 }

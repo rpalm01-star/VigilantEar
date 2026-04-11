@@ -54,64 +54,6 @@ final class StartupVerificationViewModel {
         isFinished = true
     }
     
-    private func checkMicArray() async -> (status: VerificationStatus, reason: String?) {
-        let session = AVAudioSession.sharedInstance()
-        
-        // Permission
-        let permission = AVAudioApplication.shared.recordPermission
-        if permission == .denied {
-            return (.failed, "Microphone permission denied")
-        }
-        if permission == .undetermined {
-            let granted = await AVAudioApplication.requestRecordPermission()
-            if !granted {
-                return (.failed, "Microphone permission denied")
-            }
-        }
-        
-        do {
-            try session.setCategory(.playAndRecord,
-                                   mode: .measurement,
-                                   options: [.defaultToSpeaker, .mixWithOthers])
-            try session.setActive(true)
-            
-            // Give hardware time to settle (this is what the real app does)
-            try await Task.sleep(for: .milliseconds(400))
-            
-            guard let builtInMic = session.availableInputs?.first(where: { $0.portType == .builtInMic }) else {
-                try? session.setActive(false)
-                return (.passed, "No built-in mic detected")
-            }
-            
-            // Try to enable stereo
-            if let sources = builtInMic.dataSources {
-                for source in sources {
-                    if source.supportedPolarPatterns?.contains(.stereo) == true {
-                        try? source.setPreferredPolarPattern(.stereo)
-                        try? builtInMic.setPreferredDataSource(source)
-                        try? session.setPreferredInputOrientation(.portrait)
-                        break
-                    }
-                }
-            }
-            
-            try? session.setPreferredInputNumberOfChannels(2)
-            
-            let channelCount = session.inputNumberOfChannels
-            print("🔍 Verification mic check — reported channels: \(channelCount)")
-            
-            try? session.setActive(false)
-            
-            if channelCount >= 2 {
-                return (.passed, nil)                    // Full stereo — perfect
-            } else {
-                return (.passed, "Mono detected in quick check — TDOA will still work (real runtime tries harder)")
-            }
-        } catch {
-            try? session.setActive(false)
-            return (.passed, "Audio session warning — TDOA will still work")
-        }
-    }
     
     private func checkNeuralEngine() async -> (status: VerificationStatus, reason: String?) {
         let hasANE = MLComputeDevice.allComputeDevices.contains { device in
@@ -171,4 +113,59 @@ final class StartupVerificationViewModel {
         // Your parent view (e.g. ContentView or App) can observe this or use a @State to dismiss the verification screen
         print("✅ Startup verification complete — launching main app")
     }
+    
+    private func checkMicArray() async -> (status: VerificationStatus, reason: String?) {
+        let session = AVAudioSession.sharedInstance()
+        
+        let permission = AVAudioApplication.shared.recordPermission
+        if permission == .denied { return (.failed, "Microphone permission denied") }
+        if permission == .undetermined {
+            guard await AVAudioApplication.requestRecordPermission() else {
+                return (.failed, "Microphone permission denied")
+            }
+        }
+        
+        do {
+            // 1. Switch to videoRecording mode to allow spatial/stereo DSP
+            try session.setCategory(.playAndRecord,
+                                    mode: .videoRecording,
+                                    options: [.defaultToSpeaker, .mixWithOthers])
+            
+            // 2. Activate first to unlock hardware routing
+            try session.setActive(true)
+            
+            guard let builtInMic = session.availableInputs?.first(where: { $0.portType == .builtInMic }) else {
+                return (.passed, "No built-in mic detected")
+            }
+            
+            guard let sources = builtInMic.dataSources,
+                  let stereoSource = sources.first(where: { $0.supportedPolarPatterns?.contains(.stereo) == true }) else {
+                return (.passed, "Stereo hardware not found on this device")
+            }
+            
+            // 3. Apple's required sequence: Source -> Orientation -> Pattern
+            try builtInMic.setPreferredDataSource(stereoSource)
+            try session.setPreferredInputOrientation(.portrait)
+            try stereoSource.setPreferredPolarPattern(.stereo)
+            
+            // 4. Request the 2 channels
+            try session.setPreferredInputNumberOfChannels(2)
+            
+            // Give hardware a moment to settle
+            try await Task.sleep(for: .milliseconds(400))
+            
+            let channelCount = session.inputNumberOfChannels
+            try? session.setActive(false)
+            
+            if channelCount >= 2 {
+                return (.passed, nil)
+            } else {
+                return (.passed, "Mono detected. Hardware rejected stereo configuration.")
+            }
+        } catch {
+            try? session.setActive(false)
+            return (.passed, "Audio session warning: \(error.localizedDescription)")
+        }
+    }
+    
 }

@@ -14,7 +14,6 @@
 		3053DCB22F83718A00241892 /* ClassificationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3053DC9A2F83718A00241892 /* ClassificationService.swift */; };
 		3053DCB32F83718A00241892 /* PermissionRequestView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3053DC9E2F83718A00241892 /* PermissionRequestView.swift */; };
 		3053DCB42F83718A00241892 /* FFTProcessor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3053DC942F83718A00241892 /* FFTProcessor.swift */; };
-		3053DCB52F83718A00241892 /* TDOAProcessor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3053DC982F83718A00241892 /* TDOAProcessor.swift */; };
 		3053DCB62F83718A00241892 /* PermissionManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3053DC972F83718A00241892 /* PermissionManager.swift */; };
 		3053DCB72F83718A00241892 /* RadarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3053DCA02F83718A00241892 /* RadarView.swift */; };
 		3053DCB82F83718A00241892 /* AcousticCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3053DC932F83718A00241892 /* AcousticCoordinator.swift */; };
@@ -41,7 +40,6 @@
 		3053DC952F83718A00241892 /* HardwareCalibration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HardwareCalibration.swift; sourceTree = "<group>"; };
 		3053DC962F83718A00241892 /* MicrophoneManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MicrophoneManager.swift; sourceTree = "<group>"; };
 		3053DC972F83718A00241892 /* PermissionManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PermissionManager.swift; sourceTree = "<group>"; };
-		3053DC982F83718A00241892 /* TDOAProcessor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TDOAProcessor.swift; sourceTree = "<group>"; };
 		3053DC9A2F83718A00241892 /* ClassificationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClassificationService.swift; sourceTree = "<group>"; };
 		3053DC9E2F83718A00241892 /* PermissionRequestView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PermissionRequestView.swift; sourceTree = "<group>"; };
 		3053DCA02F83718A00241892 /* RadarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RadarView.swift; sourceTree = "<group>"; };
@@ -129,7 +127,6 @@
 				3053DC952F83718A00241892 /* HardwareCalibration.swift */,
 				3053DC962F83718A00241892 /* MicrophoneManager.swift */,
 				3053DC972F83718A00241892 /* PermissionManager.swift */,
-				3053DC982F83718A00241892 /* TDOAProcessor.swift */,
 			);
 			path = AudioEngine;
 			sourceTree = "<group>";
@@ -312,7 +309,6 @@
 				3053DCB32F83718A00241892 /* PermissionRequestView.swift in Sources */,
 				3053DCB42F83718A00241892 /* FFTProcessor.swift in Sources */,
 				308EF3E72F8755A300885DCB /* StartupVerificationViewModel.swift in Sources */,
-				3053DCB52F83718A00241892 /* TDOAProcessor.swift in Sources */,
 				3053DCB62F83718A00241892 /* PermissionManager.swift in Sources */,
 				3053DCB72F83718A00241892 /* RadarView.swift in Sources */,
 				3053DCB82F83718A00241892 /* AcousticCoordinator.swift in Sources */,
