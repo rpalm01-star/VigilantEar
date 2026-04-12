@@ -49,6 +49,8 @@ struct DeviceRadarView: View {
     
     // Background heartbeat for the warning zone
     @State private var isBlinking = false
+    @State private var rippleScale: CGFloat = 0.25
+    @State private var rippleOpacity: Double = 0.0
     
     var body: some View {
         // Determine if ANY emergency vehicle is inside the 0.25 threshold
@@ -77,7 +79,7 @@ struct DeviceRadarView: View {
             let centerY = maxHeight / 2
             
             ZStack {
-                // 1. Draw the "Phone Outline" grid
+                // 1. Draw the "Phone" and Radar grid
                 ForEach(1...4, id: \.self) { ring in
                     let scale = CGFloat(ring) / 4.0
                     
@@ -91,16 +93,51 @@ struct DeviceRadarView: View {
                     let ringColor = isWarningActive ? Color.red : Color.green
                     let finalShading = isWarningActive ? (isBlinking ? 0.35 : 0.05) : shadingOpacity
                     
-                    RoundedRectangle(cornerRadius: 30 * scale, style: .continuous)
-                        .fill(ringColor.opacity(finalShading))
-                        .background(
-                            RoundedRectangle(cornerRadius: 30 * scale, style: .continuous)
-                                // Thicker border when alarming
-                                .stroke(ringColor.opacity(borderOpacity), lineWidth: isWarningActive ? 2 : 1)
-                        )
-                        // Use the calculated radar dimensions
+                    if isInnerRing {
+                        // The Center Device
+                        ZStack {
+                            // Keep the background fill so the pulsing warning effect is highly visible
+                            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                .fill(ringColor.opacity(finalShading))
+                            
+                            // The actual SF Symbol
+                            Image(systemName: events.isEmpty ? "iphone" : "iphone.radiowaves.left.and.right")
+                                .resizable()
+                                .scaledToFit()
+                                .symbolEffect(.variableColor.iterative, options: .repeating, isActive: !events.isEmpty)
+                            // A lighter weight matches the technical HUD aesthetic
+                                .fontWeight(.light)
+                            // Bump up the opacity so the phone stands out clearly
+                                .foregroundStyle(ringColor.opacity(isWarningActive ? 0.9 : 0.45))
+                                .padding(8) // Inset the icon slightly
+                        }
                         .frame(width: radarWidth * scale, height: radarHeight * scale)
+                        
+                    } else {
+                        // The Outer Radar Waves
+                        RoundedRectangle(cornerRadius: 30 * scale, style: .continuous)
+                            .fill(ringColor.opacity(finalShading))
+                            .background(
+                                RoundedRectangle(cornerRadius: 30 * scale, style: .continuous)
+                                    .stroke(ringColor.opacity(borderOpacity), lineWidth: isWarningActive ? 2 : 1)
+                            )
+                            .frame(width: radarWidth * scale, height: radarHeight * scale)
+                    }
                 }
+                
+                // --- THE SONAR RIPPLE ---
+                RoundedRectangle(cornerRadius: 30 * rippleScale, style: .continuous)
+                    .stroke(Color.green.opacity(rippleOpacity), lineWidth: 1.5)
+                    .frame(width: radarWidth * rippleScale, height: radarHeight * rippleScale)
+                    .onAppear {
+                        // Start visible and small
+                        rippleOpacity = 0.4
+                        // Animate outward and fade to zero
+                        withAnimation(.easeOut(duration: 2.5).repeatForever(autoreverses: false)) {
+                            rippleScale = 1.0
+                            rippleOpacity = 0.0
+                        }
+                    }
                 
                 // 2. Draw subtle crosshairs scaled to the radar box
                 Path { path in
@@ -324,7 +361,7 @@ struct ThreatHUD: View {
         case let l where l.contains("keyboard") || l.contains("typing"): return "keyboard"
         case let l where l.contains("person"): return "figure.wave"
         case let l where l.contains("breathing") || l.contains("cough"): return "lungs.fill"
-        case let l where l.contains("sneeze"): return "nose.fill"
+        case let l where l.contains("sneeze") || l.contains("snoring"): return "nose.fill"
         case let l where l.contains("snore") || l.contains("sleep"): return "zzz"
         case let l where l.contains("burp") || l.contains("hiccup") || l.contains("swallow"): return "mouth.fill"
         case let l where l.contains("laugh") || l.contains("chuckle"): return "face.smiling.fill"
@@ -336,9 +373,11 @@ struct ThreatHUD: View {
         case let l where l.contains("car") || l.contains("engine") || l.contains("traffic"): return "car.fill"
         case let l where l.contains("bird") || l.contains("chirp"): return "bird.fill"
         case let l where l.contains("baby") || l.contains("cry"): return "stroller.fill"
+        case let l where l.contains("bowling"): return "figure.bowling"
         case let l where l.contains("cat"): return "cat"
         case let l where l.contains("dog"): return "dog"
         case let l where l.contains("fan"): return "fan"
+        case let l where l.contains("horn"): return "horn"
         default: return "exclamationmark.triangle.fill"
         }
     }
