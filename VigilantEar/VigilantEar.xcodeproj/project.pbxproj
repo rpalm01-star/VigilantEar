@@ -9,7 +9,6 @@
 /* Begin PBXBuildFile section */
 		3053DCAE2F83718A00241892 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3053DCA22F83718A00241892 /* SettingsView.swift */; };
 		3053DCAF2F83718A00241892 /* SoundEvent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3053DCA92F83718A00241892 /* SoundEvent.swift */; };
-		3053DCB02F83718A00241892 /* BreadCrumb.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3053DCA72F83718A00241892 /* BreadCrumb.swift */; };
 		3053DCB12F83718A00241892 /* HardwareCalibration.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3053DC952F83718A00241892 /* HardwareCalibration.swift */; };
 		3053DCB22F83718A00241892 /* ClassificationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3053DC9A2F83718A00241892 /* ClassificationService.swift */; };
 		3053DCB32F83718A00241892 /* PermissionRequestView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3053DC9E2F83718A00241892 /* PermissionRequestView.swift */; };
@@ -45,7 +44,6 @@
 		3053DCA02F83718A00241892 /* RadarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RadarView.swift; sourceTree = "<group>"; };
 		3053DCA22F83718A00241892 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		3053DCA42F83718A00241892 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
-		3053DCA72F83718A00241892 /* BreadCrumb.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BreadCrumb.swift; sourceTree = "<group>"; };
 		3053DCA82F83718A00241892 /* Configuration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Configuration.swift; sourceTree = "<group>"; };
 		3053DCA92F83718A00241892 /* SoundEvent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SoundEvent.swift; sourceTree = "<group>"; };
 		3053DCAC2F83718A00241892 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
@@ -191,7 +189,6 @@
 			isa = PBXGroup;
 			children = (
 				308EF3E62F8755A300885DCB /* StartupVerificationViewModel.swift */,
-				3053DCA72F83718A00241892 /* BreadCrumb.swift */,
 				3053DCA82F83718A00241892 /* Configuration.swift */,
 				3053DCA92F83718A00241892 /* SoundEvent.swift */,
 			);
@@ -302,7 +299,6 @@
 				308EF3E92F8755BC00885DCB /* StartupVerificationView.swift in Sources */,
 				3053DCAE2F83718A00241892 /* SettingsView.swift in Sources */,
 				3053DCAF2F83718A00241892 /* SoundEvent.swift in Sources */,
-				3053DCB02F83718A00241892 /* BreadCrumb.swift in Sources */,
 				3053DCB12F83718A00241892 /* HardwareCalibration.swift in Sources */,
 				30C55CC52F85FB1900D0B984 /* AcousticProcessingPipeline.swift in Sources */,
 				3053DCB22F83718A00241892 /* ClassificationService.swift in Sources */,
