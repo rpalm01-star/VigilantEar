@@ -7,6 +7,7 @@ struct VigilantEarApp: App {
     @State private var isVerified = false
     @State private var verificationViewModel = StartupVerificationViewModel()
     
+    // And configure your Info.plist or Project Settings to only support Portrait.
     private let classificationService = DependencyContainer.shared.classificationService
     
     init() {
@@ -54,6 +55,8 @@ struct VigilantEarApp: App {
                     }
                 }
                 .background(Color(.systemGroupedBackground)) // Optional: matches list style
+                .defersSystemGestures(on: .all)
+                .persistentSystemOverlays(.hidden)
             }
         }
     }
