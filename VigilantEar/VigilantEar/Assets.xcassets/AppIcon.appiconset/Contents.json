@@ -1,7 +1,7 @@
 {
   "images" : [
     {
-      "filename" : "image.png",
+      "filename" : "ONUo0.png",
       "idiom" : "universal",
       "platform" : "ios",
       "size" : "1024x1024"
@@ -24,7 +24,6 @@
           "value" : "tinted"
         }
       ],
-      "filename" : "Untitled-1 copy.png",
       "idiom" : "universal",
       "platform" : "ios",
       "size" : "1024x1024"
