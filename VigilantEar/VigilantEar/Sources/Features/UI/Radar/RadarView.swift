@@ -297,13 +297,18 @@ struct ThreatHUD: View {
     
     private func iconFor(label: String) -> String {
         switch label.lowercased() {
+        case let l where l.contains("rail"): return "lightrail.fill"
         case let l where l.contains("bell"): return "bell.fill"
-        case let l where l.contains("music") || l.contains("song"): return "music.quarternote.3"
+        case let l where l.contains("music") || l.contains("choir") || l.contains("song"): return "music.quarternote.3"
         case let l where l.contains("knock") || l.contains("tap"): return "hand.tap.fill"
         case let l where l.contains("ambulance") || l.contains("siren") || l.contains("alarm"): return "light.beacon.max.fill"
         case let l where l.contains("speech") || l.contains("voice") || l.contains("talk"): return "waveform"
-        case let l where l.contains("dog") || l.contains("bark") || l.contains("animal"): return "pawprint.fill"
-        case let l where l.contains("cough"): return "lungs.fill"
+        case let l where l.contains("bark") || l.contains("animal"): return "pawprint.fill"
+        case let l where l.contains("dog"): return "dog"
+        case let l where l.contains("tornado"): return "tornado"
+        case let l where l.contains("keyboard") || l.contains("typing"): return "keyboard"
+        case let l where l.contains("cat"): return "cat"
+        case let l where l.contains("breathing") || l.contains("cough"): return "lungs.fill"
         case let l where l.contains("sneeze"): return "nose.fill"
         case let l where l.contains("snore") || l.contains("sleep"): return "zzz"
         case let l where l.contains("burp") || l.contains("hiccup") || l.contains("swallow"): return "mouth.fill"

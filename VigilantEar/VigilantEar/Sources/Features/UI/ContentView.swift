@@ -49,12 +49,11 @@ struct ContentView: View {
                         Image("firemanHat") // External fireman hat asset from project assets
                             .resizable()
                             .scaledToFit()
-                            .frame(width: 25, height: 25)
+                            .frame(width: 60, height: 60)
                             .padding()
-                            .background(Color.red.opacity(0.15))
-                            .clipShape(Rectangle())
-                            .overlay(Rectangle().stroke(Color.red.opacity(0.5), lineWidth: 1.5))
-                        //Styled to highlight on a touch
+                            //.background(Color.red.opacity(0.15))
+                            //.clipShape(Rectangle())
+                            //.overlay(Rectangle().stroke(Color.red.opacity(0.5), lineWidth: 1.5))
                     }
                 }
                 .padding(.bottom, 20)
