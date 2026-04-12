@@ -33,7 +33,7 @@ Carthage/Build/
 # --- Security & API Keys ---
 # This is crucial for your Google Maps SDK integration
 *.env
-Secrets.xcconfig
+Settings.xcconfig
 secrets.swift
 Keys.plist
 UserInterfaceState.xcuserstate
