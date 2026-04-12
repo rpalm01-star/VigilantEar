@@ -18,6 +18,10 @@ final class AcousticCoordinator: NSObject {
     private var baselineFreq: Double = 0.0
     private let alpha: Double = 0.1
     
+    // City-Scale Dynamic Range
+    private let floorDB: Float = -80.0
+    private let ceilingDB: Float = -2.0
+    
     // MARK: - Unified Stereo Path
     func processStereoBuffer(
         left: [Float],
@@ -28,13 +32,14 @@ final class AcousticCoordinator: NSObject {
     ) -> SoundEvent? {
         
         let now = Date()
-        let floor: Float = 0.005
         
-        guard currentRMS > floor * 1.001,
+        // Convert raw RMS to Decibels
+        let currentDB = 20 * log10(max(currentRMS, 0.00001))
+        
+        guard currentDB > floorDB,
               now.timeIntervalSince(lastEventTime) > cooldownInterval else { return nil }
         
-        // === 1. ILD GEOMETRY (Apple's DSP Panning) ===
-        // We calculate the independent power of the Left and Right channels
+        // === 1. ILD GEOMETRY (Forced Stereo Widening) ===
         var leftRMS: Float = 0
         vDSP_rmsqv(left, 1, &leftRMS, vDSP_Length(left.count))
         
@@ -45,19 +50,26 @@ final class AcousticCoordinator: NSObject {
         let rawAngle: Double
         
         if totalPower > 0.0001 {
-            // Balance ranges from -1.0 (All Left) to 1.0 (All Right)
             let balance = Double((rightRMS - leftRMS) / totalPower)
             
-            // Map that balance to our 180-degree radar dome (-90° to 90°)
-            // We multiply by an aggressive 150.0 to counteract Apple's center-heavy DSP mixing
-            rawAngle = max(-90.0, min(90.0, balance * 150.0))
+            // Assume physical acoustic bleed caps realistic balance at +/- 0.2
+            let maxPhysicalBalance = 0.2
+            let clampedBalance = max(-maxPhysicalBalance, min(maxPhysicalBalance, balance))
+            let normalizedBalance = clampedBalance / maxPhysicalBalance // Maps to -1.0 to 1.0
+            
+            // Square root curve to aggressively widen small off-center differences
+            let sign = normalizedBalance < 0 ? -1.0 : 1.0
+            let widenedBalance = sign * sqrt(abs(normalizedBalance))
+            
+            rawAngle = widenedBalance * 90.0
         } else {
             rawAngle = 0.0
         }
         
-        // Adaptive smoothing
-        let energyRatio = Double(currentRMS / floor)
-        let bearingSmoothing = energyRatio < 3.0 ? 0.90 : 0.60
+        // Adaptive smoothing based on how loud the sound is
+        let linearRatio = Double((max(floorDB, min(ceilingDB, currentDB)) - floorDB) / (ceilingDB - floorDB))
+        let bearingSmoothing = linearRatio < 0.5 ? 0.90 : 0.60
+        
         if let last = smoothedBearing {
             smoothedBearing = (last * bearingSmoothing) + (rawAngle * (1 - bearingSmoothing))
         } else {
@@ -65,10 +77,10 @@ final class AcousticCoordinator: NSObject {
         }
         let finalBearing = smoothedBearing ?? rawAngle
         
-        // === 2. UI ENERGY ===
-        let ceiling: Float = 0.15
-        let usableRMS = max(0.0, currentRMS - floor)
-        let normalizedEnergy = min(1.0, max(0.2, usableRMS / ceiling))
+        // === 2. UI ENERGY & PROXIMITY (Logarithmic Curve) ===
+        // Apply an exponential curve so distant/quiet sounds get more visual space on the radar
+        let visualEnergy = pow(linearRatio, 0.5)
+        let usableEnergyForUI = min(1.0, max(0.1, visualEnergy))
         
         // === 3. DOPPLER VELOCITY ===
         let (currentFreq, conf) = fftProcessor.analyze(samples: left, sampleRate: sampleRate)
@@ -89,15 +101,12 @@ final class AcousticCoordinator: NSObject {
         let isApproaching = velocityMS > 0
         
         // === 4. HYBRID DISTANCE (Volume + Doppler) ===
-        // 1. Base Distance: Loud sounds plot closer to the center, quiet sounds plot near the edge.
-        // We use the normalizedEnergy we already calculated (0.2 to 1.0)
-        // A maximum energy (1.0) plots at 0.2 radius. Minimum energy plots at 0.9 radius.
-        let baseRadius = 0.9 - (Double(normalizedEnergy) * 0.7)
+        // Base Distance: 0.95 (edge of radar) to 0.10 (center)
+        let baseRadius = 0.95 - (usableEnergyForUI * 0.85)
         
-        // 2. Doppler Modifier: If the object is actually driving towards us, pull it even closer.
-        let approachFactor = isApproaching ? (Double(velocityMS) / 50.0) : 0.0
+        // Doppler Modifier (scaled down so it doesn't overpower the volume proximity)
+        let approachFactor = isApproaching ? (Double(velocityMS) / 100.0) : 0.0
         
-        // Combine them, keeping a safety buffer so it doesn't cross dead-center (0.0)
         let finalProximity = max(0.05, baseRadius - approachFactor)
         
         lastEventTime = now
@@ -109,7 +118,7 @@ final class AcousticCoordinator: NSObject {
             threatLabel: finalLabel,
             bearing: finalBearing,
             distance: finalProximity,
-            energy: normalizedEnergy,
+            energy: Float(usableEnergyForUI),
             dopplerRate: Float(velocityMS),
             isApproaching: isApproaching
         )
@@ -125,17 +134,22 @@ final class AcousticCoordinator: NSObject {
     ) -> SoundEvent? {
         
         let now = Date()
-        let floor: Float = 0.005
         
-        guard currentRMS > floor * 1.5 else { return nil }
-        guard now.timeIntervalSince(lastEventTime) > cooldownInterval else { return nil }
+        // Convert raw RMS to Decibels
+        let currentDB = 20 * log10(max(currentRMS, 0.00001))
         
-        let finalBearing: Double = 0.0
+        // Require slightly more volume for mono processing to prevent noise triggers
+        guard currentDB > floorDB + 5.0,
+              now.timeIntervalSince(lastEventTime) > cooldownInterval else { return nil }
         
-        let ceiling: Float = 0.15
-        let usableRMS = max(0.0, currentRMS - floor)
-        let normalizedEnergy = min(1.0, max(0.2, usableRMS / ceiling))
+        let finalBearing: Double = 0.0 // Mono has no bearing
         
+        // === UI ENERGY & PROXIMITY (Logarithmic Curve) ===
+        let linearRatio = Double((max(floorDB, min(ceilingDB, currentDB)) - floorDB) / (ceilingDB - floorDB))
+        let visualEnergy = pow(linearRatio, 0.5)
+        let usableEnergyForUI = min(1.0, max(0.1, visualEnergy))
+        
+        // === DOPPLER VELOCITY ===
         let (currentFreq, conf) = fftProcessor.analyze(samples: samples, sampleRate: sampleRate)
         let velocityMS: Double
         
@@ -153,16 +167,9 @@ final class AcousticCoordinator: NSObject {
         
         let isApproaching = velocityMS > 0
         
-        // === 4. HYBRID DISTANCE (Volume + Doppler) ===
-        // 1. Base Distance: Loud sounds plot closer to the center, quiet sounds plot near the edge.
-        // We use the normalizedEnergy we already calculated (0.2 to 1.0)
-        // A maximum energy (1.0) plots at 0.2 radius. Minimum energy plots at 0.9 radius.
-        let baseRadius = 0.9 - (Double(normalizedEnergy) * 0.7)
-        
-        // 2. Doppler Modifier: If the object is actually driving towards us, pull it even closer.
-        let approachFactor = isApproaching ? (Double(velocityMS) / 50.0) : 0.0
-        
-        // Combine them, keeping a safety buffer so it doesn't cross dead-center (0.0)
+        // === HYBRID DISTANCE (Volume + Doppler) ===
+        let baseRadius = 0.95 - (usableEnergyForUI * 0.85)
+        let approachFactor = isApproaching ? (Double(velocityMS) / 100.0) : 0.0
         let finalProximity = max(0.05, baseRadius - approachFactor)
         
         lastEventTime = now
@@ -174,7 +181,7 @@ final class AcousticCoordinator: NSObject {
             threatLabel: finalLabel,
             bearing: finalBearing,
             distance: finalProximity,
-            energy: normalizedEnergy,
+            energy: Float(usableEnergyForUI),
             dopplerRate: Float(velocityMS),
             isApproaching: isApproaching
         )

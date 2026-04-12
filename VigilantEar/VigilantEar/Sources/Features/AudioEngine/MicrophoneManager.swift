@@ -55,6 +55,8 @@ class MicrophoneManager: NSObject, CLLocationManagerDelegate {
         do {
             // FIX: Must use .videoRecording to allow the 16 Pro Max stereo DSP to function
             try session.setCategory(.playAndRecord, mode: .videoRecording, options: [.defaultToSpeaker, .mixWithOthers])
+            // THE MAGIC LINE: Tell iOS to leave the Taptic Engine on!
+            try session.setAllowHapticsAndSystemSoundsDuringRecording(true)
             try session.setActive(true, options: .notifyOthersOnDeactivation)
             
             configureHardwareForStereo(session: session)
@@ -115,8 +117,8 @@ class MicrophoneManager: NSObject, CLLocationManagerDelegate {
                     let rightSample = channelData[1][500]
                     if leftSample == rightSample {
                         print("🚨 TRAP: iOS forced 2 Channels, but they are IDENTICAL (Dual-Mono DSP)")
-                    } else {
-                        print("✅ SUCCESS: iOS is feeding true independent Stereo channels!")
+                        //} else {
+                        //print("✅ SUCCESS: iOS is feeding true independent Stereo channels!")
                     }
                 }
             }

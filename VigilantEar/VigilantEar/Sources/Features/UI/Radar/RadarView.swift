@@ -1,6 +1,12 @@
 import SwiftUI
 import CoreHaptics
 
+
+// A high-speed memory lock to prevent 60 FPS haptic queueing
+class HapticCooldownManager {
+    var lastFired: [String: Date] = [:]
+}
+
 struct PulseData: Equatable, Identifiable {
     let id = UUID()
     let bearing: Double
@@ -10,129 +16,140 @@ struct PulseData: Equatable, Identifiable {
     let label: String
 }
 
+// --- RESTORED: Stable Dot View (No Blink) ---
+struct RadarDotView: View {
+    let event: SoundEvent
+    let width: CGFloat
+    let height: CGFloat
+    
+    var body: some View {
+        let centerX = width / 2
+        let centerY = height / 2
+        
+        // Coordinates
+        let radians = CGFloat(event.bearing) * .pi / 180.0
+        let xOffset = CGFloat(event.distance) * (width / 2) * sin(radians)
+        let yOffset = -CGFloat(event.distance) * (height / 2) * cos(radians)
+        
+        // Threat Analysis
+        let label = event.threatLabel.lowercased()
+        let isEmergency = label.contains("siren") || label.contains("ambulance") || label.contains("firetruck")
+        
+        // Make emergency vehicles visually distinct
+        let dotColor = isEmergency ? Color.red : Color.cyan
+        
+        Circle()
+            .fill(dotColor)
+            .frame(width: 16, height: 16)
+            .shadow(color: dotColor, radius: CGFloat(event.energy) * 15)
+            .position(x: centerX + xOffset, y: centerY + yOffset)
+            .animation(.spring(response: 0.3, dampingFraction: 0.7), value: event.distance)
+            .animation(.spring(response: 0.3, dampingFraction: 0.7), value: event.bearing)
+    }
+}
+
+// --- UPDATED: Device Radar View with Flashing Inner Zone ---
+struct DeviceRadarView: View {
+    var events: [SoundEvent]
+    
+    // Background heartbeat for the warning zone
+    @State private var isBlinking = false
+    
+    var body: some View {
+        // Determine if ANY emergency vehicle is inside the 0.25 threshold
+        let isBreaching = events.contains { event in
+            let label = event.threatLabel.lowercased()
+            let isEmergency = label.contains("siren") || label.contains("ambulance") || label.contains("firetruck")
+            return isEmergency && abs(event.distance) <= 0.25
+        }
+        
+        GeometryReader { geo in
+            let width = geo.size.width
+            let height = geo.size.height
+            let centerX = width / 2
+            let centerY = height / 2
+            
+            ZStack {
+                // 1. Draw the "Phone Outline" grid
+                ForEach(1...4, id: \.self) { ring in
+                    let scale = CGFloat(ring) / 4.0
+                    
+                    let shadingOpacity = 0.20 - (Double(ring) * 0.03)
+                    let borderOpacity = 0.35 - (Double(ring) * 0.05)
+                    
+                    // --- THE RED ALERT LOGIC ---
+                    let isInnerRing = (ring == 1)
+                    let isWarningActive = isInnerRing && isBreaching
+                    
+                    let ringColor = isWarningActive ? Color.red : Color.green
+                    // If it's a warning, pulse the opacity between high (0.35) and low (0.05)
+                    let finalShading = isWarningActive ? (isBlinking ? 0.35 : 0.05) : shadingOpacity
+                    
+                    RoundedRectangle(cornerRadius: 30 * scale, style: .continuous)
+                        .fill(ringColor.opacity(finalShading))
+                        .background(
+                            RoundedRectangle(cornerRadius: 30 * scale, style: .continuous)
+                            // Thicker border when alarming
+                                .stroke(ringColor.opacity(borderOpacity), lineWidth: isWarningActive ? 2 : 1)
+                        )
+                        .frame(width: width * scale, height: height * scale)
+                }
+                
+                // 2. Draw subtle crosshairs
+                Path { path in
+                    path.move(to: CGPoint(x: centerX, y: 0))
+                    path.addLine(to: CGPoint(x: centerX, y: height))
+                    path.move(to: CGPoint(x: 0, y: centerY))
+                    path.addLine(to: CGPoint(x: width, y: centerY))
+                }
+                .stroke(Color.green.opacity(0.15), style: StrokeStyle(lineWidth: 1, dash: [4, 4]))
+                
+                // 3. Plot the acoustic events
+                ForEach(events, id: \.timestamp) { event in
+                    RadarDotView(event: event, width: width, height: height)
+                }
+            }
+        }
+        .padding(.horizontal, 20)
+        .padding(.bottom, 40)
+        .onAppear {
+            // Start the infinite heartbeat the moment the radar loads
+            withAnimation(.easeInOut(duration: 0.5).repeatForever(autoreverses: true)) {
+                isBlinking = true
+            }
+        }
+    }
+}
+
 struct RadarView: View {
     @Environment(MicrophoneManager.self) private var micManager
     
     @State private var engine: CHHapticEngine?
-    
-    @State private var activePulses: [PulseData] = []
-    @State private var lastPulseTimes: [String: Date] = [:]
+    @State private var hapticGatekeeper = HapticCooldownManager()
     
     // --- HUD DATA EXTRACTORS ---
-    var topThreats: [SoundEvent] {
-        extractTopThreats(from: micManager.events, inTopHemisphere: true)
+    // Notice these now return [String] instead of [SoundEvent]
+    var topThreats: [String] {
+        extractTopThreatLabels(from: micManager.events, inTopHemisphere: true)
     }
     
-    var bottomThreats: [SoundEvent] {
-        extractTopThreats(from: micManager.events, inTopHemisphere: false)
+    var bottomThreats: [String] {
+        extractTopThreatLabels(from: micManager.events, inTopHemisphere: false)
     }
     
     var body: some View {
         VStack(spacing: 20) {
             
             // --- TOP HUD ---
-            ThreatHUD(threats: topThreats)
+            ThreatHUD(threatLabels: topThreats)
                 .frame(height: 60)
             
-            // --- THE RADAR ---
-            GeometryReader { geometry in
-                TimelineView(.animation) { timeline in
-                    Canvas { ctx, size in
-                        let center = CGPoint(x: size.width / 2, y: size.height / 2)
-                        let radius = min(size.width, size.height) / 2.1
-                        
-                        // 1. BACKGROUND RINGS
-                        for i in 1...4 {
-                            let r = radius * CGFloat(i) / 4
-                            let rect = CGRect(x: center.x - r, y: center.y - r, width: r * 2, height: r * 2)
-                            ctx.stroke(Path { $0.addEllipse(in: rect) }, with: .color(.green.opacity(0.15)), lineWidth: 1)
-                        }
-                        
-                        let nowInterval = timeline.date.timeIntervalSinceReferenceDate
-                        
-                        // 2. ALWAYS-ON RESTING HEARTBEAT
-                        let idleDuration: TimeInterval = 3.0
-                        let idleAge = nowInterval.truncatingRemainder(dividingBy: idleDuration)
-                        let progress = CGFloat(idleAge / idleDuration)
-                        
-                        let waveLeadingEdge = (radius * 1.1) * progress
-                        let waveThickness = radius * 0.45
-                        
-                        let startR = max(0, waveLeadingEdge - waveThickness)
-                        let endR = max(0.1, waveLeadingEdge)
-                        
-                        let globalFade = progress > 0.85 ? 1.0 - ((progress - 0.85) / 0.15) : 1.0
-                        let idleOpacity = 0.45 * globalFade
-                        
-                        let gradient = Gradient(stops: [
-                            .init(color: .clear, location: 0.0),
-                            .init(color: .green.opacity(idleOpacity * 0.2), location: 0.5),
-                            .init(color: .green.opacity(idleOpacity), location: 0.95),
-                            .init(color: .clear, location: 1.0)
-                        ])
-                        
-                        let waveRect = CGRect(
-                            x: center.x - waveLeadingEdge,
-                            y: center.y - waveLeadingEdge,
-                            width: waveLeadingEdge * 2,
-                            height: waveLeadingEdge * 2
-                        )
-                        
-                        ctx.fill(
-                            Path { $0.addEllipse(in: waveRect) },
-                            with: .radialGradient(gradient, center: center, startRadius: startR, endRadius: endR)
-                        )
-                        
-                        // 3. TARGETED SONAR PULSES
-                        let pulseDuration: TimeInterval = 1.5
-                        
-                        for pulse in activePulses {
-                            let age = nowInterval - pulse.startTime
-                            
-                            if age < pulseDuration {
-                                let pulseCenter = polarToCartesian(angle: pulse.bearing, radius: radius * CGFloat(pulse.distance), center: center)
-                                
-                                let currentRadius = 150.0 * CGFloat(age / pulseDuration)
-                                let opacity = 1.0 - (age / pulseDuration)
-                                
-                                let pulseRect = CGRect(
-                                    x: pulseCenter.x - currentRadius,
-                                    y: pulseCenter.y - currentRadius,
-                                    width: currentRadius * 2,
-                                    height: currentRadius * 2
-                                )
-                                
-                                ctx.stroke(Path { $0.addEllipse(in: pulseRect) }, with: .color(.green.opacity(opacity)), lineWidth: 2.5)
-                            }
-                        }
-                        
-                        // 4. DOTS
-                        for event in micManager.events {
-                            let relativeAngle = event.bearing
-                            let dotPos = polarToCartesian(angle: relativeAngle, radius: radius * CGFloat(event.distance), center: center)
-                            
-                            let age = timeline.date.timeIntervalSince(event.timestamp)
-                            let ageFade = max(0.0, 1.0 - (age / 5.0))
-                            let finalOpacity = Double(event.energy) * ageFade
-                            
-                            let color = event.isApproaching ? Color.red : Color.cyan
-                            
-                            let coreSize = 26.0 * CGFloat(event.energy)
-                            let glowSize = 40.0 * CGFloat(event.energy)
-                            
-                            let coreRect = CGRect(x: dotPos.x - coreSize/2, y: dotPos.y - coreSize/2, width: coreSize, height: coreSize)
-                            let glowRect = CGRect(x: dotPos.x - glowSize/2, y: dotPos.y - glowSize/2, width: glowSize, height: glowSize)
-                            
-                            ctx.fill(Path { $0.addEllipse(in: glowRect) }, with: .color(color.opacity(finalOpacity * 0.4)))
-                            ctx.fill(Path { $0.addEllipse(in: coreRect) }, with: .color(color.opacity(finalOpacity)))
-                        }
-                    }
-                }
+            // --- THE DEVICE RADAR ---
+            DeviceRadarView(events: micManager.events)
                 .background(Color.black)
-                .clipShape(Circle())
-                .overlay(Circle().stroke(Color.green.opacity(0.3), lineWidth: 3))
-                .contentShape(Circle())
-                .onChange(of: micManager.events) { _, events in triggerPulseIfNeeded(events: events) }
+                .onChange(of: micManager.events) { _, events in
+                    checkInnerRingCrossing(events: events)
+                }
                 .overlay(alignment: .top) {
                     if micManager.isTestMode {
                         Text("TEST MODE ON")
@@ -146,21 +163,20 @@ struct RadarView: View {
                     }
                 }
                 .gesture(TapGesture(count: 2).onEnded { micManager.toggleTestMode() })
-                .onAppear { startHapticEngine() }
-            }
-            .aspectRatio(1, contentMode: .fit)
-            .padding(.horizontal)
             
             // --- BOTTOM HUD ---
-            ThreatHUD(threats: bottomThreats)
+            ThreatHUD(threatLabels: bottomThreats)
                 .frame(height: 60)
             
         }
         .padding(.vertical)
+        .onAppear { startHapticEngine() }
     }
     
+    // --- HUD DATA EXTRACTORS ---
+    
     // MARK: - HUD Logic Helpers
-    private func extractTopThreats(from events: [SoundEvent], inTopHemisphere: Bool) -> [SoundEvent] {
+    private func extractTopThreatLabels(from events: [SoundEvent], inTopHemisphere: Bool) -> [String] {
         let now = Date()
         let genericLabels = ["Acoustic Event", "Monitoring..."]
         
@@ -174,61 +190,48 @@ struct RadarView: View {
             return inTopHemisphere ? isTop : !isTop
         }
         
-        var uniqueThreats: [SoundEvent] = []
+        var uniqueLabels: [String] = []
         var seenLabels = Set<String>()
         
+        // We still sort by timestamp to find the latest active threats...
         for event in validEvents.sorted(by: { $0.timestamp > $1.timestamp }) {
             if !seenLabels.contains(event.threatLabel) {
-                uniqueThreats.append(event)
+                uniqueLabels.append(event.threatLabel)
                 seenLabels.insert(event.threatLabel)
             }
-            if uniqueThreats.count == 3 { break }
+            if uniqueLabels.count == 3 { break }
         }
         
-        return uniqueThreats
+        // ...but we return them sorted alphabetically so they lock their physical positions on screen!
+        return uniqueLabels.sorted()
     }
     
-    private func polarToCartesian(angle: Double, radius: CGFloat, center: CGPoint) -> CGPoint {
-        let rad = (angle - 90) * .pi / 180
-        return CGPoint(x: center.x + radius * cos(rad), y: center.y + radius * sin(rad))
-    }
-    
-    // MARK: - Core Logic Helpers
-    private func triggerPulseIfNeeded(events: [SoundEvent]) {
+    private func checkInnerRingCrossing(events: [SoundEvent]) {
         let now = Date()
-        let currentTime = CFAbsoluteTimeGetCurrent()
-        activePulses.removeAll { currentTime - $0.startTime > 1.5 }
+        let innerRingThreshold: Double = 0.25
         
-        let genericLabels = ["Acoustic Event", "Music", "Monitoring..."]
-        let activeThreats = events.filter {
-            !genericLabels.contains($0.threatLabel) &&
-            $0.energy > 0.05 &&
-            now.timeIntervalSince($0.timestamp) < 1.0
-        }
-        
-        var didFireNewPulse = false
-        
-        for threat in activeThreats {
-            let lastTime = lastPulseTimes[threat.threatLabel] ?? .distantPast
+        for event in events {
+            let label = event.threatLabel.lowercased()
             
-            if now.timeIntervalSince(lastTime) > 1.5 {
-                let newPulse = PulseData(bearing: threat.bearing, distance: threat.distance, startTime: currentTime, energy: threat.energy, label: threat.threatLabel)
-                activePulses.append(newPulse)
-                lastPulseTimes[threat.threatLabel] = now
-                didFireNewPulse = true
-            } else {
-                if let active = activePulses.last(where: { $0.label == threat.threatLabel }), threat.energy > active.energy + 0.15 {
-                    let newPulse = PulseData(bearing: threat.bearing, distance: threat.distance, startTime: currentTime, energy: threat.energy, label: threat.threatLabel)
-                    activePulses.append(newPulse)
-                    lastPulseTimes[threat.threatLabel] = now
-                    didFireNewPulse = true
+            if label.contains("siren") || label.contains("ambulance") || label.contains("firetruck") {
+                if abs(event.distance) <= innerRingThreshold {
+                    
+                    // Look up the cooldown for THIS specific unique threat label
+                    let lastTime = hapticGatekeeper.lastFired[event.threatLabel] ?? .distantPast
+                    
+                    // If this specific siren hasn't fired in 10 seconds...
+                    if now.timeIntervalSince(lastTime) > 10.0 {
+                        triggerSirenProximityHaptic()
+                        
+                        // Instantly lock the memory gate for this siren
+                        hapticGatekeeper.lastFired[event.threatLabel] = now
+                    }
                 }
             }
         }
-        
-        if didFireNewPulse { triggerDirectionalHaptic() }
     }
     
+    // MARK: - Haptics
     private func startHapticEngine() {
         do {
             engine = try CHHapticEngine()
@@ -236,52 +239,83 @@ struct RadarView: View {
         } catch {}
     }
     
-    private func triggerDirectionalHaptic() {
+    private func triggerSirenProximityHaptic() {
         guard let engine else { return }
-        let pattern = CHHapticEvent(eventType: .hapticTransient, parameters: [
-            CHHapticEventParameter(parameterID: .hapticIntensity, value: 0.8),
-            CHHapticEventParameter(parameterID: .hapticSharpness, value: 0.8)
+        
+        let pulse1 = CHHapticEvent(eventType: .hapticTransient, parameters: [
+            CHHapticEventParameter(parameterID: .hapticIntensity, value: 1.0),
+            CHHapticEventParameter(parameterID: .hapticSharpness, value: 1.0)
         ], relativeTime: 0)
         
+        let pulse2 = CHHapticEvent(eventType: .hapticTransient, parameters: [
+            CHHapticEventParameter(parameterID: .hapticIntensity, value: 1.0),
+            CHHapticEventParameter(parameterID: .hapticSharpness, value: 1.0)
+        ], relativeTime: 0.15)
+        
         do {
-            let player = try engine.makePlayer(with: CHHapticPattern(events: [pattern], parameters: []))
+            // Stop any rogue lingering patterns just in case
+            engine.stop(completionHandler: nil)
+            try engine.start()
+            
+            let player = try engine.makePlayer(with: CHHapticPattern(events: [pulse1, pulse2], parameters: []))
             try player.start(atTime: 0)
         } catch {}
     }
 }
-
 // MARK: - HUD UI Components
+// [Stable sort logic maps down to strings and alphabetically sorts labels logic]
 struct ThreatHUD: View {
-    let threats: [SoundEvent]
+    let threatLabels: [String] // Input logic stable [String]
     
     var body: some View {
         HStack(spacing: 35) {
-            ForEach(threats, id: \.threatLabel) { threat in
+            ForEach(threatLabels, id: \.self) { label in
                 VStack(spacing: 6) {
-                    Image(systemName: iconFor(label: threat.threatLabel))
+                    Image(systemName: iconFor(label: label))
                         .font(.system(size: 28, weight: .semibold))
                         .foregroundStyle(.green)
                         .symbolEffect(.bounce, options: .repeating, isActive: true)
                     
-                    Text(threat.threatLabel)
+                    // Hidden ID handling logic preserved, splitting at `_`.
+                    Text(formatLabel(label))
                         .font(.caption2.monospaced().bold())
                         .foregroundStyle(.green.opacity(0.8))
+                        .multilineTextAlignment(.center)
+                        .lineLimit(2)
                 }
                 .transition(.scale.combined(with: .opacity))
             }
         }
-        .animation(.spring(response: 0.4, dampingFraction: 0.7), value: threats.map { $0.threatLabel })
+        .animation(.spring(response: 0.4, dampingFraction: 0.7), value: threatLabels)
+    }
+    
+    private func formatLabel(_ label: String) -> String {
+        let parts = label.components(separatedBy: "_")
+        if parts.count == 1 { return label }
+        return "\(parts[0])\n\(parts[1])"
     }
     
     private func iconFor(label: String) -> String {
         switch label.lowercased() {
         case let l where l.contains("bell"): return "bell.fill"
-        case let l where l.contains("music"): return "music.quarternote.3"
-        case let l where l.contains("knock"): return "hand.tap.fill"
-        case let l where l.contains("ambulance"), let l where l.contains("siren"): return "light.beacon.max.fill"
-        case let l where l.contains("speech"), let l where l.contains("voice"): return "waveform"
-        case let l where l.contains("dog"), let l where l.contains("bark"): return "pawprint.fill"
+        case let l where l.contains("music") || l.contains("song"): return "music.quarternote.3"
+        case let l where l.contains("knock") || l.contains("tap"): return "hand.tap.fill"
+        case let l where l.contains("ambulance") || l.contains("siren") || l.contains("alarm"): return "light.beacon.max.fill"
+        case let l where l.contains("speech") || l.contains("voice") || l.contains("talk"): return "waveform"
+        case let l where l.contains("dog") || l.contains("bark") || l.contains("animal"): return "pawprint.fill"
         case let l where l.contains("cough"): return "lungs.fill"
+        case let l where l.contains("sneeze"): return "nose.fill"
+        case let l where l.contains("snore") || l.contains("sleep"): return "zzz"
+        case let l where l.contains("burp") || l.contains("hiccup") || l.contains("swallow"): return "mouth.fill"
+        case let l where l.contains("laugh") || l.contains("chuckle"): return "face.smiling.fill"
+        case let l where l.contains("clock") || l.contains("tick") || l.contains("chime"): return "clock.fill"
+        case let l where l.contains("glass") || l.contains("shatter") || l.contains("crash"): return "burst.fill"
+        case let l where l.contains("step") || l.contains("walk") || l.contains("foot"): return "figure.walk"
+        case let l where l.contains("water") || l.contains("rain") || l.contains("splash"): return "drop.fill"
+        case let l where l.contains("wind") || l.contains("breeze"): return "wind"
+        case let l where l.contains("car") || l.contains("engine") || l.contains("traffic"): return "car.fill"
+        case let l where l.contains("bird") || l.contains("chirp"): return "bird.fill"
+        case let l where l.contains("baby") || l.contains("cry"): return "stroller.fill"
         default: return "exclamationmark.triangle.fill"
         }
     }
