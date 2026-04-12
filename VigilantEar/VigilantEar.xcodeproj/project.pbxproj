@@ -23,11 +23,9 @@
 		3053DCBE2F83718A00241892 /* Configuration.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3053DCA82F83718A00241892 /* Configuration.swift */; };
 		3053DCBF2F83718A00241892 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 3053DCAC2F83718A00241892 /* Assets.xcassets */; };
 		3087D7042F830F3D001AC208 /* GoogleMaps in Frameworks */ = {isa = PBXBuildFile; productRef = 3087D7032F830F3D001AC208 /* GoogleMaps */; };
-		308EF3E52F87558D00885DCB /* DiagnosticStatus.swift in Sources */ = {isa = PBXBuildFile; fileRef = 308EF3E42F87558D00885DCB /* DiagnosticStatus.swift */; };
 		308EF3E72F8755A300885DCB /* StartupVerificationViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 308EF3E62F8755A300885DCB /* StartupVerificationViewModel.swift */; };
 		308EF3E92F8755BC00885DCB /* StartupVerificationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 308EF3E82F8755BC00885DCB /* StartupVerificationView.swift */; };
 		30C55CC52F85FB1900D0B984 /* AcousticProcessingPipeline.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30C55CC42F85FB1500D0B984 /* AcousticProcessingPipeline.swift */; };
-		30C55CC92F8601F700D0B984 /* PerformanceLogger.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30C55CC82F8601F700D0B984 /* PerformanceLogger.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -47,21 +45,14 @@
 		3053DCA82F83718A00241892 /* Configuration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Configuration.swift; sourceTree = "<group>"; };
 		3053DCA92F83718A00241892 /* SoundEvent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SoundEvent.swift; sourceTree = "<group>"; };
 		3053DCAC2F83718A00241892 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
-		308EF3E42F87558D00885DCB /* DiagnosticStatus.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiagnosticStatus.swift; sourceTree = "<group>"; };
 		308EF3E62F8755A300885DCB /* StartupVerificationViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StartupVerificationViewModel.swift; sourceTree = "<group>"; };
 		308EF3E82F8755BC00885DCB /* StartupVerificationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StartupVerificationView.swift; sourceTree = "<group>"; };
 		308EF3EB2F875A9400885DCB /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		30C55CC42F85FB1500D0B984 /* AcousticProcessingPipeline.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AcousticProcessingPipeline.swift; sourceTree = "<group>"; };
-		30C55CC82F8601F700D0B984 /* PerformanceLogger.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PerformanceLogger.swift; sourceTree = "<group>"; };
 		30CA44A52F88AB5D0059C1D7 /* Settings.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Settings.xcconfig; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
-		304438492F8379F400F57539 /* Direction */ = {
-			isa = PBXFileSystemSynchronizedRootGroup;
-			path = Direction;
-			sourceTree = "<group>";
-		};
 		3044384A2F837A1D00F57539 /* Logging */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = Logging;
@@ -109,8 +100,6 @@
 		3053DC922F83718A00241892 /* Core */ = {
 			isa = PBXGroup;
 			children = (
-				308EF3E42F87558D00885DCB /* DiagnosticStatus.swift */,
-				30C55CC82F8601F700D0B984 /* PerformanceLogger.swift */,
 				3053DC912F83718A00241892 /* DependencyContainer.swift */,
 			);
 			path = Core;
@@ -177,7 +166,6 @@
 			isa = PBXGroup;
 			children = (
 				3044384A2F837A1D00F57539 /* Logging */,
-				304438492F8379F400F57539 /* Direction */,
 				3053DC992F83718A00241892 /* AudioEngine */,
 				3053DC9B2F83718A00241892 /* Classification */,
 				3053DCA52F83718A00241892 /* UI */,
@@ -232,7 +220,6 @@
 			dependencies = (
 			);
 			fileSystemSynchronizedGroups = (
-				304438492F8379F400F57539 /* Direction */,
 				3044384A2F837A1D00F57539 /* Logging */,
 			);
 			name = VigilantEar;
@@ -308,13 +295,11 @@
 				3053DCB62F83718A00241892 /* PermissionManager.swift in Sources */,
 				3053DCB72F83718A00241892 /* RadarView.swift in Sources */,
 				3053DCB82F83718A00241892 /* AcousticCoordinator.swift in Sources */,
-				308EF3E52F87558D00885DCB /* DiagnosticStatus.swift in Sources */,
 				3053DCB92F83718A00241892 /* VigilantEarApp.swift in Sources */,
 				3053DCBA2F83718A00241892 /* MicrophoneManager.swift in Sources */,
 				3053DCBB2F83718A00241892 /* ContentView.swift in Sources */,
 				3053DCBC2F83718A00241892 /* DependencyContainer.swift in Sources */,
 				3053DCBE2F83718A00241892 /* Configuration.swift in Sources */,
-				30C55CC92F8601F700D0B984 /* PerformanceLogger.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

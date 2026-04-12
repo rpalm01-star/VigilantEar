@@ -16,26 +16,22 @@ struct PulseData: Equatable, Identifiable {
     let label: String
 }
 
-// --- RESTORED: Stable Dot View (No Blink) ---
 struct RadarDotView: View {
     let event: SoundEvent
-    let width: CGFloat
-    let height: CGFloat
+    let width: CGFloat  // The calculated radarWidth
+    let height: CGFloat // The calculated radarHeight
+    let centerX: CGFloat
+    let centerY: CGFloat
     
     var body: some View {
-        let centerX = width / 2
-        let centerY = height / 2
-        
-        // Coordinates
         let radians = CGFloat(event.bearing) * .pi / 180.0
+        
+        // Distance of 1.0 maps to the outer edge of the bounding rectangle
         let xOffset = CGFloat(event.distance) * (width / 2) * sin(radians)
         let yOffset = -CGFloat(event.distance) * (height / 2) * cos(radians)
         
-        // Threat Analysis
         let label = event.threatLabel.lowercased()
         let isEmergency = label.contains("siren") || label.contains("ambulance") || label.contains("firetruck")
-        
-        // Make emergency vehicles visually distinct
         let dotColor = isEmergency ? Color.red : Color.cyan
         
         Circle()
@@ -48,7 +44,6 @@ struct RadarDotView: View {
     }
 }
 
-// --- UPDATED: Device Radar View with Flashing Inner Zone ---
 struct DeviceRadarView: View {
     var events: [SoundEvent]
     
@@ -64,10 +59,22 @@ struct DeviceRadarView: View {
         }
         
         GeometryReader { geo in
-            let width = geo.size.width
-            let height = geo.size.height
-            let centerX = width / 2
-            let centerY = height / 2
+            let maxWidth = geo.size.width
+            let maxHeight = geo.size.height
+            
+            // Abandon the strict hardware ratio.
+            // 0.65 gives a great "rectangular" feel while filling the horizontal space.
+            let targetRatio: CGFloat = 0.65
+            
+            // 1. Evaluate the condition once
+            let isWider = (maxWidth / maxHeight) > targetRatio
+            
+            // 2. Use ternary operators to initialize on a single line for ViewBuilder
+            let radarHeight: CGFloat = isWider ? maxHeight : (maxWidth / targetRatio)
+            let radarWidth: CGFloat  = isWider ? (maxHeight * targetRatio) : maxWidth
+            
+            let centerX = maxWidth / 2
+            let centerY = maxHeight / 2
             
             ZStack {
                 // 1. Draw the "Phone Outline" grid
@@ -82,33 +89,36 @@ struct DeviceRadarView: View {
                     let isWarningActive = isInnerRing && isBreaching
                     
                     let ringColor = isWarningActive ? Color.red : Color.green
-                    // If it's a warning, pulse the opacity between high (0.35) and low (0.05)
                     let finalShading = isWarningActive ? (isBlinking ? 0.35 : 0.05) : shadingOpacity
                     
                     RoundedRectangle(cornerRadius: 30 * scale, style: .continuous)
                         .fill(ringColor.opacity(finalShading))
                         .background(
                             RoundedRectangle(cornerRadius: 30 * scale, style: .continuous)
-                            // Thicker border when alarming
+                                // Thicker border when alarming
                                 .stroke(ringColor.opacity(borderOpacity), lineWidth: isWarningActive ? 2 : 1)
                         )
-                        .frame(width: width * scale, height: height * scale)
+                        // Use the calculated radar dimensions
+                        .frame(width: radarWidth * scale, height: radarHeight * scale)
                 }
                 
-                // 2. Draw subtle crosshairs
+                // 2. Draw subtle crosshairs scaled to the radar box
                 Path { path in
-                    path.move(to: CGPoint(x: centerX, y: 0))
-                    path.addLine(to: CGPoint(x: centerX, y: height))
-                    path.move(to: CGPoint(x: 0, y: centerY))
-                    path.addLine(to: CGPoint(x: width, y: centerY))
+                    path.move(to: CGPoint(x: centerX, y: centerY - (radarHeight / 2)))
+                    path.addLine(to: CGPoint(x: centerX, y: centerY + (radarHeight / 2)))
+                    path.move(to: CGPoint(x: centerX - (radarWidth / 2), y: centerY))
+                    path.addLine(to: CGPoint(x: centerX + (radarWidth / 2), y: centerY))
                 }
                 .stroke(Color.green.opacity(0.15), style: StrokeStyle(lineWidth: 1, dash: [4, 4]))
                 
                 // 3. Plot the acoustic events
                 ForEach(events, id: \.timestamp) { event in
-                    RadarDotView(event: event, width: width, height: height)
+                    // Pass the calculated dimensions down so the dots scale correctly
+                    RadarDotView(event: event, width: radarWidth, height: radarHeight, centerX: centerX, centerY: centerY)
                 }
             }
+            // Keep the ZStack centered in the available geometry space
+            .position(x: centerX, y: centerY)
         }
         .padding(.horizontal, 20)
         .padding(.bottom, 40)
@@ -178,7 +188,7 @@ struct RadarView: View {
     // MARK: - HUD Logic Helpers
     private func extractTopThreatLabels(from events: [SoundEvent], inTopHemisphere: Bool) -> [String] {
         let now = Date()
-        let genericLabels = ["Acoustic Event", "Monitoring..."]
+        let genericLabels = ["Acoustic Event", "Initializing..."]
         
         var validEvents = events.filter {
             !genericLabels.contains($0.threatLabel) &&
@@ -268,7 +278,7 @@ struct ThreatHUD: View {
     let threatLabels: [String] // Input logic stable [String]
     
     var body: some View {
-        HStack(spacing: 35) {
+        HStack(spacing: 6) {
             ForEach(threatLabels, id: \.self) { label in
                 VStack(spacing: 6) {
                     Image(systemName: iconFor(label: label))
@@ -287,6 +297,7 @@ struct ThreatHUD: View {
             }
         }
         .animation(.spring(response: 0.4, dampingFraction: 0.7), value: threatLabels)
+        .padding(.bottom, 0)
     }
     
     private func formatLabel(_ label: String) -> String {
@@ -297,17 +308,21 @@ struct ThreatHUD: View {
     
     private func iconFor(label: String) -> String {
         switch label.lowercased() {
+        case let l where l.contains("bicycle"): return "bicycle"
+        case let l where l.contains("subway"): return "tram.fill.tunnel"
         case let l where l.contains("rail"): return "lightrail.fill"
         case let l where l.contains("bell"): return "bell.fill"
-        case let l where l.contains("music") || l.contains("choir") || l.contains("song"): return "music.quarternote.3"
+        case let l where l.contains("tuning"): return "tuningfork"
+        case let l where l.contains("hammer"): return "hammer"
+        case let l where l.contains("whistl"): return "music.note"
+        case let l where l.contains("music") || l.contains("choir") || l.contains("song") || l.contains("sing"): return "music.quarternote.3"
         case let l where l.contains("knock") || l.contains("tap"): return "hand.tap.fill"
         case let l where l.contains("ambulance") || l.contains("siren") || l.contains("alarm"): return "light.beacon.max.fill"
         case let l where l.contains("speech") || l.contains("voice") || l.contains("talk"): return "waveform"
         case let l where l.contains("bark") || l.contains("animal"): return "pawprint.fill"
-        case let l where l.contains("dog"): return "dog"
         case let l where l.contains("tornado"): return "tornado"
         case let l where l.contains("keyboard") || l.contains("typing"): return "keyboard"
-        case let l where l.contains("cat"): return "cat"
+        case let l where l.contains("person"): return "figure.wave"
         case let l where l.contains("breathing") || l.contains("cough"): return "lungs.fill"
         case let l where l.contains("sneeze"): return "nose.fill"
         case let l where l.contains("snore") || l.contains("sleep"): return "zzz"
@@ -321,6 +336,9 @@ struct ThreatHUD: View {
         case let l where l.contains("car") || l.contains("engine") || l.contains("traffic"): return "car.fill"
         case let l where l.contains("bird") || l.contains("chirp"): return "bird.fill"
         case let l where l.contains("baby") || l.contains("cry"): return "stroller.fill"
+        case let l where l.contains("cat"): return "cat"
+        case let l where l.contains("dog"): return "dog"
+        case let l where l.contains("fan"): return "fan"
         default: return "exclamationmark.triangle.fill"
         }
     }

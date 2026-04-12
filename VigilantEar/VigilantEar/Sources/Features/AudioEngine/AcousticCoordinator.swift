@@ -111,7 +111,7 @@ final class AcousticCoordinator: NSObject {
         
         lastEventTime = now
         
-        let finalLabel = classification == "Monitoring..." ? "Acoustic Event" : classification
+        let finalLabel = classification == "Initializing..." ? "Acoustic Event" : classification
         
         return SoundEvent(
             timestamp: now,
@@ -174,7 +174,7 @@ final class AcousticCoordinator: NSObject {
         
         lastEventTime = now
         
-        let finalLabel = classification == "Monitoring..." ? "Acoustic Event" : classification
+        let finalLabel = classification == "Initializing..." ? "Acoustic Event" : classification
         
         return SoundEvent(
             timestamp: now,

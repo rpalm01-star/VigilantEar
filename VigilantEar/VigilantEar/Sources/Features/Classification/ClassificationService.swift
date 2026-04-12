@@ -6,7 +6,7 @@ import CoreML
 @Observable
 @MainActor
 final class ClassificationService {
-    var currentClassification: String = "Monitoring..."
+    var currentClassification: String = "Initializing..."
     var confidence: Double = 0.0
     
     // MARK: - Long-lived Pipeline Properties

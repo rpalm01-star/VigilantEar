@@ -47,3 +47,24 @@ struct HardwareCalibration {
         return identifier
     }
 }
+
+extension HardwareCalibration {
+    /// The physical width-to-height ratio of the device screen.
+    static var displayAspectRatio: CGFloat {
+        let model = deviceIdentifier
+        
+        switch model {
+        // MARK: - iPhone 16 Family
+        case "iPhone17,1": return 1179.0 / 2556.0 // iPhone 16
+        case "iPhone17,2": return 1290.0 / 2796.0 // iPhone 16 Plus
+        case "iPhone17,3": return 1179.0 / 2556.0 // iPhone 16 Pro
+        case "iPhone17,4": return 1290.0 / 2796.0 // iPhone 16 Pro Max
+            
+        // MARK: - Older / Generic Fallbacks
+        case let x where x.hasPrefix("iPad"):
+            return 3.0 / 4.0 // iPads are much wider relative to height
+        default:
+            return 9.0 / 19.5 // Safe fallback for most modern notch/island iPhones
+        }
+    }
+}

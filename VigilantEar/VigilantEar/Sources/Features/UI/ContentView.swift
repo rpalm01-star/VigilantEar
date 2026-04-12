@@ -8,57 +8,58 @@ struct ContentView: View {
         ZStack {
             Color.black.ignoresSafeArea()
             
-            VStack(spacing: 12) {
+            VStack(spacing: 6) {
                 // Title + Live HUD
                 HStack {
                     Text("VIGILANT EAR")
                         .font(.system(.headline, design: .monospaced))
                         .tracking(3)
                         .foregroundStyle(.green)
-                    
+
                     Spacer()
                     
                     // Listening indicator + current classification
-                    HStack(spacing: 6) {
+                    HStack(spacing: 8) {
                         Circle()
                             .fill(microphoneManager.isListening ? Color.green : Color.gray)
                             .frame(width: 8, height: 8)
-                        
-                        
+                                                
                         Text(classificationService.currentClassification.uppercased())
                             .font(.caption2.monospaced())
                             .foregroundStyle(.green)
                             .lineLimit(1)
                     }
-                    .padding(.horizontal, 10)
+                    .padding(.horizontal, 0)
                     .padding(.vertical, 4)
                     .background(Color.green.opacity(0.15))
                     .clipShape(RoundedRectangle(cornerRadius: 8))
                 }
-                .padding(.horizontal)
+                .lineLimit(1)
+                .padding(.horizontal, 0)
+                .frame(maxWidth: .infinity)
                 
                 RadarView()
                     .frame(maxHeight: .infinity)
-                    .padding(.horizontal, 8)
-                
-                // --- NEW SMALL THEMATIC BUTTON ---
-                HStack {
-                    Button(action: {
-                        runFiretruckSimulation()
-                    }) {
-                        Image("firemanHat") // External fireman hat asset from project assets
-                            .resizable()
-                            .scaledToFit()
-                            .frame(width: 60, height: 60)
-                            .padding()
-                            //.background(Color.red.opacity(0.15))
-                            //.clipShape(Rectangle())
-                            //.overlay(Rectangle().stroke(Color.red.opacity(0.5), lineWidth: 1.5))
-                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.horizontal, 0)
+                    .padding(.vertical, 0)
+                    .padding(.bottom, 0)
+                    .padding(.top, 0)
+
+                Spacer()
+
+                Button(action: {
+                    runFiretruckSimulation()
+                }) {
+                    Image("firemanHat") // External fireman hat asset from project assets
+                        .resizable()
+                        .scaledToFit()
+                        .frame(maxWidth: .infinity)
+                        .frame(maxHeight: 32)
                 }
-                .padding(.bottom, 20)
             }
-            .padding(.top, 20)
+            .padding(.top, 0)
+            .padding(.bottom, 0)
         }
         .onAppear {
             microphoneManager.startCapturing()
