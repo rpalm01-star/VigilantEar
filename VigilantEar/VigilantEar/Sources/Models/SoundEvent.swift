@@ -1,16 +1,38 @@
 import Foundation
 import SwiftData
+import SwiftUI
 import CoreLocation
+
+// A simple state machine for your queue
+public enum EventSyncStatus: Int, Codable {
+    case queued = 0      // Sitting locally, waiting for action
+    case processing = 1  // Currently being handled (prevents double-processing)
+    case completed = 2   // Done! (Archived or ready for deletion)
+    case failed = 3      // Attempted to process but failed
+}
 
 @Model
 public final class SoundEvent {
-    
-    // MARK: - Core Identity
     @Attribute(.unique) public var id: UUID
     public var timestamp: Date
     public var threatLabel: String
+    public var isEmergency: Bool
     
-    // MARK: - Spatial & Acoustic Metrics
+    // MARK: - Queue State (Shadow Property Pattern)
+    
+    // 1. Store the raw integer in SQLite so Predicates work flawlessly
+    public var syncStatusRaw: Int = EventSyncStatus.queued.rawValue
+    
+    // 2. Keep the nice enum API for the rest of your app, but hide it from SwiftData's SQL generator
+    @Transient
+    public var syncStatus: EventSyncStatus {
+        get {
+            return EventSyncStatus(rawValue: syncStatusRaw) ?? .queued
+        }
+        set {
+            syncStatusRaw = newValue.rawValue
+        }
+    }
     
     /// The calculated Angle of Arrival (AoA) in degrees (-90.0 to 90.0)
     public var bearing: Double
@@ -55,10 +77,16 @@ public final class SoundEvent {
         self.isApproaching = isApproaching
         self.latitude = latitude
         self.longitude = longitude
+        
+        // HEAVY LIFTING: Performed exactly once on the background thread during initialization.
+        let lowercased = threatLabel.lowercased()
+        self.isEmergency = lowercased.contains("siren") ||
+        lowercased.contains("ambulance") ||
+        lowercased.contains("firetruck")
+        self.syncStatus = .queued // Defaults to the queue!
     }
 }
 
-// MARK: - Computed Properties for the UI
 extension SoundEvent {
     
     /// Returns a coordinate for the Google Maps SDK
@@ -76,5 +104,12 @@ extension SoundEvent {
         
         // Formatted to show meters per second
         return "\(direction) (\(String(format: "%.1f", abs(rate))) m/s)"
+    }
+    
+    /// Instantly maps the pre-calculated boolean to a UI Color.
+    /// Marked @Transient so SwiftData knows not to attempt to save a SwiftUI.Color to SQLite.
+    @Transient
+    var dotColor: Color {
+        return isEmergency ? VigilantTheme.emergencyDot : VigilantTheme.standardDot
     }
 }

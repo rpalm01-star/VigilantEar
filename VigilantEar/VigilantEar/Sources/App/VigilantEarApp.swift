@@ -1,62 +1,82 @@
 import SwiftUI
 import GoogleMaps
+import SwiftData
 
 @main
 struct VigilantEarApp: App {
-    @State private var audioManager: MicrophoneManager
     @State private var isVerified = false
     @State private var verificationViewModel = StartupVerificationViewModel()
     
-    // And configure your Info.plist or Project Settings to only support Portrait.
-    private let classificationService = DependencyContainer.shared.classificationService
+    @Environment(\.scenePhase) private var scenePhase
+    
+    // Grab everything directly from your unified container
+    private let deps = DependencyContainer.shared
     
     init() {
-        let manager = MicrophoneManager(
-            coordinator: DependencyContainer.shared.acousticCoordinator,
-            classificationService: DependencyContainer.shared.classificationService
-        )
-        _audioManager = State(initialValue: manager)
-        
+        // Only Google Maps needs to be configured here now
         if let apiKey = Bundle.main.object(forInfoDictionaryKey: "GOOGLE_MAPS_API_KEY") as? String, !apiKey.isEmpty {
             GMSServices.provideAPIKey(apiKey)
-            
         }
     }
     
     var body: some Scene {
         WindowGroup {
-            if isVerified {
-                ContentView()
-                    .environment(audioManager)
-                    .environment(classificationService)
-            } else {
-                // Wrap in a VStack to stack the view and button vertically
-                VStack(spacing: 0) {
-                    StartupVerificationView(viewModel: verificationViewModel)
-                    
-                    // Only show the button area if diagnostics are finished
-                    if verificationViewModel.isFinished {
-                        Button(action: {
-                            withAnimation(.spring()) {
-                                isVerified = true
+            Group {
+                if isVerified {
+                    ContentView()
+                    // Use the managers from your DependencyContainer
+                        .environment(deps.microphoneManager)
+                        .environment(deps.classificationService)
+                } else {
+                    VStack(spacing: 0) {
+                        StartupVerificationView(viewModel: verificationViewModel)
+                        
+                        if verificationViewModel.isFinished {
+                            Button(action: {
+                                withAnimation(.spring()) {
+                                    isVerified = true
+                                }
+                            }) {
+                                Text("Begin Monitoring")
+                                    .bold()
+                                    .frame(maxWidth: .infinity)
+                                    .padding()
+                                    .background(Color.blue)
+                                    .foregroundColor(.white)
+                                    .cornerRadius(12)
                             }
-                        }) {
-                            Text("Begin Monitoring")
-                                .bold()
-                                .frame(maxWidth: .infinity)
-                                .padding()
-                                .background(Color.blue)
-                                .foregroundColor(.white)
-                                .cornerRadius(12)
+                            .padding(.horizontal, 24)
+                            .padding(.bottom, 20)
+                            .transition(.move(edge: .bottom).combined(with: .opacity))
                         }
-                        .padding(.horizontal, 24)
-                        .padding(.bottom, 20) // Proper padding from the bottom edge
-                        .transition(.move(edge: .bottom).combined(with: .opacity))
                     }
+                    .background(Color(.systemGroupedBackground))
                 }
-                .background(Color(.systemGroupedBackground)) // Optional: matches list style
-                .defersSystemGestures(on: .all)
-                .persistentSystemOverlays(.hidden)
+            }
+            .defersSystemGestures(on: .all)
+            .persistentSystemOverlays(.hidden)
+        }
+        // Attach the database from your DependencyContainer
+        .modelContainer(deps.sharedModelContainer)
+        .onChange(of: scenePhase) { oldPhase, newPhase in
+            if newPhase == .background {
+                // 1. Request a formal background execution lease from the OS
+                var bgTask: UIBackgroundTaskIdentifier = .invalid
+                bgTask = UIApplication.shared.beginBackgroundTask(withName: "FlushAcousticQueue") {
+                    // Expiration handler if we take too long (iOS gives us ~30 seconds)
+                    UIApplication.shared.endBackgroundTask(bgTask)
+                    bgTask = .invalid
+                }
+                
+                let queueManager = EventQueueManager(container: deps.sharedModelContainer)
+                Task {
+                    // 2. Safely run the file write
+                    await queueManager.flushQueue()
+                    
+                    // 3. Explicitly tell the OS we are done and it can safely suspend the app
+                    UIApplication.shared.endBackgroundTask(bgTask)
+                    bgTask = .invalid
+                }
             }
         }
     }

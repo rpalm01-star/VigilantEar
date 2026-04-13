@@ -1,8 +1,10 @@
 import SwiftUI
+import SwiftData
 
 struct ContentView: View {
     @Environment(ClassificationService.self) private var classificationService
     @Environment(MicrophoneManager.self) private var microphoneManager
+    @Environment(\.modelContext) private var modelContext
     
     var body: some View {
         ZStack {
@@ -15,7 +17,7 @@ struct ContentView: View {
                         .font(.system(.headline, design: .monospaced))
                         .tracking(3)
                         .foregroundStyle(.green)
-
+                    
                     Spacer()
                     
                     // Listening indicator + current classification
@@ -23,7 +25,7 @@ struct ContentView: View {
                         Circle()
                             .fill(microphoneManager.isListening ? Color.green : Color.gray)
                             .frame(width: 8, height: 8)
-                                                
+                        
                         Text(classificationService.currentClassification.uppercased())
                             .font(.caption2.monospaced())
                             .foregroundStyle(.green)
@@ -45,11 +47,27 @@ struct ContentView: View {
                     .padding(.vertical, 0)
                     .padding(.bottom, 0)
                     .padding(.top, 0)
-
+                
                 Spacer()
-
+                
                 Button(action: {
+                    // Run the visual UI simulation
                     runFiretruckSimulation()
+                    
+                    // DROP A REAL EVENT INTO THE DATABASE QUEUE
+                    let testDbEvent = SoundEvent(
+                        timestamp: Date(),
+                        threatLabel: "Simulated_Firetruck_Database_Test",
+                        bearing: 45.0,
+                        distance: 0.5,
+                        energy: 0.8,
+                        dopplerRate: 15.6,
+                        isApproaching: true
+                    )
+                    
+                    modelContext.insert(testDbEvent)
+                    try? modelContext.save()
+                    
                 }) {
                     Image("firemanHat") // External fireman hat asset from project assets
                         .resizable()
@@ -120,16 +138,29 @@ struct ContentView: View {
 
 // MARK: - Preview
 #Preview {
-    let coordinator = AcousticCoordinator()
-    let classifier = ClassificationService()
-    let manager = MicrophoneManager(
-        coordinator: coordinator,
-        classificationService: classifier
-    )
-    manager.isTestMode = true
-    manager.toggleTestMode()   // populate test dots immediately
-    
-    return ContentView()
-        .environment(classifier)
-        .environment(manager)
+    do {
+        // Create the in-memory database for the preview canvas
+        let config = ModelConfiguration(isStoredInMemoryOnly: true)
+        let container = try ModelContainer(for: SoundEvent.self, configurations: config)
+        
+        let coordinator = AcousticCoordinator()
+        let classifier = ClassificationService()
+        
+        let manager = MicrophoneManager(
+            coordinator: coordinator,
+            classificationService: classifier,
+            container: container // Inject the temporary container
+        )
+        
+        manager.isTestMode = true
+        manager.toggleTestMode()   // populate test dots immediately
+        
+        return ContentView()
+            .environment(classifier)
+            .environment(manager)
+        
+    } catch {
+        return Text("Failed to load preview: \(error.localizedDescription)")
+            .foregroundStyle(.red)
+    }
 }

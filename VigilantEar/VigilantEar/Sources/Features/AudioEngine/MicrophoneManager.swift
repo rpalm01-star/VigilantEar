@@ -4,6 +4,7 @@ import AVFoundation
 import CoreLocation
 import Accelerate
 import Observation
+import SwiftData
 
 @Observable
 class MicrophoneManager: NSObject, CLLocationManagerDelegate {
@@ -21,14 +22,16 @@ class MicrophoneManager: NSObject, CLLocationManagerDelegate {
     private let classificationService: ClassificationService
     private let locationManager = CLLocationManager()
     private let audioEngine = AVAudioEngine()
+    private let container: ModelContainer
     
     private var tapInstalled = false
     private var isRunning = false
     private var realTimeEvents: [SoundEvent] = []
     
-    init(coordinator: AcousticCoordinator, classificationService: ClassificationService) {
+    init(coordinator: AcousticCoordinator, classificationService: ClassificationService, container: ModelContainer) {
         self.coordinator = coordinator
         self.classificationService = classificationService
+        self.container = container
         super.init()
         setupHeading()
     }
@@ -176,6 +179,8 @@ class MicrophoneManager: NSObject, CLLocationManagerDelegate {
     @MainActor
     private func processNewEvent(_ event: SoundEvent, rms1: Float) {
         let now = Date()
+        
+        // 1. Update the UI Data Source
         if let index = self.realTimeEvents.firstIndex(where: {
             $0.threatLabel == event.threatLabel && abs($0.bearing - event.bearing) < 20.0
         }) {
@@ -190,7 +195,23 @@ class MicrophoneManager: NSObject, CLLocationManagerDelegate {
             self.realTimeEvents[index].isApproaching = event.isApproaching
         } else {
             self.realTimeEvents.append(event)
+            
+            // 2. NEW: Forward new emergency events to the local database queue
+            if event.isEmergency {
+                // Perform the database insert on a detached background thread
+                Task.detached {
+                    let backgroundContext = ModelContext(self.container)
+                    backgroundContext.insert(event)
+                    
+                    do {
+                        try backgroundContext.save()
+                    } catch {
+                        print("❌ Failed to queue real emergency event: \(error)")
+                    }
+                }
+            }
         }
+        
         self.realTimeEvents.removeAll { now.timeIntervalSince($0.timestamp) > 5.0 }
         self.events = self.realTimeEvents
     }

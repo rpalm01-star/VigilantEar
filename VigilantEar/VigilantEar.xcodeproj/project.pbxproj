@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		303DF5392F8C6BBD00D814D7 /* VigilantTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 303DF5382F8C6BBD00D814D7 /* VigilantTheme.swift */; };
 		3053DCAE2F83718A00241892 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3053DCA22F83718A00241892 /* SettingsView.swift */; };
 		3053DCAF2F83718A00241892 /* SoundEvent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3053DCA92F83718A00241892 /* SoundEvent.swift */; };
 		3053DCB12F83718A00241892 /* HardwareCalibration.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3053DC952F83718A00241892 /* HardwareCalibration.swift */; };
@@ -29,6 +30,7 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		303DF5382F8C6BBD00D814D7 /* VigilantTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VigilantTheme.swift; sourceTree = "<group>"; };
 		304F73C52F830A8800F67563 /* VigilantEar.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = VigilantEar.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		3053DC8E2F83718A00241892 /* VigilantEarApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VigilantEarApp.swift; sourceTree = "<group>"; };
 		3053DC912F83718A00241892 /* DependencyContainer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DependencyContainer.swift; sourceTree = "<group>"; };
@@ -100,6 +102,7 @@
 		3053DC922F83718A00241892 /* Core */ = {
 			isa = PBXGroup;
 			children = (
+				303DF5382F8C6BBD00D814D7 /* VigilantTheme.swift */,
 				3053DC912F83718A00241892 /* DependencyContainer.swift */,
 			);
 			path = Core;
@@ -286,6 +289,7 @@
 				308EF3E92F8755BC00885DCB /* StartupVerificationView.swift in Sources */,
 				3053DCAE2F83718A00241892 /* SettingsView.swift in Sources */,
 				3053DCAF2F83718A00241892 /* SoundEvent.swift in Sources */,
+				303DF5392F8C6BBD00D814D7 /* VigilantTheme.swift in Sources */,
 				3053DCB12F83718A00241892 /* HardwareCalibration.swift in Sources */,
 				30C55CC52F85FB1900D0B984 /* AcousticProcessingPipeline.swift in Sources */,
 				3053DCB22F83718A00241892 /* ClassificationService.swift in Sources */,
@@ -446,7 +450,7 @@
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UIStatusBarStyle = "";
-				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -455,12 +459,15 @@
 				PRODUCT_BUNDLE_IDENTIFIER = "com.rpalm01-star.VigilantEar";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
+				TARGETED_DEVICE_FAMILY = 1;
 			};
 			name = Debug;
 		};
@@ -483,7 +490,7 @@
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UIStatusBarStyle = "";
-				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -492,12 +499,15 @@
 				PRODUCT_BUNDLE_IDENTIFIER = "com.rpalm01-star.VigilantEar";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
+				TARGETED_DEVICE_FAMILY = 1;
 			};
 			name = Release;
 		};

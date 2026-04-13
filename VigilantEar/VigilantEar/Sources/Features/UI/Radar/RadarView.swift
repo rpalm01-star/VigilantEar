@@ -18,27 +18,22 @@ struct PulseData: Equatable, Identifiable {
 
 struct RadarDotView: View {
     let event: SoundEvent
-    let width: CGFloat  // The calculated radarWidth
-    let height: CGFloat // The calculated radarHeight
-    let centerX: CGFloat
-    let centerY: CGFloat
+    let width: CGFloat
+    let height: CGFloat
     
     var body: some View {
         let radians = CGFloat(event.bearing) * .pi / 180.0
         
-        // Distance of 1.0 maps to the outer edge of the bounding rectangle
         let xOffset = CGFloat(event.distance) * (width / 2) * sin(radians)
         let yOffset = -CGFloat(event.distance) * (height / 2) * cos(radians)
         
-        let label = event.threatLabel.lowercased()
-        let isEmergency = label.contains("siren") || label.contains("ambulance") || label.contains("firetruck")
-        let dotColor = isEmergency ? Color.red : Color.cyan
-        
         Circle()
-            .fill(dotColor)
+        // Read the pre-calculated color directly from the model
+            .fill(event.dotColor)
             .frame(width: 16, height: 16)
-            .shadow(color: dotColor, radius: CGFloat(event.energy) * 15)
-            .position(x: centerX + xOffset, y: centerY + yOffset)
+        // Use it for the shadow too
+            .shadow(color: event.dotColor, radius: CGFloat(event.energy) * 15)
+            .offset(x: xOffset, y: yOffset)
             .animation(.spring(response: 0.3, dampingFraction: 0.7), value: event.distance)
             .animation(.spring(response: 0.3, dampingFraction: 0.7), value: event.bearing)
     }
@@ -53,11 +48,10 @@ struct DeviceRadarView: View {
     @State private var rippleOpacity: Double = 0.0
     
     var body: some View {
-        // Determine if ANY emergency vehicle is inside the 0.25 threshold
+        
+        // Much cleaner and highly readable
         let isBreaching = events.contains { event in
-            let label = event.threatLabel.lowercased()
-            let isEmergency = label.contains("siren") || label.contains("ambulance") || label.contains("firetruck")
-            return isEmergency && abs(event.distance) <= 0.25
+            return event.isEmergency && abs(event.distance) <= 0.25
         }
         
         GeometryReader { geo in
@@ -151,7 +145,7 @@ struct DeviceRadarView: View {
                 // 3. Plot the acoustic events
                 ForEach(events, id: \.timestamp) { event in
                     // Pass the calculated dimensions down so the dots scale correctly
-                    RadarDotView(event: event, width: radarWidth, height: radarHeight, centerX: centerX, centerY: centerY)
+                    RadarDotView(event: event, width: radarWidth, height: radarHeight)
                 }
             }
             // Keep the ZStack centered in the available geometry space
@@ -258,19 +252,14 @@ struct RadarView: View {
         let innerRingThreshold: Double = 0.25
         
         for event in events {
-            let label = event.threatLabel.lowercased()
-            
-            if label.contains("siren") || label.contains("ambulance") || label.contains("firetruck") {
+            // Rely purely on the data model's assessment
+            if event.isEmergency {
                 if abs(event.distance) <= innerRingThreshold {
                     
-                    // Look up the cooldown for THIS specific unique threat label
                     let lastTime = hapticGatekeeper.lastFired[event.threatLabel] ?? .distantPast
                     
-                    // If this specific siren hasn't fired in 10 seconds...
                     if now.timeIntervalSince(lastTime) > 10.0 {
                         triggerSirenProximityHaptic()
-                        
-                        // Instantly lock the memory gate for this siren
                         hapticGatekeeper.lastFired[event.threatLabel] = now
                     }
                 }
@@ -322,8 +311,6 @@ struct ThreatHUD: View {
                         .font(.system(size: 28, weight: .semibold))
                         .foregroundStyle(.green)
                         .symbolEffect(.bounce, options: .repeating, isActive: true)
-                    
-                    // Hidden ID handling logic preserved, splitting at `_`.
                     Text(formatLabel(label))
                         .font(.caption2.monospaced().bold())
                         .foregroundStyle(.green.opacity(0.8))
@@ -345,23 +332,23 @@ struct ThreatHUD: View {
     
     private func iconFor(label: String) -> String {
         switch label.lowercased() {
+        case let l where l.contains("keyboard") || l.contains("typing"): return "keyboard.fill"
         case let l where l.contains("bicycle"): return "bicycle"
         case let l where l.contains("subway"): return "tram.fill.tunnel"
-        case let l where l.contains("rail"): return "lightrail.fill"
+        case let l where l.contains("train") || l.contains("rail"): return "lightrail.fill"
         case let l where l.contains("bell"): return "bell.fill"
         case let l where l.contains("tuning"): return "tuningfork"
         case let l where l.contains("hammer"): return "hammer"
-        case let l where l.contains("whistl"): return "music.note"
+        case let l where l.contains("whistl") || l.contains("didgeridoo") || l.contains("bassoon"): return "music.note"
         case let l where l.contains("music") || l.contains("choir") || l.contains("song") || l.contains("sing"): return "music.quarternote.3"
         case let l where l.contains("knock") || l.contains("tap"): return "hand.tap.fill"
-        case let l where l.contains("ambulance") || l.contains("siren") || l.contains("alarm"): return "light.beacon.max.fill"
+        case let l where l.contains("ambulance") || l.contains("siren") || l.contains("alarm") || l.contains("emergency"): return "light.beacon.max.fill"
         case let l where l.contains("speech") || l.contains("voice") || l.contains("talk"): return "waveform"
         case let l where l.contains("bark") || l.contains("animal"): return "pawprint.fill"
         case let l where l.contains("tornado"): return "tornado"
-        case let l where l.contains("keyboard") || l.contains("typing"): return "keyboard"
         case let l where l.contains("person"): return "figure.wave"
         case let l where l.contains("breathing") || l.contains("cough"): return "lungs.fill"
-        case let l where l.contains("sneeze") || l.contains("snoring"): return "nose.fill"
+        case let l where l.contains("sneeze") || l.contains("snoring") || l.starts(with: "nose"): return "nose.fill"
         case let l where l.contains("snore") || l.contains("sleep"): return "zzz"
         case let l where l.contains("burp") || l.contains("hiccup") || l.contains("swallow"): return "mouth.fill"
         case let l where l.contains("laugh") || l.contains("chuckle"): return "face.smiling.fill"
