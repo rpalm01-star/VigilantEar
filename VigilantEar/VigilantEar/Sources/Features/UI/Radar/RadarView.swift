@@ -1,19 +1,11 @@
 import SwiftUI
 import CoreHaptics
+import Combine
 
+// MARK: - Supporting Logic
 
-// A high-speed memory lock to prevent 60 FPS haptic queueing
 class HapticCooldownManager {
     var lastFired: [String: Date] = [:]
-}
-
-struct PulseData: Equatable, Identifiable {
-    let id = UUID()
-    let bearing: Double
-    let distance: Double
-    let startTime: TimeInterval
-    let energy: Float
-    let label: String
 }
 
 struct RadarDotView: View {
@@ -21,51 +13,51 @@ struct RadarDotView: View {
     let width: CGFloat
     let height: CGFloat
     
+    @State private var now = Date()
+    let timer = Timer.publish(every: 0.1, on: .main, in: .common).autoconnect()
+    
     var body: some View {
-        let radians = CGFloat(event.bearing) * .pi / 180.0
-        
+        let isSimulated = event.threatLabel.contains("Fire")
+        let multiplier: CGFloat = isSimulated ? 1.0 : 4.0
+        let displayAngle = CGFloat(event.bearing) * multiplier
+
+        let radians = displayAngle * .pi / 180.0
+
+        // X moves Left/Right
         let xOffset = CGFloat(event.distance) * (width / 2) * sin(radians)
+        
+        // Y moves Top/Bottom.
+        // IMPORTANT: To match your "Top" earpiece and "Bottom" port:
+        // We use a negative cos to ensure -Bearing (Bottom) = +Y (Down)
         let yOffset = -CGFloat(event.distance) * (height / 2) * cos(radians)
         
         Circle()
-        // Read the pre-calculated color directly from the model
-            .fill(event.dotColor)
-            .frame(width: 16, height: 16)
-        // Use it for the shadow too
-            .shadow(color: event.dotColor, radius: CGFloat(event.energy) * 15)
+            .fill(event.dotColor.opacity(max(0, 1.0 - (now.timeIntervalSince(event.timestamp) / 1.5))))
+            .frame(width: 22, height: 22)
             .offset(x: xOffset, y: yOffset)
-            .animation(.spring(response: 0.3, dampingFraction: 0.7), value: event.distance)
-            .animation(.spring(response: 0.3, dampingFraction: 0.7), value: event.bearing)
+            .onReceive(timer) { now = $0 }
+            .animation(.interactiveSpring(response: 0.4, dampingFraction: 0.7), value: event.bearing)
     }
 }
+
+// MARK: - Main Radar Components
 
 struct DeviceRadarView: View {
     var events: [SoundEvent]
     
-    // Background heartbeat for the warning zone
     @State private var isBlinking = false
     @State private var rippleScale: CGFloat = 0.25
     @State private var rippleOpacity: Double = 0.0
     
     var body: some View {
-        
-        // Much cleaner and highly readable
-        let isBreaching = events.contains { event in
-            return event.isEmergency && abs(event.distance) <= 0.25
-        }
+        let isBreaching = events.contains { $0.isEmergency && abs($0.distance) <= 0.25 }
         
         GeometryReader { geo in
             let maxWidth = geo.size.width
             let maxHeight = geo.size.height
-            
-            // Abandon the strict hardware ratio.
-            // 0.65 gives a great "rectangular" feel while filling the horizontal space.
             let targetRatio: CGFloat = 0.65
             
-            // 1. Evaluate the condition once
             let isWider = (maxWidth / maxHeight) > targetRatio
-            
-            // 2. Use ternary operators to initialize on a single line for ViewBuilder
             let radarHeight: CGFloat = isWider ? maxHeight : (maxWidth / targetRatio)
             let radarWidth: CGFloat  = isWider ? (maxHeight * targetRatio) : maxWidth
             
@@ -73,67 +65,74 @@ struct DeviceRadarView: View {
             let centerY = maxHeight / 2
             
             ZStack {
-                // 1. Draw the "Phone" and Radar grid
+                // Radar Rings
                 ForEach(1...4, id: \.self) { ring in
                     let scale = CGFloat(ring) / 4.0
-                    
                     let shadingOpacity = 0.20 - (Double(ring) * 0.03)
                     let borderOpacity = 0.35 - (Double(ring) * 0.05)
                     
-                    // --- THE RED ALERT LOGIC ---
                     let isInnerRing = (ring == 1)
                     let isWarningActive = isInnerRing && isBreaching
-                    
                     let ringColor = isWarningActive ? Color.red : Color.green
                     let finalShading = isWarningActive ? (isBlinking ? 0.35 : 0.05) : shadingOpacity
                     
-                    if isInnerRing {
-                        // The Center Device
-                        ZStack {
-                            // Keep the background fill so the pulsing warning effect is highly visible
-                            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                                .fill(ringColor.opacity(finalShading))
-                            
-                            // The actual SF Symbol
-                            Image(systemName: events.isEmpty ? "iphone" : "iphone.radiowaves.left.and.right")
-                                .resizable()
-                                .scaledToFit()
-                                .symbolEffect(.variableColor.iterative, options: .repeating, isActive: !events.isEmpty)
-                            // A lighter weight matches the technical HUD aesthetic
-                                .fontWeight(.light)
-                            // Bump up the opacity so the phone stands out clearly
-                                .foregroundStyle(ringColor.opacity(isWarningActive ? 0.9 : 0.45))
-                                .padding(8) // Inset the icon slightly
-                        }
-                        .frame(width: radarWidth * scale, height: radarHeight * scale)
-                        
-                    } else {
-                        // The Outer Radar Waves
-                        RoundedRectangle(cornerRadius: 30 * scale, style: .continuous)
+                    ZStack(alignment: .top) {
+                        // The Ring Shape
+                        RoundedRectangle(cornerRadius: isInnerRing ? 16 : 30 * scale, style: .continuous)
                             .fill(ringColor.opacity(finalShading))
                             .background(
-                                RoundedRectangle(cornerRadius: 30 * scale, style: .continuous)
+                                RoundedRectangle(cornerRadius: isInnerRing ? 16 : 30 * scale, style: .continuous)
                                     .stroke(ringColor.opacity(borderOpacity), lineWidth: isWarningActive ? 2 : 1)
                             )
+                        
+                        // PHYSICAL DISTANCE LABELS (30ft scale)
+                        let distanceInFeet = Int(scale * 30)
+                        Text("\(distanceInFeet) ft")
+                            .font(.system(size: 10, design: .monospaced).bold())
+                            .foregroundStyle(.green.opacity(0.4))
+                            .padding(.top, 4)
+                        
+                        if isInnerRing {
+                            ZStack {
+                                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                    .fill(ringColor.opacity(finalShading))
+                                
+                                // Use a conditional ZStack to keep the "phone" size consistent
+                                ZStack {
+                                    if events.isEmpty {
+                                        Image(systemName: "iphone")
+                                            .resizable()
+                                            .scaledToFit()
+                                            .padding(8) // Keeps it from touching the edges
+                                    } else {
+                                        // When active, we use the "radiowaves" icon but
+                                        // we force it to ignore the extra width of the waves
+                                        // so the phone body stays large.
+                                        Image(systemName: "iphone.radiowaves.left.and.right")
+                                            .resizable()
+                                            .scaledToFit()
+                                            .symbolEffect(.variableColor.iterative, options: .repeating, isActive: true)
+                                        // This padding keeps the waves inside the rectangle
+                                            .padding(4)
+                                    }
+                                }
+                                .fontWeight(.light)
+                                .foregroundStyle(ringColor.opacity(isWarningActive ? 0.9 : 0.45))
+                                
+                                // DISTANCE LABEL
+                                let distanceInFeet = Int(scale * 30)
+                                Text("\(distanceInFeet) ft")
+                                    .font(.system(size: 9, design: .monospaced).bold())
+                                    .foregroundStyle(.green.opacity(0.6))
+                                    .offset(y: -(radarHeight * scale / 2) + 10)
+                            }
                             .frame(width: radarWidth * scale, height: radarHeight * scale)
-                    }
-                }
-                
-                // --- THE SONAR RIPPLE ---
-                RoundedRectangle(cornerRadius: 30 * rippleScale, style: .continuous)
-                    .stroke(Color.green.opacity(rippleOpacity), lineWidth: 1.5)
-                    .frame(width: radarWidth * rippleScale, height: radarHeight * rippleScale)
-                    .onAppear {
-                        // Start visible and small
-                        rippleOpacity = 0.4
-                        // Animate outward and fade to zero
-                        withAnimation(.easeOut(duration: 2.5).repeatForever(autoreverses: false)) {
-                            rippleScale = 1.0
-                            rippleOpacity = 0.0
                         }
                     }
+                    .frame(width: radarWidth * scale, height: radarHeight * scale)
+                }
                 
-                // 2. Draw subtle crosshairs scaled to the radar box
+                // Crosshairs
                 Path { path in
                     path.move(to: CGPoint(x: centerX, y: centerY - (radarHeight / 2)))
                     path.addLine(to: CGPoint(x: centerX, y: centerY + (radarHeight / 2)))
@@ -142,19 +141,16 @@ struct DeviceRadarView: View {
                 }
                 .stroke(Color.green.opacity(0.15), style: StrokeStyle(lineWidth: 1, dash: [4, 4]))
                 
-                // 3. Plot the acoustic events
-                ForEach(events, id: \.timestamp) { event in
-                    // Pass the calculated dimensions down so the dots scale correctly
+                // Plot the acoustic events
+                ForEach(events) { event in
                     RadarDotView(event: event, width: radarWidth, height: radarHeight)
                 }
             }
-            // Keep the ZStack centered in the available geometry space
             .position(x: centerX, y: centerY)
         }
         .padding(.horizontal, 20)
         .padding(.bottom, 40)
         .onAppear {
-            // Start the infinite heartbeat the moment the radar loads
             withAnimation(.easeInOut(duration: 0.5).repeatForever(autoreverses: true)) {
                 isBlinking = true
             }
@@ -163,171 +159,120 @@ struct DeviceRadarView: View {
 }
 
 struct RadarView: View {
-    @Environment(MicrophoneManager.self) private var micManager
-    
+    @Environment(AcousticCoordinator.self) private var coordinator
     @State private var engine: CHHapticEngine?
     @State private var hapticGatekeeper = HapticCooldownManager()
     
-    // --- HUD DATA EXTRACTORS ---
-    // Notice these now return [String] instead of [SoundEvent]
     var topThreats: [String] {
-        extractTopThreatLabels(from: micManager.events, inTopHemisphere: true)
+        extractThreatLabels(from: coordinator.activeEvents, inTop: true)
     }
     
     var bottomThreats: [String] {
-        extractTopThreatLabels(from: micManager.events, inTopHemisphere: false)
+        extractThreatLabels(from: coordinator.activeEvents, inTop: false)
     }
     
     var body: some View {
-        VStack(spacing: 20) {
+        VStack(spacing: -10) { // Negative spacing pulls them together
             
             // --- TOP HUD ---
             ThreatHUD(threatLabels: topThreats)
-                .frame(height: 60)
+                .frame(height: 50)
+                .zIndex(1) // Ensure it stays on top of the radar background
             
             // --- THE DEVICE RADAR ---
-            DeviceRadarView(events: micManager.events)
+            DeviceRadarView(events: coordinator.activeEvents)
                 .background(Color.black)
-                .onChange(of: micManager.events) { _, events in
+                .onChange(of: coordinator.activeEvents) { _, events in
                     checkInnerRingCrossing(events: events)
                 }
-                .overlay(alignment: .top) {
-                    if micManager.isTestMode {
-                        Text("TEST MODE ON")
-                            .font(.caption2.monospaced().bold())
-                            .foregroundStyle(.yellow)
-                            .padding(.horizontal, 14)
-                            .padding(.vertical, 6)
-                            .background(.black.opacity(0.75))
-                            .clipShape(RoundedRectangle(cornerRadius: 20))
-                            .padding(.top, 12)
-                    }
-                }
-                .gesture(TapGesture(count: 2).onEnded { micManager.toggleTestMode() })
             
             // --- BOTTOM HUD ---
             ThreatHUD(threatLabels: bottomThreats)
-                .frame(height: 60)
-            
+                .frame(height: 50)
+                .zIndex(1)
+            // This pulls the bottom HUD UP to touch the radar grid
+                .padding(.top, -15)
         }
-        .padding(.vertical)
+        .padding(.bottom, 10) // Small padding to keep it off the very edge of the screen
         .onAppear { startHapticEngine() }
     }
     
-    // --- HUD DATA EXTRACTORS ---
-    
-    // MARK: - HUD Logic Helpers
-    private func extractTopThreatLabels(from events: [SoundEvent], inTopHemisphere: Bool) -> [String] {
+    private func extractThreatLabels(from events: [SoundEvent], inTop: Bool) -> [String] {
         let now = Date()
-        let genericLabels = ["Acoustic Event", "Initializing..."]
+        let validEvents = events.filter { now.timeIntervalSince($0.timestamp) < 2.0 }
         
-        var validEvents = events.filter {
-            !genericLabels.contains($0.threatLabel) &&
-            now.timeIntervalSince($0.timestamp) < 2.0
-        }
-        
-        validEvents = validEvents.filter { event in
-            let isTop = abs(event.bearing) <= 90
-            return inTopHemisphere ? isTop : !isTop
+        // HEMISPHERE LOGIC:
+        // We divide the HUD based on the bearing.
+        // Snaps at the earpiece (Top) usually have bearings near -8 to 0 in your logs.
+        // Snaps at the charging port (Bottom) show larger absolute values or flipped polarity.
+        let filtered = validEvents.filter { event in
+            return inTop ? (event.bearing <= 0) : (event.bearing > 0)
         }
         
         var uniqueLabels: [String] = []
-        var seenLabels = Set<String>()
+        var seen = Set<String>()
         
-        // We still sort by timestamp to find the latest active threats...
-        for event in validEvents.sorted(by: { $0.timestamp > $1.timestamp }) {
-            if !seenLabels.contains(event.threatLabel) {
+        for event in filtered.sorted(by: { $0.timestamp > $1.timestamp }) {
+            if !seen.contains(event.threatLabel) {
                 uniqueLabels.append(event.threatLabel)
-                seenLabels.insert(event.threatLabel)
+                seen.insert(event.threatLabel)
             }
             if uniqueLabels.count == 3 { break }
         }
-        
-        // ...but we return them sorted alphabetically so they lock their physical positions on screen!
         return uniqueLabels.sorted()
     }
     
     private func checkInnerRingCrossing(events: [SoundEvent]) {
         let now = Date()
-        let innerRingThreshold: Double = 0.25
-        
-        for event in events {
-            // Rely purely on the data model's assessment
-            if event.isEmergency {
-                if abs(event.distance) <= innerRingThreshold {
-                    
-                    let lastTime = hapticGatekeeper.lastFired[event.threatLabel] ?? .distantPast
-                    
-                    if now.timeIntervalSince(lastTime) > 10.0 {
-                        triggerSirenProximityHaptic()
-                        hapticGatekeeper.lastFired[event.threatLabel] = now
-                    }
-                }
+        for event in events where event.isEmergency && event.distance <= 0.25 {
+            let lastTime = hapticGatekeeper.lastFired[event.threatLabel] ?? .distantPast
+            if now.timeIntervalSince(lastTime) > 8.0 {
+                triggerSirenProximityHaptic()
+                hapticGatekeeper.lastFired[event.threatLabel] = now
             }
         }
     }
     
-    // MARK: - Haptics
     private func startHapticEngine() {
-        do {
-            engine = try CHHapticEngine()
-            try engine?.start()
-        } catch {}
+        do { engine = try CHHapticEngine(); try engine?.start() } catch {}
     }
     
     private func triggerSirenProximityHaptic() {
         guard let engine else { return }
-        
-        let pulse1 = CHHapticEvent(eventType: .hapticTransient, parameters: [
+        let p1 = CHHapticEvent(eventType: .hapticTransient, parameters: [
             CHHapticEventParameter(parameterID: .hapticIntensity, value: 1.0),
             CHHapticEventParameter(parameterID: .hapticSharpness, value: 1.0)
         ], relativeTime: 0)
-        
-        let pulse2 = CHHapticEvent(eventType: .hapticTransient, parameters: [
+        let p2 = CHHapticEvent(eventType: .hapticTransient, parameters: [
             CHHapticEventParameter(parameterID: .hapticIntensity, value: 1.0),
             CHHapticEventParameter(parameterID: .hapticSharpness, value: 1.0)
-        ], relativeTime: 0.15)
-        
+        ], relativeTime: 0.12)
         do {
-            // Stop any rogue lingering patterns just in case
-            engine.stop(completionHandler: nil)
             try engine.start()
-            
-            let player = try engine.makePlayer(with: CHHapticPattern(events: [pulse1, pulse2], parameters: []))
+            let player = try engine.makePlayer(with: CHHapticPattern(events: [p1, p2], parameters: []))
             try player.start(atTime: 0)
         } catch {}
     }
 }
-// MARK: - HUD UI Components
-// [Stable sort logic maps down to strings and alphabetically sorts labels logic]
+
 struct ThreatHUD: View {
-    let threatLabels: [String] // Input logic stable [String]
-    
+    let threatLabels: [String]
     var body: some View {
-        HStack(spacing: 6) {
+        HStack(spacing: 20) { // Horizontal gap between different threats
             ForEach(threatLabels, id: \.self) { label in
-                VStack(spacing: 6) {
+                VStack(spacing: 0) { // ZERO vertical spacing between icon and text
                     Image(systemName: iconFor(label: label))
-                        .font(.system(size: 28, weight: .semibold))
+                        .font(.system(size: 24, weight: .bold))
                         .foregroundStyle(.green)
-                        .symbolEffect(.bounce, options: .repeating, isActive: true)
-                    Text(formatLabel(label))
-                        .font(.caption2.monospaced().bold())
+                    
+                    Text(label.replacingOccurrences(of: "_", with: " ").capitalized)
+                        .font(.system(size: 8, weight: .bold, design: .monospaced))
                         .foregroundStyle(.green.opacity(0.8))
-                        .multilineTextAlignment(.center)
-                        .lineLimit(2)
+                        .frame(height: 12) // Constrain the text height
                 }
-                .transition(.scale.combined(with: .opacity))
+                .transition(.opacity.combined(with: .scale))
             }
         }
-        .animation(.spring(response: 0.4, dampingFraction: 0.7), value: threatLabels)
-        .padding(.bottom, 0)
-    }
-    
-    private func formatLabel(_ label: String) -> String {
-        let parts = label.components(separatedBy: "_")
-        if parts.count == 1 { return label }
-        return "\(parts[0])\n\(parts[1])"
     }
     
     private func iconFor(label: String) -> String {

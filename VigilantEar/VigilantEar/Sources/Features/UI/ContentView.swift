@@ -2,8 +2,8 @@ import SwiftUI
 import SwiftData
 
 struct ContentView: View {
-    @Environment(ClassificationService.self) private var classificationService
     @Environment(MicrophoneManager.self) private var microphoneManager
+    @Environment(AcousticCoordinator.self) private var coordinator
     @Environment(\.modelContext) private var modelContext
     
     var body: some View {
@@ -20,13 +20,15 @@ struct ContentView: View {
                     
                     Spacer()
                     
-                    // Listening indicator + current classification
                     HStack(spacing: 8) {
                         Circle()
                             .fill(microphoneManager.isListening ? Color.green : Color.gray)
                             .frame(width: 8, height: 8)
                         
-                        Text(classificationService.currentClassification.uppercased())
+                        // ✅ FIX: Read the live data! If there are active dots, show the newest one. Otherwise, show Listening.
+                        let statusText = coordinator.activeEvents.last?.threatLabel.uppercased() ?? (microphoneManager.isListening ? "LISTENING..." : "OFFLINE")
+                        
+                        Text(statusText)
                             .font(.caption2.monospaced())
                             .foregroundStyle(.green)
                             .lineLimit(1)
@@ -52,7 +54,7 @@ struct ContentView: View {
                 
                 Button(action: {
                     // Run the visual UI simulation
-                    runFiretruckSimulation()
+                    simulateFireTruck()
                     
                     // DROP A REAL EVENT INTO THE DATABASE QUEUE
                     let testDbEvent = SoundEvent(
@@ -79,7 +81,9 @@ struct ContentView: View {
             .padding(.top, 0)
             .padding(.bottom, 0)
         }
-        .onAppear {
+        .task {
+            // Wait 300ms to guarantee VigilantEarApp has wired the pipeline to the mic
+            try? await Task.sleep(for: .milliseconds(300))
             microphoneManager.startCapturing()
         }
         .onDisappear {
@@ -87,51 +91,38 @@ struct ContentView: View {
         }
     }
     
-    private func runFiretruckSimulation() {
-        Task {
-            // Generate unique ID and hidden label for stable sorting
-            let truckID = UUID().uuidString.prefix(4)
-            let uniqueLabel = "Siren_Approaching_\(truckID)"
-            // The hidden ID is safely handled by HUD logic splitting at `_`.
+    func simulateFireTruck() {
+        var step: Double = 0
+        let totalSteps: Double = 30
+        
+        Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { timer in
+            step += 1
             
-            let targetFPS = 60.0
-            //accurate real-world conversion logic preserved: 35 mph, route through center (0.0, 0.0)
-            let duration: TimeInterval = 14.5
-            let steps = Int(duration * targetFPS)
-            let sleepTime = duration / Double(steps)
+            // 1. VIRTUAL PATH: Straight line from Bottom-Left to Top-Right
+            // Using a 40-unit grid to ensure it starts/ends outside the 30ft rings
+            let x = -20.0 + (step * 1.33)
+            let y = -20.0 + (step * 1.33)
             
-            for step in 0...steps {
-                let t = Double(step) / Double(steps)
-                let bearing = 45.0
-                let signedDistance = -1.13 + (2.26 * t)
-                let energy = Float(max(0.15, 1.0 - abs(signedDistance)))
-                let isApproaching = signedDistance < 0
-                
-                let testEvent = SoundEvent(
-                    timestamp: Date(),
-                    threatLabel: uniqueLabel,
-                    bearing: bearing,
-                    distance: signedDistance,
-                    energy: energy,
-                    //accurate doppler rate calculation logic preserved
-                    dopplerRate: isApproaching ? 15.6 : -15.6,
-                    isApproaching: isApproaching
-                )
-                
-                await MainActor.run {
-                    // Filter out ONLY this specific unique ID to maintain ambient data.
-                    var mixedEvents = microphoneManager.events.filter { $0.threatLabel != uniqueLabel }
-                    mixedEvents.append(testEvent)
-                    microphoneManager.events = mixedEvents
-                }
-                
-                try? await Task.sleep(nanoseconds: UInt64(sleepTime * 1_000_000_000))
+            // 2. CONVERT TO RADAR DATA
+            let distanceInFeet = sqrt(x*x + y*y)
+            let bearing = atan2(x, y) * 180 / .pi
+            
+            // 3. NORMALIZE FOR RADAR (30ft scale)
+            let normalizedDistance = min(1.0, distanceInFeet / 30.0)
+            
+            let event = SoundEvent(
+                threatLabel: "Fire_Truck", // SoundEvent init handles "Fire" -> Red
+                bearing: bearing,
+                distance: normalizedDistance,
+                energy: 0.9
+            )
+            
+            DispatchQueue.main.async {
+                // FIX: Ensure this points to your coordinator instance
+                self.coordinator.addEvent(event)
             }
             
-            await MainActor.run {
-                // When simulation ends, remove only the simulated event.
-                microphoneManager.events = microphoneManager.events.filter { $0.threatLabel != uniqueLabel }
-            }
+            if step >= totalSteps { timer.invalidate() }
         }
     }
 }
@@ -152,12 +143,13 @@ struct ContentView: View {
             container: container // Inject the temporary container
         )
         
-        manager.isTestMode = true
-        manager.toggleTestMode()   // populate test dots immediately
+        // FIX: Removed the old toggleTestMode calls that no longer exist
         
         return ContentView()
             .environment(classifier)
             .environment(manager)
+        // FIX: Inject the coordinator into the preview environment
+            .environment(coordinator)
         
     } catch {
         return Text("Failed to load preview: \(error.localizedDescription)")

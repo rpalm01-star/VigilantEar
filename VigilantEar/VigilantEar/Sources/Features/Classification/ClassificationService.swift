@@ -48,6 +48,8 @@ final class ClassificationService {
         do {
             let newAnalyzer = SNAudioStreamAnalyzer(format: format)
             let request = try SNClassifySoundRequest(classifierIdentifier: .version1)
+            request.windowDuration = CMTime(seconds: 0.5, preferredTimescale: 1000)
+            request.overlapFactor = 0.9 // This is the "Rapid Fire" fix
             
             try newAnalyzer.add(request, withObserver: resultsObserver)
             self.analyzer = newAnalyzer

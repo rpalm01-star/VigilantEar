@@ -12,46 +12,33 @@ public enum EventSyncStatus: Int, Codable {
 }
 
 @Model
-public final class SoundEvent {
+final class SoundEvent: @unchecked Sendable {
     @Attribute(.unique) public var id: UUID
+    
     public var timestamp: Date
     public var threatLabel: String
     public var isEmergency: Bool
     
-    // MARK: - Queue State (Shadow Property Pattern)
+    // MARK: - Queue State
     
-    // 1. Store the raw integer in SQLite so Predicates work flawlessly
-    public var syncStatusRaw: Int = EventSyncStatus.queued.rawValue
+    /// This is the actual Integer stored in SQLite
+    public var syncStatusRaw: Int = 0
     
-    // 2. Keep the nice enum API for the rest of your app, but hide it from SwiftData's SQL generator
+    /// This is the nice Enum used by the UI/Logic (not stored in DB)
     @Transient
     public var syncStatus: EventSyncStatus {
-        get {
-            return EventSyncStatus(rawValue: syncStatusRaw) ?? .queued
-        }
-        set {
-            syncStatusRaw = newValue.rawValue
-        }
+        get { return EventSyncStatus(rawValue: syncStatusRaw) ?? .queued }
+        set { syncStatusRaw = newValue.rawValue }
     }
     
-    /// The calculated Angle of Arrival (AoA) in degrees (-90.0 to 90.0)
+    // MARK: - Spatial Data
+    
     public var bearing: Double
-    
-    /// The physical distance of the threat, driven dynamically by Doppler velocity
     public var distance: Double
-    
-    /// The normalized RMS energy (0.0 to 1.0) used for UI scale and opacity fading
     public var energy: Float
-    
-    /// The relative velocity in meters per second (m/s). Nil if the shift was negligible.
     public var dopplerRate: Float?
-    
-    /// True if the frequency is blue-shifting (increasing), indicating a collision course.
     public var isApproaching: Bool
     
-    // MARK: - GIS Location Data
-    
-    // Stored as optional Doubles because we might detect a threat before the GPS gets a precise lock
     public var latitude: Double?
     public var longitude: Double?
     
@@ -78,16 +65,25 @@ public final class SoundEvent {
         self.latitude = latitude
         self.longitude = longitude
         
-        // HEAVY LIFTING: Performed exactly once on the background thread during initialization.
         let lowercased = threatLabel.lowercased()
         self.isEmergency = lowercased.contains("siren") ||
         lowercased.contains("ambulance") ||
-        lowercased.contains("firetruck")
-        self.syncStatus = .queued // Defaults to the queue!
+        lowercased.contains("fire")
+        
+        // Initialize the raw value for the database
+        self.syncStatusRaw = EventSyncStatus.queued.rawValue
     }
 }
 
 extension SoundEvent {
+    
+    @Transient
+    var age: TimeInterval { Date().timeIntervalSince(timestamp) }
+    
+    @Transient
+    var opacity: Double {
+        return max(0, 1.0 - (age / 2.0))
+    }
     
     /// Returns a coordinate for the Google Maps SDK
     @Transient
@@ -96,7 +92,7 @@ extension SoundEvent {
         return CLLocationCoordinate2D(latitude: lat, longitude: lon)
     }
     
-    /// Formats the Doppler velocity for the UI
+    /// Formats the Doppler velocity for the UI
     @Transient
     var formattedDoppler: String {
         guard let rate = dopplerRate, abs(rate) > 0.1 else { return "Stationary" }
@@ -112,4 +108,5 @@ extension SoundEvent {
     var dotColor: Color {
         return isEmergency ? VigilantTheme.emergencyDot : VigilantTheme.standardDot
     }
+    
 }

@@ -12,6 +12,13 @@ struct VigilantEarApp: App {
     // Grab everything directly from your unified container
     private let deps = DependencyContainer.shared
     
+    // MARK: - NEW ARCHITECTURE
+    // 1. Create the UI Coordinator as State so the views can observe it
+    @State private var coordinator = AcousticCoordinator()
+    
+    // 2. Create the background pipeline
+    let pipeline = AcousticProcessingPipeline()
+    
     init() {
         // Only Google Maps needs to be configured here now
         if let apiKey = Bundle.main.object(forInfoDictionaryKey: "GOOGLE_MAPS_API_KEY") as? String, !apiKey.isEmpty {
@@ -24,9 +31,19 @@ struct VigilantEarApp: App {
             Group {
                 if isVerified {
                     ContentView()
-                    // Use the managers from your DependencyContainer
+                        // Use the managers from your DependencyContainer
                         .environment(deps.microphoneManager)
                         .environment(deps.classificationService)
+                        // NEW: Inject the coordinator into the SwiftUI environment
+                        .environment(coordinator)
+                        // NEW: Wire the pipeline to the UI and Microphone once verified
+                        .task {
+                            // Tell the UI to start listening to the background math
+                            coordinator.startListeningToPipeline(pipeline)
+                            
+                            // Hand the pipeline to the microphone manager so it can feed it
+                            deps.microphoneManager.pipeline = pipeline
+                        }
                 } else {
                     VStack(spacing: 0) {
                         StartupVerificationView(viewModel: verificationViewModel)
