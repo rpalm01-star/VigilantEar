@@ -50,36 +50,34 @@ actor AcousticProcessingPipeline {
         
         // Calculate volume (0.0 to 1.0)
         let peak = leftSamples.map(abs).max() ?? 0.0
-                
+        
         Task.detached(priority: .userInitiated) { [weak self] in
             guard let self = self else { return }
+            
+            let estimatedFeet = 1.0 / (Double(peak) + 0.01) // Cite: 133
+            let maxRange: Double = 30.0
+            
+            // NEW: Border Guard Logic
+            // If it's 100ft away, it becomes 1.0 (on the outer ring)
+            // If it's 5ft away, it becomes 0.16
+            let normalizedDistance = min(1.0, estimatedFeet / maxRange) // Cite: 133, 184
             
             // 1. Get the direction
             let angle = self.fftProcessor.calculateTDOA(left: leftSamples, right: rightSamples, sampleRate: self.sampleRate) ?? 0.0
             
-            // --- PHYSICAL DISTANCE MAPPING ---
-            // 1. Convert Peak (0...1) to a logarithmic scale
-            // A snap at 1.0 peak = ~1.0 foot
-            // A snap at 0.01 peak = ~30.0 feet
-            let estimatedFeet = 1.0 / (Double(peak) + 0.03) // Adding 0.03 prevents infinity at silence
-
-            // 2. Clamp it for the Radar View (which still needs 0...1 for the grid)
-            // Let's say our "Radar Horizon" is 30 feet.
-            let maxRange: Double = 30.0
-            let normalizedDistance = min(1.0, estimatedFeet / maxRange)
-            
             print("🔔 EVENT: \(label) | PEAK: \(String(format: "%.3f", peak)) | EST. DISTANCE: \(String(format: "%.1f", estimatedFeet)) ft")
-
+            
             let newEvent = SoundEvent(
                 threatLabel: label,
                 bearing: angle,
-                distance: normalizedDistance, // For the UI positioning
+                distance: normalizedDistance,
                 energy: Float(peak)
             )
             
             _ = await MainActor.run {
                 self.continuation.yield(newEvent)
             }
+            
         }
     }
     
