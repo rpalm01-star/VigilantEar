@@ -25,7 +25,9 @@ class MicrophoneManager: NSObject, CLLocationManagerDelegate {
     
     private var tapInstalled = false
     private var isRunning = false
+    var currentLocation: CLLocation? = nil
     
+
     init(coordinator: AcousticCoordinator, classificationService: ClassificationService, container: ModelContainer) {
         self.classificationService = classificationService
         self.container = container
@@ -36,15 +38,31 @@ class MicrophoneManager: NSObject, CLLocationManagerDelegate {
     private func setupHeading() {
         locationManager.delegate = self
         locationManager.desiredAccuracy = kCLLocationAccuracyBest
+        
+        // This triggers the popup (now that the Info.plist is fixed)
         locationManager.requestWhenInUseAuthorization()
+        
+        // Start compass
         if CLLocationManager.headingAvailable() {
             locationManager.startUpdatingHeading()
         }
+        
+        // Start GPS
+        locationManager.startUpdatingLocation()
     }
     
+    // Updates Compass
     func locationManager(_ manager: CLLocationManager, didUpdateHeading newHeading: CLHeading) {
         Task { @MainActor in
             self.currentHeading = newHeading.magneticHeading
+        }
+    }
+    
+    // Updates GPS
+    func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
+        guard let location = locations.last else { return }
+        Task { @MainActor in
+            self.currentLocation = location
         }
     }
     
@@ -104,6 +122,16 @@ class MicrophoneManager: NSObject, CLLocationManagerDelegate {
         
         inputNode.installTap(onBus: 0, bufferSize: 4096, format: hardwareFormat) { [weak self] buffer, time in
             guard let self = self else { return }
+
+            if let channelData = buffer.floatChannelData {
+                let leftSample = channelData[0][100]
+                let rightSample = channelData[1][100]
+                
+                // DEBUG: Check if channels are physically different
+                if leftSample == rightSample && leftSample != 0 {
+                    print("🚨 HARDWARE ERROR: Mono signal detected. Channels are identical.")
+                }
+            }
             
             // --- 🕵️‍♂️ THE WIRETAP ---
             if Int.random(in: 1...30) == 1 {

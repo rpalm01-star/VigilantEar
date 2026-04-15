@@ -19,14 +19,10 @@ struct RadarDotView: View {
     var body: some View {
         // Standardized mapping: event.distance is 0.0 to 1.0 (clamped to 30ft horizon)
         let radians = CGFloat(event.bearing) * .pi / 180.0
-        
-        // X moves Left/Right
         let xOffset = CGFloat(event.distance) * (width / 2) * sin(radians)
-        
-        // Y moves Top/Bottom (Inverted for iOS coordinates)
         let yOffset = -CGFloat(event.distance) * (height / 2) * cos(radians)
-        
-        Circle()
+                        
+        return Circle()
             .fill(event.dotColor.opacity(max(0, 1.0 - (now.timeIntervalSince(event.timestamp) / 1.5))))
             .frame(width: 22, height: 22)
             .offset(x: xOffset, y: yOffset)
@@ -160,7 +156,7 @@ struct RadarView: View {
     var body: some View {
         VStack(spacing: 0) {
             // SINGLE TOP HUD
-            ThreatHUD(threatLabels: activeThreats)
+            xThreatHUD(threatLabels: activeThreats)
                 .frame(height: 60)
                 .padding(.top, 10)
             
@@ -212,7 +208,7 @@ struct RadarView: View {
     }
 }
 
-struct ThreatHUD: View {
+struct xThreatHUD: View {
     let threatLabels: [String]
     var body: some View {
         ScrollView(.horizontal, showsIndicators: false) {

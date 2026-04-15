@@ -4,52 +4,64 @@ struct StartupVerificationView: View {
     @Bindable var viewModel: StartupVerificationViewModel
     
     var body: some View {
-        VStack(spacing: 30) {
-            headerSection
+        HStack(spacing: 40) {
             
-            List(viewModel.steps) { step in
-                VerificationRow(step: step)
+            // Left Side: Branding / Instructions
+            VStack(alignment: .leading, spacing: 16) {
+                
+                Text("VIGILANT EAR")
+                    .font(.largeTitle.monospaced().bold())
+                
+                Text("Pre-flight Systems Check")
+                    .font(.subheadline.monospaced())
+                    .foregroundStyle(.secondary)
+                
+                Spacer()
+                
+                if !viewModel.isFinished {
+                    HStack(spacing: 12) {
+                        ProgressView()
+                            .tint(.green)
+                        Text("Initializing arrays...")
+                            .font(.caption.monospaced())
+                            .foregroundStyle(.green)
+                    }
+                } else if viewModel.allPassed {
+                    Text("SYSTEMS GREEN")
+                        .font(.headline.monospaced())
+                        .foregroundStyle(.green)
+                } else {
+                    Button(action: { Task { await viewModel.runDiagnostics() } }) {
+                        Label("REBOOT DIAGNOSTICS", systemImage: "arrow.clockwise")
+                            .font(.caption.bold().monospaced())
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 10)
+                            .background(Color.orange.opacity(0.2))
+                            .foregroundStyle(.orange)
+                            .cornerRadius(8)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 8)
+                                    .stroke(Color.orange, lineWidth: 1)
+                            )
+                    }
+                }
             }
-            .listStyle(.plain)
-            .frame(maxHeight: 340)
+            .padding(.vertical, 20)
             
-            if !viewModel.isFinished {
-                ProgressView("Running hardware diagnostics...")
-                    .padding()
-            } else if viewModel.allPassed {
-                Text("✅ All systems ready!")
-                    .font(.title3.bold())
-                    .foregroundStyle(.green)
-            } else {
-                Text("⚠️ Some checks failed.\nThe app may have limited functionality.")
-                    .font(.subheadline)
-                    .foregroundStyle(.orange)
-                    .multilineTextAlignment(.center)
+            // Right Side: The "Squished" Button List
+            VStack(spacing: 8) {
+                ForEach(viewModel.steps) { step in
+                    VerificationRow(step: step)
+                }
             }
-            
+            .frame(maxWidth: .infinity)
         }
-        .padding()
+        .padding(30)
+        .background(Color.black.ignoresSafeArea())
+        .environment(\.colorScheme, .dark)
         .onAppear {
-            Task {
-                await viewModel.runDiagnostics()
-            }
+            Task { await viewModel.runDiagnostics() }
         }
-    }
-    
-    private var headerSection: some View {
-        VStack(spacing: 10) {
-            Image(systemName: "waveform.circle.fill")
-                .font(.system(size: 60))
-                .foregroundStyle(.blue)
-            
-            Text("VigilantEar")
-                .font(.largeTitle.bold())
-            
-            Text("Hardware & System Check")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-        }
-        .padding(.top, 40)
     }
 }
 
@@ -57,27 +69,60 @@ struct VerificationRow: View {
     let step: VerificationTask
     
     var body: some View {
-        HStack {
+        HStack(spacing: 12) {
             Text(step.type.rawValue)
+                .font(.system(size: 13, weight: .medium, design: .monospaced))
+                .foregroundStyle(.white.opacity(0.9))
+            
             Spacer()
-            statusIcon
-            if let reason = step.failureReason {
+            
+            if let reason = step.failureReason, step.status == .failed {
                 Text(reason)
-                    .font(.caption)
+                    .font(.system(size: 10, design: .monospaced))
                     .foregroundStyle(.red)
-                    .padding(.leading, 8)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
             }
+            
+            statusIcon
         }
-        .padding(.vertical, 6)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 10)
+        .background(Color(white: 0.1))
+        .cornerRadius(6)
+        .overlay(
+            RoundedRectangle(cornerRadius: 6)
+                .stroke(borderColor, lineWidth: 1)
+        )
+    }
+    
+    private var borderColor: Color {
+        switch step.status {
+        case .failed: return .red.opacity(0.5)
+        case .passed: return .green.opacity(0.3)
+        default: return .clear
+        }
     }
     
     @ViewBuilder
     private var statusIcon: some View {
         switch step.status {
-        case .pending: Image(systemName: "circle").foregroundStyle(.secondary)
-        case .running: ProgressView().controlSize(.small)
-        case .passed: Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
-        case .failed: Image(systemName: "xmark.circle.fill").foregroundStyle(.red)
+        case .pending:
+            Image(systemName: "circle")
+                .foregroundStyle(.gray)
+                .font(.system(size: 14))
+        case .running:
+            ProgressView()
+                .controlSize(.small)
+                .tint(.green)
+        case .passed:
+            Image(systemName: "checkmark.square.fill")
+                .foregroundStyle(.green)
+                .font(.system(size: 14))
+        case .failed:
+            Image(systemName: "xmark.square.fill")
+                .foregroundStyle(.red)
+                .font(.system(size: 14))
         }
     }
 }

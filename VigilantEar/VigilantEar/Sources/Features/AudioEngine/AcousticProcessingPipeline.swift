@@ -56,11 +56,9 @@ actor AcousticProcessingPipeline {
             
             let estimatedFeet = 1.0 / (Double(peak) + 0.01) // Cite: 133
             let maxRange: Double = 30.0
-            
-            // NEW: Border Guard Logic
-            // If it's 100ft away, it becomes 1.0 (on the outer ring)
-            // If it's 5ft away, it becomes 0.16
             let normalizedDistance = min(1.0, estimatedFeet / maxRange) // Cite: 133, 184
+            
+            print("📏 [DIST] Peak Amp: \(peak) | Est. Feet: \(estimatedFeet) | Normalized: \(normalizedDistance)")
             
             // 1. Get the direction
             let angle = self.fftProcessor.calculateTDOA(left: leftSamples, right: rightSamples, sampleRate: self.sampleRate) ?? 0.0

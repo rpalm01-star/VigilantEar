@@ -18,12 +18,17 @@ struct VigilantEarApp: App {
     
     // 2. Create the background pipeline
     let pipeline = AcousticProcessingPipeline()
-    
+        
     init() {
-        // Only Google Maps needs to be configured here now
-        if let apiKey = Bundle.main.object(forInfoDictionaryKey: "GOOGLE_MAPS_API_KEY") as? String, !apiKey.isEmpty {
+        let apiKey = Bundle.main.object(forInfoDictionaryKey: "GOOGLE_MAPS_API_KEY") as? String ?? ""
+        
+        if apiKey.isEmpty || apiKey == "$(GOOGLE_MAPS_API_KEY)" {
+            print("🚨 FATAL: Google Maps API Key is missing! Check your Settings.xcconfig.")
+            GMSServices.provideAPIKey("AIzaSyCvvMWbvHvrP4R6kYdd8Q3jATfWo9AqCqk")
+        } else {
             GMSServices.provideAPIKey(apiKey)
         }
+        UIDevice.current.beginGeneratingDeviceOrientationNotifications()
     }
     
     var body: some Scene {
