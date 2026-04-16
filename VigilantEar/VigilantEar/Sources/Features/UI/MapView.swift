@@ -36,7 +36,7 @@ struct MapView: View {
                 
                 // 3. The Threat Dots
                 ForEach(events) { event in
-                    let distanceInMeters = Double(event.distance) * 9.144
+                    let distanceInMeters = Double(event.distance) * 304.8
                     let absoluteBearing = userHeading + Double(event.bearing)
                     let projectedCoord = center.projected(by: distanceInMeters, bearingDegrees: absoluteBearing)
                     

@@ -12,7 +12,7 @@ struct StartupVerificationView: View {
                 Text("VIGILANT EAR")
                     .font(.largeTitle.monospaced().bold())
                 
-                Text("Pre-flight Systems Check")
+                Text("Pre-flight Check")
                     .font(.subheadline.monospaced())
                     .foregroundStyle(.secondary)
                 
@@ -27,12 +27,12 @@ struct StartupVerificationView: View {
                             .foregroundStyle(.green)
                     }
                 } else if viewModel.allPassed {
-                    Text("SYSTEMS GREEN")
+                    Text("READY!")
                         .font(.headline.monospaced())
                         .foregroundStyle(.green)
                 } else {
                     Button(action: { Task { await viewModel.runDiagnostics() } }) {
-                        Label("REBOOT DIAGNOSTICS", systemImage: "arrow.clockwise")
+                        Label("RETRY SETUP CHECKS", systemImage: "arrow.clockwise")
                             .font(.caption.bold().monospaced())
                             .padding(.horizontal, 16)
                             .padding(.vertical, 10)

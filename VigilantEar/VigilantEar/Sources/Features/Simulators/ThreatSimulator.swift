@@ -1,11 +1,3 @@
-//
-//  ThreatSimulator.swift
-//  VigilantEar
-//
-//  Created by Robert Palmer on 4/15/26.
-//
-
-
 import Foundation
 import CoreLocation
 import MapKit
@@ -13,7 +5,6 @@ import MapKit
 @MainActor
 struct ThreatSimulator {
     
-    /// Runs a pedestrian-routed straight-line simulation past the user's location
     static func runFireTruckDriveBy(
         location: CLLocation?,
         heading: Double,
@@ -22,8 +13,9 @@ struct ThreatSimulator {
         guard let location = location else { return }
         
         Task {
-            let startCoord = location.coordinate.projected(by: 45.0, bearingDegrees: heading - 90)
-            let endCoord = location.coordinate.projected(by: 45.0, bearingDegrees: heading + 90)
+            // 1. EXPANDED STAGE: 1,000 feet (304.8 meters) left and right!
+            let startCoord = location.coordinate.projected(by: 304.8, bearingDegrees: heading - 90)
+            let endCoord = location.coordinate.projected(by: 304.8, bearingDegrees: heading + 90)
             
             let request = MKDirections.Request()
             let startLoc = CLLocation(latitude: startCoord.latitude, longitude: startCoord.longitude)
@@ -31,7 +23,7 @@ struct ThreatSimulator {
             
             request.source = MKMapItem(location: startLoc, address: nil)
             request.destination = MKMapItem(location: endLoc, address: nil)
-            request.transportType = .walking
+            request.transportType = .walking // Cheat code to ignore one-ways
             
             do {
                 let directions = MKDirections(request: request)
@@ -42,7 +34,9 @@ struct ThreatSimulator {
                     return
                 }
                 
-                let pathCoordinates = route.polyline.denselySampled(spacingMeters: 1.0)
+                // 2. HIGHER SPEED: Sample every 2 meters.
+                // At 0.1s ticks, this equals 20m/s (~45 mph) so you aren't waiting all day.
+                let pathCoordinates = route.polyline.denselySampled(spacingMeters: 2.0)
                 guard !pathCoordinates.isEmpty else { return }
                 
                 var step = 0
@@ -74,11 +68,13 @@ struct ThreatSimulator {
                     if relativeBearing > 180 { relativeBearing -= 360 }
                     if relativeBearing < -180 { relativeBearing += 360 }
                     
-                    let normalizedDistance = distanceInFeet / 30.0
-                    let calculatedEnergy = max(0.1, 1.0 - (distanceInFeet / 150.0))
+                    // 3. THE FIX: Normalize using the new 1,000 foot radar scale
+                    let normalizedDistance = distanceInFeet / 1000.0
+                    
+                    // Smooth volume fade starting from 1,000 feet out
+                    let calculatedEnergy = max(0.05, 1.0 - (distanceInFeet / 1000.0))
                     
                     let event = SoundEvent(
-                        timestamp: Date(),
                         threatLabel: "Fire_Truck",
                         bearing: relativeBearing,
                         distance: normalizedDistance,
@@ -104,7 +100,6 @@ struct ThreatSimulator {
 
 // MARK: - MapKit Extensions
 extension MKPolyline {
-    
     var coordinates: [CLLocationCoordinate2D] {
         var coords = [CLLocationCoordinate2D](repeating: kCLLocationCoordinate2DInvalid, count: pointCount)
         getCoordinates(&coords, range: NSRange(location: 0, length: pointCount))

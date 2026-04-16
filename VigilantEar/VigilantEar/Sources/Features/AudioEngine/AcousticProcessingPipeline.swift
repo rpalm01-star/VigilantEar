@@ -53,14 +53,29 @@ actor AcousticProcessingPipeline {
         Task.detached(priority: .userInitiated) { [weak self] in
             guard let self = self else { return }
             
-            let estimatedFeet = 1.0 / (Double(peak) + 0.01)
-            let maxRange: Double = 30.0
-            let normalizedDistance = min(1.0, estimatedFeet / maxRange)
+            // --- 1. INVERSE SQUARE LAW DISTANCE CALIBRATION ---
+            // Establish the Acoustic Floor and Ceiling
+            let ambientFloor: Double = 0.01
+            let clippingCeiling: Double = 0.95
             
-            // 1. Calculate TDOA Bearing
+            // Clamp the raw peak to prevent math crashes
+            let safePeak = min(max(Double(peak), ambientFloor), clippingCeiling)
+            
+            // Logarithmic Scaling
+            let linearRatio = (clippingCeiling - safePeak) / (clippingCeiling - ambientFloor)
+            let exponentialCurve = pow(linearRatio, 3.0)
+            
+            // Map to the true Radar Horizon (1,000 feet)
+            let radarHorizonInFeet = 1000.0
+            let estimatedFeet = max(5.0, exponentialCurve * radarHorizonInFeet)
+            
+            // Normalize for the UI (1.0 = 1,000 feet)
+            let normalizedDistance = estimatedFeet / radarHorizonInFeet
+            
+            // --- 2. TDOA BEARING CALCULATION ---
             var angle = self.fftProcessor.calculateTDOA(left: leftSamples, right: rightSamples, sampleRate: self.sampleRate) ?? 0.0
             
-            // 2. THE HARDWARE POLARITY FIX
+            // --- 3. HARDWARE POLARITY FIX ---
             // If the user flips the phone so the notch is on the left, the Left and Right
             // microphones are physically swapped. We must invert the math to match.
             let orientation = await MainActor.run { UIDevice.current.orientation }
@@ -93,7 +108,6 @@ actor AcousticProcessingPipeline {
         try streamAnalyzer?.add(request, withObserver: observer)
     }
     
-    
     private func updateDoppler(frequency: Double, confidence: Float) -> (isApproaching: Bool, shiftHz: Double)? {
         guard confidence > 0.3 else { return nil }
         
@@ -119,7 +133,6 @@ actor AcousticProcessingPipeline {
         return (isApproaching, shift)
     }
     
-    // FIXED: Moved this helper function inside the actor's scope
     private func calculateRMS(buffer: AVAudioPCMBuffer) -> Float? {
         guard let channelData = buffer.floatChannelData else { return nil }
         var rms: Float = 0.0

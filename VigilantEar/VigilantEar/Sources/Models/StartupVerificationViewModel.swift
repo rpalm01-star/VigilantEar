@@ -19,7 +19,8 @@ struct VerificationTask: Identifiable {
 }
 
 enum VerificationType: String {
-    case spatialAudio = "Spatial Audio (FOA)"
+    // UPDATED: Changed from Spatial Audio to Stereo Array
+    case stereoAudio = "Stereo Microphone Array"
     case audioRouting = "Audio Routing (Built-in Mic)"
     case orientation = "Landscape Orientation"
     case locationAccess = "GPS Tactical Mapping"
@@ -37,7 +38,6 @@ final class StartupVerificationViewModel {
     var isFinished = false
     var allPassed: Bool { steps.allSatisfy { $0.status == .passed } }
     
-    // Keep a strong reference to the location manager so the delegate/popup doesn't deallocate
     private let locationManager = CLLocationManager()
     
     init() {
@@ -46,7 +46,8 @@ final class StartupVerificationViewModel {
     
     private func resetSteps() {
         steps = [
-            VerificationTask(type: .spatialAudio),
+            // UPDATED
+            VerificationTask(type: .stereoAudio),
             VerificationTask(type: .audioRouting),
             VerificationTask(type: .orientation),
             VerificationTask(type: .locationAccess),
@@ -61,7 +62,8 @@ final class StartupVerificationViewModel {
         resetSteps()
         for i in steps.indices { steps[i].status = .running }
         
-        async let spatialResult = checkSpatialAudio()
+        // UPDATED
+        async let stereoResult = checkStereoAudio()
         async let routingResult = checkAudioRouting()
         let orientationResult = checkOrientation()
         async let locationResult = checkLocation()
@@ -69,7 +71,7 @@ final class StartupVerificationViewModel {
         async let alertsResult = checkEntitlements()
         async let storageResult = checkStorage()
         
-        let results = await [spatialResult, routingResult, orientationResult, locationResult, neuralResult, alertsResult, storageResult]
+        let results = await [stereoResult, routingResult, orientationResult, locationResult, neuralResult, alertsResult, storageResult]
         
         for (index, result) in results.enumerated() {
             steps[index].status = result.status
@@ -79,15 +81,12 @@ final class StartupVerificationViewModel {
         isFinished = true
     }
     
-    // MARK: - New Location Check
-    
     private func checkLocation() async -> (status: VerificationStatus, reason: String?) {
         let status = locationManager.authorizationStatus
         
         if status == .notDetermined {
             locationManager.requestWhenInUseAuthorization()
             
-            // Poll for the user's response to the popup (checks every 0.5 seconds for up to 15 seconds)
             for _ in 0..<30 {
                 if locationManager.authorizationStatus != .notDetermined { break }
                 try? await Task.sleep(for: .milliseconds(500))
@@ -102,9 +101,11 @@ final class StartupVerificationViewModel {
         }
     }
     
-    // MARK: - FOA Acoustic Checks
+    // MARK: - UPDATED: Stereo Acoustic Checks
     
-    private func checkSpatialAudio() async -> (status: VerificationStatus, reason: String?) {
+    // MARK: - UPDATED: Stereo Acoustic Checks
+    
+    private func checkStereoAudio() async -> (status: VerificationStatus, reason: String?) {
         let permission = AVAudioApplication.shared.recordPermission
         if permission == .denied { return (.failed, "Microphone permission denied") }
         if permission == .undetermined {
@@ -113,19 +114,30 @@ final class StartupVerificationViewModel {
             }
         }
         
-        guard let builtInMic = AVCaptureDevice.default(for: .audio) else {
+        let audioSession = AVAudioSession.sharedInstance()
+        
+        do {
+            // THE FIX: We must use .videoRecording mode to unlock the Stereo polar patterns!
+            // .measurement mode disables the extra mics and forces Mono.
+            try audioSession.setCategory(.playAndRecord, mode: .videoRecording, options: [.defaultToSpeaker, .mixWithOthers])
+            try audioSession.setActive(true)
+        } catch {
+            return (.failed, "Audio Session locked")
+        }
+        
+        guard let builtInMic = audioSession.availableInputs?.first(where: { $0.portType == .builtInMic }) else {
             return (.failed, "No built-in mic detected")
         }
         
-        do {
-            let audioInput = try AVCaptureDeviceInput(device: builtInMic)
-            if audioInput.isMultichannelAudioModeSupported(.firstOrderAmbisonics) {
-                return (.passed, nil)
-            } else {
-                return (.failed, "Device lacks Spatial Audio (FOA)")
-            }
-        } catch {
-            return (.failed, "Cannot initialize mic: \(error.localizedDescription)")
+        // Now that the session is in Video mode, the hardware will reveal its Stereo capabilities
+        let hasStereo = builtInMic.dataSources?.contains { source in
+            source.supportedPolarPatterns?.contains(.stereo) == true
+        } ?? false
+        
+        if hasStereo {
+            return (.passed, nil)
+        } else {
+            return (.failed, "Device lacks Stereo Array support")
         }
     }
     
@@ -150,15 +162,12 @@ final class StartupVerificationViewModel {
             return (.failed, "Cannot determine orientation")
         }
         
-        // Updated to use the modern effectiveGeometry API to silence the iOS 26+ warning
         if scene.effectiveGeometry.interfaceOrientation.isLandscape {
             return (.passed, nil)
         } else {
             return (.failed, "Rotate phone to Landscape")
         }
     }
-    
-    // MARK: - Legacy Checks
     
     private func checkNeuralEngine() async -> (status: VerificationStatus, reason: String?) {
         let hasANE = MLComputeDevice.allComputeDevices.contains { if case .neuralEngine = $0 { return true }; return false }
