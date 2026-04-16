@@ -2,13 +2,9 @@ import Foundation
 import Accelerate
 
 /// Optimized, thread-safe FFT processor using Accelerate.
-/// Fully fixed for Swift 6 isolation boundaries + GCC-PHAT TDOA.
 final class FFTProcessor: @unchecked Sendable {
     private let log2n: vDSP_Length
-    
-    // The ultimate Swift 6 override for thread-safe C-pointers
     nonisolated(unsafe) private let fftSetup: FFTSetup
-    
     private let window: [Float]
     private let fftSize: Int
     
@@ -16,9 +12,7 @@ final class FFTProcessor: @unchecked Sendable {
         precondition(fftSize > 0 && (fftSize & (fftSize - 1)) == 0, "FFT size must be a power of 2")
         self.fftSize = fftSize
         self.log2n = vDSP_Length(log2(Double(fftSize)))
-        
         self.fftSetup = vDSP_create_fftsetup(self.log2n, FFTRadix(kFFTRadix2))!
-        
         self.window = {
             var w = [Float](repeating: 0, count: fftSize)
             vDSP_hann_window(&w, vDSP_Length(fftSize), 0)
@@ -26,9 +20,7 @@ final class FFTProcessor: @unchecked Sendable {
         }()
     }
     
-    deinit {
-        vDSP_destroy_fftsetup(fftSetup)
-    }
+    deinit { vDSP_destroy_fftsetup(fftSetup) }
     
     // MARK: - Core Analysis
     

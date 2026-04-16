@@ -95,14 +95,9 @@ class MicrophoneManager: NSObject, CLLocationManagerDelegate {
             try session.setPreferredInput(builtInMic)
             if let sources = builtInMic.dataSources {
                 for source in sources {
-                    // We look for a source that supports the .stereo pattern
                     if source.supportedPolarPatterns?.contains(.stereo) == true {
                         try builtInMic.setPreferredDataSource(source)
-                        
-                        // NOTE: Even though you are in Portrait UI, we tell the mic to align
-                        // as if it were Landscape to force the hardware out of 'Mono' mode.
                         try session.setPreferredInputOrientation(.landscapeRight)
-                        
                         try source.setPreferredPolarPattern(.stereo)
                         break
                     }
@@ -122,32 +117,7 @@ class MicrophoneManager: NSObject, CLLocationManagerDelegate {
         
         inputNode.installTap(onBus: 0, bufferSize: 4096, format: hardwareFormat) { [weak self] buffer, time in
             guard let self = self else { return }
-
-            if let channelData = buffer.floatChannelData {
-                let leftSample = channelData[0][100]
-                let rightSample = channelData[1][100]
-                
-                // DEBUG: Check if channels are physically different
-                if leftSample == rightSample && leftSample != 0 {
-                    print("🚨 HARDWARE ERROR: Mono signal detected. Channels are identical.")
-                }
-            }
             
-            // --- 🕵️‍♂️ THE WIRETAP ---
-            if Int.random(in: 1...30) == 1 {
-                let channels = buffer.format.channelCount
-                if channels >= 2, let channelData = buffer.floatChannelData {
-                    let leftSample = channelData[0][500]
-                    let rightSample = channelData[1][500]
-                    if leftSample == rightSample {
-                        print("🚨 TRAP: iOS is feeding IDENTICAL channels (Dual-Mono)")
-                    } else {
-                        print("✅ SUCCESS: Channels are unique (Phase separation active)")
-                    }
-                }
-            }
-            
-            // Send to our new pipeline
             Task {
                 await self.pipeline?.processAudio(buffer: buffer, time: time)
             }
@@ -159,14 +129,11 @@ class MicrophoneManager: NSObject, CLLocationManagerDelegate {
             audioEngine.prepare()
             try audioEngine.start()
             
-            // Wake up the ML analyzer
             let format = audioEngine.inputNode.inputFormat(forBus: 0)
-            Task {
-                try? await self.pipeline?.setupAnalyzer(format: format)
-            }
+            Task { try? await self.pipeline?.setupAnalyzer(format: format) }
             
             isRunning = true
-            print("✅ Audio Engine Flowing")
+            print("✅ Audio Engine Flowing (Stereo)")
         } catch {
             print("❌ Engine Start Failed: \(error)")
         }

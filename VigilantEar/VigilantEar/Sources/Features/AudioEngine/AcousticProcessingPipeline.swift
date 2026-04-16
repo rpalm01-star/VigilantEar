@@ -1,13 +1,13 @@
 import AVFoundation
 import Accelerate
 import SoundAnalysis
+import SwiftUI
 
 actor AcousticProcessingPipeline {
     
     private let sampleRate: Double = 44100.0
     private let bufferSize: AVAudioFrameCount = 4096
     
-    // MARK: - The Async Bridge
     nonisolated let eventStream: AsyncStream<SoundEvent>
     private let continuation: AsyncStream<SoundEvent>.Continuation
     
@@ -48,22 +48,25 @@ actor AcousticProcessingPipeline {
         let leftSamples = Array(UnsafeBufferPointer(start: channelData[0], count: min(frameLength, 4096)))
         let rightSamples = Array(UnsafeBufferPointer(start: channelData[1], count: min(frameLength, 4096)))
         
-        // Calculate volume (0.0 to 1.0)
         let peak = leftSamples.map(abs).max() ?? 0.0
         
         Task.detached(priority: .userInitiated) { [weak self] in
             guard let self = self else { return }
             
-            let estimatedFeet = 1.0 / (Double(peak) + 0.01) // Cite: 133
+            let estimatedFeet = 1.0 / (Double(peak) + 0.01)
             let maxRange: Double = 30.0
-            let normalizedDistance = min(1.0, estimatedFeet / maxRange) // Cite: 133, 184
+            let normalizedDistance = min(1.0, estimatedFeet / maxRange)
             
-            print("📏 [DIST] Peak Amp: \(peak) | Est. Feet: \(estimatedFeet) | Normalized: \(normalizedDistance)")
+            // 1. Calculate TDOA Bearing
+            var angle = self.fftProcessor.calculateTDOA(left: leftSamples, right: rightSamples, sampleRate: self.sampleRate) ?? 0.0
             
-            // 1. Get the direction
-            let angle = self.fftProcessor.calculateTDOA(left: leftSamples, right: rightSamples, sampleRate: self.sampleRate) ?? 0.0
-            
-            print("🔔 EVENT: \(label) | PEAK: \(String(format: "%.3f", peak)) | EST. DISTANCE: \(String(format: "%.1f", estimatedFeet)) ft")
+            // 2. THE HARDWARE POLARITY FIX
+            // If the user flips the phone so the notch is on the left, the Left and Right
+            // microphones are physically swapped. We must invert the math to match.
+            let orientation = await MainActor.run { UIDevice.current.orientation }
+            if orientation == .landscapeLeft {
+                angle *= -1.0
+            }
             
             let newEvent = SoundEvent(
                 threatLabel: label,
@@ -75,7 +78,6 @@ actor AcousticProcessingPipeline {
             _ = await MainActor.run {
                 self.continuation.yield(newEvent)
             }
-            
         }
     }
     
