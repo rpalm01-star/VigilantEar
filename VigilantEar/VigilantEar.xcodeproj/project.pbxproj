@@ -23,7 +23,6 @@
 		3053DCBB2F83718A00241892 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3053DCA42F83718A00241892 /* ContentView.swift */; };
 		3053DCBC2F83718A00241892 /* DependencyContainer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3053DC912F83718A00241892 /* DependencyContainer.swift */; };
 		3053DCBF2F83718A00241892 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 3053DCAC2F83718A00241892 /* Assets.xcassets */; };
-		3087D7042F830F3D001AC208 /* GoogleMaps in Frameworks */ = {isa = PBXBuildFile; productRef = 3087D7032F830F3D001AC208 /* GoogleMaps */; };
 		308EF3E72F8755A300885DCB /* StartupVerificationViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 308EF3E62F8755A300885DCB /* StartupVerificationViewModel.swift */; };
 		308EF3E92F8755BC00885DCB /* StartupVerificationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 308EF3E82F8755BC00885DCB /* StartupVerificationView.swift */; };
 		30C55CC52F85FB1900D0B984 /* AcousticProcessingPipeline.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30C55CC42F85FB1500D0B984 /* AcousticProcessingPipeline.swift */; };
@@ -76,7 +75,6 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				3087D7042F830F3D001AC208 /* GoogleMaps in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -216,7 +214,6 @@
 			);
 			name = VigilantEar;
 			packageProductDependencies = (
-				3087D7032F830F3D001AC208 /* GoogleMaps */,
 			);
 			productName = VigilantEar;
 			productReference = 304F73C52F830A8800F67563 /* VigilantEar.app */;
@@ -247,7 +244,6 @@
 			mainGroup = 304F73BC2F830A8800F67563;
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
-				3087D7022F830F3D001AC208 /* XCRemoteSwiftPackageReference "ios-maps-sdk" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 304F73C62F830A8800F67563 /* Products */;
@@ -526,25 +522,6 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
-
-/* Begin XCRemoteSwiftPackageReference section */
-		3087D7022F830F3D001AC208 /* XCRemoteSwiftPackageReference "ios-maps-sdk" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/googlemaps/ios-maps-sdk";
-			requirement = {
-				kind = upToNextMajorVersion;
-				minimumVersion = 10.10.0;
-			};
-		};
-/* End XCRemoteSwiftPackageReference section */
-
-/* Begin XCSwiftPackageProductDependency section */
-		3087D7032F830F3D001AC208 /* GoogleMaps */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = 3087D7022F830F3D001AC208 /* XCRemoteSwiftPackageReference "ios-maps-sdk" */;
-			productName = GoogleMaps;
-		};
-/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 304F73BD2F830A8800F67563 /* Project object */;
 }

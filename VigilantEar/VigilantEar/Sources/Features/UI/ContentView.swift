@@ -1,6 +1,5 @@
 import SwiftUI
 import SwiftData
-import GoogleMaps
 
 struct ContentView: View {
     @Environment(MicrophoneManager.self) private var microphoneManager

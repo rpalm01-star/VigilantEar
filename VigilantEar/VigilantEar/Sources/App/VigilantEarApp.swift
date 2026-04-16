@@ -1,5 +1,4 @@
 import SwiftUI
-import GoogleMaps
 import SwiftData
 
 @main
@@ -18,30 +17,18 @@ struct VigilantEarApp: App {
     
     // 2. Create the background pipeline
     let pipeline = AcousticProcessingPipeline()
-        
-    init() {
-        let apiKey = Bundle.main.object(forInfoDictionaryKey: "GOOGLE_MAPS_API_KEY") as? String ?? ""
-        
-        if apiKey.isEmpty || apiKey == "$(GOOGLE_MAPS_API_KEY)" {
-            print("🚨 FATAL: Google Maps API Key is missing! Check your Settings.xcconfig.")
-            GMSServices.provideAPIKey("AIzaSyCvvMWbvHvrP4R6kYdd8Q3jATfWo9AqCqk")
-        } else {
-            GMSServices.provideAPIKey(apiKey)
-        }
-        UIDevice.current.beginGeneratingDeviceOrientationNotifications()
-    }
     
     var body: some Scene {
         WindowGroup {
             Group {
                 if isVerified {
                     ContentView()
-                        // Use the managers from your DependencyContainer
+                    // Use the managers from your DependencyContainer
                         .environment(deps.microphoneManager)
                         .environment(deps.classificationService)
-                        // NEW: Inject the coordinator into the SwiftUI environment
+                    // NEW: Inject the coordinator into the SwiftUI environment
                         .environment(coordinator)
-                        // NEW: Wire the pipeline to the UI and Microphone once verified
+                    // NEW: Wire the pipeline to the UI and Microphone once verified
                         .task {
                             // Tell the UI to start listening to the background math
                             coordinator.startListeningToPipeline(pipeline)
