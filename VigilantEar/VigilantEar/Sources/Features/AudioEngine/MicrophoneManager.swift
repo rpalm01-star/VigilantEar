@@ -3,7 +3,6 @@ import Foundation
 import AVFoundation
 import CoreLocation
 import Observation
-import SwiftData
 
 @Observable
 class MicrophoneManager: NSObject, CLLocationManagerDelegate {
@@ -14,23 +13,20 @@ class MicrophoneManager: NSObject, CLLocationManagerDelegate {
     
     /// Public status for UI (green listening dot)
     public var isListening: Bool { isRunning }
-    
-    // NEW: Public pipeline reference so the App can inject it
     public var pipeline: AcousticProcessingPipeline?
     
+    private let coordinator: AcousticCoordinator
     private let classificationService: ClassificationService
     private let locationManager = CLLocationManager()
     private let audioEngine = AVAudioEngine()
-    private let container: ModelContainer
     
     private var tapInstalled = false
     private var isRunning = false
     var currentLocation: CLLocation? = nil
-    
 
-    init(coordinator: AcousticCoordinator, classificationService: ClassificationService, container: ModelContainer) {
+    init(coordinator: AcousticCoordinator, classificationService: ClassificationService) {
+        self.coordinator = coordinator
         self.classificationService = classificationService
-        self.container = container
         super.init()
         setupHeading()
     }
@@ -58,14 +54,20 @@ class MicrophoneManager: NSObject, CLLocationManagerDelegate {
         }
     }
     
-    // Updates GPS
     func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
         guard let location = locations.last else { return }
+        
+        // Your existing code saving the location for the UI
         Task { @MainActor in
             self.currentLocation = location
         }
+        
+        // THE BRIDGE: Send the new coordinates to the math engine!
+        Task {
+            await pipeline?.updateLocation(location.coordinate)
+        }
     }
-    
+        
     func startCapturing() {
         guard !isRunning else { return }
         

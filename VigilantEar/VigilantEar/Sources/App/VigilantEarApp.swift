@@ -1,18 +1,27 @@
 import SwiftUI
 import SwiftData
+import FirebaseCore
+
+class AppDelegate: NSObject, UIApplicationDelegate {
+    func application(_ application: UIApplication,
+                     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey : Any]? = nil) -> Bool {
+        FirebaseApp.configure()
+        return true
+    }
+}
 
 @main
 struct VigilantEarApp: App {
+    @UIApplicationDelegateAdaptor(AppDelegate.self) var delegate
+
     @State private var isVerified = false
     @State private var verificationViewModel = StartupVerificationViewModel()
     
     @Environment(\.scenePhase) private var scenePhase
-    
+
     // Grab everything directly from your unified container
     private let deps = DependencyContainer.shared
-    
-    // MARK: - NEW ARCHITECTURE
-    // 1. Create the UI Coordinator as State so the views can observe it
+
     @State private var coordinator = AcousticCoordinator()
     
     // 2. Create the background pipeline
@@ -64,29 +73,6 @@ struct VigilantEarApp: App {
             }
             .defersSystemGestures(on: .all)
             .persistentSystemOverlays(.hidden)
-        }
-        // Attach the database from your DependencyContainer
-        .modelContainer(deps.sharedModelContainer)
-        .onChange(of: scenePhase) { oldPhase, newPhase in
-            if newPhase == .background {
-                // 1. Request a formal background execution lease from the OS
-                var bgTask: UIBackgroundTaskIdentifier = .invalid
-                bgTask = UIApplication.shared.beginBackgroundTask(withName: "FlushAcousticQueue") {
-                    // Expiration handler if we take too long (iOS gives us ~30 seconds)
-                    UIApplication.shared.endBackgroundTask(bgTask)
-                    bgTask = .invalid
-                }
-                
-                let queueManager = EventQueueManager(container: deps.sharedModelContainer)
-                Task {
-                    // 2. Safely run the file write
-                    await queueManager.flushQueue()
-                    
-                    // 3. Explicitly tell the OS we are done and it can safely suspend the app
-                    UIApplication.shared.endBackgroundTask(bgTask)
-                    bgTask = .invalid
-                }
-            }
         }
     }
 }

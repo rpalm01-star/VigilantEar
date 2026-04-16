@@ -2,6 +2,7 @@ import AVFoundation
 import Accelerate
 import SoundAnalysis
 import SwiftUI
+import CoreLocation
 
 actor AcousticProcessingPipeline {
     
@@ -24,12 +25,19 @@ actor AcousticProcessingPipeline {
     private var latestBuffer: AVAudioPCMBuffer?
     private var latestTime: AVAudioTime?
     
+    private var lastKnownLocation: CLLocationCoordinate2D? = nil
+    
     init() {
         let (stream, cont) = AsyncStream.makeStream(of: SoundEvent.self)
         self.eventStream = stream
         self.continuation = cont
         
         self.fftProcessor = FFTProcessor(fftSize: Int(self.bufferSize))
+    }
+    
+    // Called by the MicrophoneManager whenever the GPS updates
+    public func updateLocation(_ coordinate: CLLocationCoordinate2D) {
+        self.lastKnownLocation = coordinate
     }
     
     func processAudio(buffer: AVAudioPCMBuffer, time: AVAudioTime) async {
@@ -83,13 +91,26 @@ actor AcousticProcessingPipeline {
                 angle *= -1.0
             }
             
+            // 1. SYNCHRONOUS READ: Grab the actor's state into local constants first!
+            let currentLat = await lastKnownLocation?.latitude
+            let currentLon = await lastKnownLocation?.longitude
+            
+            // 2. BUILD THE COPY: Create the struct before crossing any thread boundaries
             let newEvent = SoundEvent(
                 threatLabel: label,
                 bearing: angle,
                 distance: normalizedDistance,
-                energy: Float(peak)
+                energy: Float(peak),
+                latitude: currentLat,
+                longitude: currentLon
             )
             
+            // 3. FIRE AND FORGET: Now it is safe to hand the finished copy to the background
+            Task.detached(priority: .background) {
+                await CloudLogger.shared.logEvent(newEvent)
+            }
+            
+            // 4. UI UPDATE
             _ = await MainActor.run {
                 self.continuation.yield(newEvent)
             }

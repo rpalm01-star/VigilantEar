@@ -62,7 +62,7 @@ final class FFTProcessor: @unchecked Sendable {
     
     nonisolated func calculateTDOA(left: [Float], right: [Float], sampleRate: Double, micDistance: Double = 0.15) -> Double? {
         // HEARTBEAT 1: Method Entry
-        print("🎙️ TDOA Step 1: Start Math (Left: \(left.count), Right: \(right.count))")
+        //print("🎙️ TDOA Step 1: Start Math (Left: \(left.count), Right: \(right.count))")
         
         // SAFETY: Ensure we don't overflow the FFT buffer.
         // If we receive 4800 samples but fftSize is 4096, we MUST truncate.
@@ -85,7 +85,7 @@ final class FFTProcessor: @unchecked Sendable {
         forwardFFT(safeRight, real: &rightReal, imag: &rightImag)
         
         // HEARTBEAT 2: Frequency Domain Reached
-        print("🎙️ TDOA Step 2: FFTs Complete")
+        //print("🎙️ TDOA Step 2: FFTs Complete")
         
         var crossReal = [Float](repeating: 0, count: halfSize)
         var crossImag = [Float](repeating: 0, count: halfSize)
@@ -116,12 +116,12 @@ final class FFTProcessor: @unchecked Sendable {
         crossImag[0] = 0.0
         
         // HEARTBEAT 3: About to Inverse
-        print("🎙️ TDOA Step 3: Entering Inverse FFT")
+        //print("🎙️ TDOA Step 3: Entering Inverse FFT")
         var crossCorr = [Float](repeating: 0, count: fftSize)
         inverseFFT(real: &crossReal, imag: &crossImag, output: &crossCorr)
         
         // HEARTBEAT 4: Back in Time Domain
-        print("🎙️ TDOA Step 4: Inverse FFT Complete")
+        //print("🎙️ TDOA Step 4: Inverse FFT Complete")
         // Loosen the window slightly to catch the "edge" cases
         let speedOfSound = 343.0
         // Increase the virtual mic distance slightly in the math to "stretch" the radar
@@ -141,7 +141,7 @@ final class FFTProcessor: @unchecked Sendable {
                 peakIdx = i - fftSize
             }
         }
-        print("📈 CC Peak: \(peakIdx) | Amp: \(maxVal)")
+        //print("📈 CC Peak: \(peakIdx) | Amp: \(maxVal)")
         
         // 6. Quadratic Interpolation for Sub-sample Bearing
         var refinedLag = Double(peakIdx)
@@ -158,7 +158,7 @@ final class FFTProcessor: @unchecked Sendable {
         let deltaT = refinedLag / sampleRate
         let ratio = (deltaT * speedOfSound) / micDistance
         let constrainedRatio = max(-1.0, min(1.0, ratio))
-        print("📊 [DSP] Refined Lag: \(String(format: "%.4f", refinedLag)) | Ratio: \(String(format: "%.4f", ratio))")
+        //print("📊 [DSP] Refined Lag: \(String(format: "%.4f", refinedLag)) | Ratio: \(String(format: "%.4f", ratio))")
         
         // We switch back to asin for a more natural -90 to +90 spread
         let theta = asin(constrainedRatio)
@@ -182,7 +182,7 @@ final class FFTProcessor: @unchecked Sendable {
         let jitter = Double.random(in: -0.2...0.2)
         
         // Before returning clampedBearing
-        print("🎯 [MATH] Final Bearing: \(finalBearing) | Clamped: \(clampedBearing)")
+        //print("🎯 [MATH] Final Bearing: \(finalBearing) | Clamped: \(clampedBearing)")
         return clampedBearing + jitter
     }
     

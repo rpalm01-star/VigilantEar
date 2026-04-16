@@ -63,7 +63,7 @@ struct ContentView: View {
                                 coordinator: coordinator
                             )
                             
-                            let testDbEvent = SoundEvent(
+                            let newEvent = SoundEvent(
                                 timestamp: Date(),
                                 threatLabel: "Simulated_Firetruck_Database_Test",
                                 bearing: 45.0,
@@ -72,8 +72,13 @@ struct ContentView: View {
                                 dopplerRate: 15.6,
                                 isApproaching: true
                             )
-                            modelContext.insert(testDbEvent)
-                            try? modelContext.save()
+                            
+                            // 1. FIRE AND FORGET: Spin up a side-task for the database write
+                            // so it doesn't block the UI from drawing the dot.
+                            Task.detached(priority: .background) {
+                                // If you updated CloudLogger to be async, keep your await here!
+                                await CloudLogger.shared.logEvent(newEvent)
+                            }
                             
                         }) {
                             Image("firemanHat")

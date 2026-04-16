@@ -25,6 +25,9 @@
 		3053DCBF2F83718A00241892 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 3053DCAC2F83718A00241892 /* Assets.xcassets */; };
 		308EF3E72F8755A300885DCB /* StartupVerificationViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 308EF3E62F8755A300885DCB /* StartupVerificationViewModel.swift */; };
 		308EF3E92F8755BC00885DCB /* StartupVerificationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 308EF3E82F8755BC00885DCB /* StartupVerificationView.swift */; };
+		30A396432F908D4800D441A0 /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = 30A396422F908D4800D441A0 /* GoogleService-Info.plist */; };
+		30A396462F908DF700D441A0 /* FirebaseFirestore in Frameworks */ = {isa = PBXBuildFile; productRef = 30A396452F908DF700D441A0 /* FirebaseFirestore */; };
+		30A396482F90900700D441A0 /* CloudLogger.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30A396472F90900700D441A0 /* CloudLogger.swift */; };
 		30C55CC52F85FB1900D0B984 /* AcousticProcessingPipeline.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30C55CC42F85FB1500D0B984 /* AcousticProcessingPipeline.swift */; };
 		30CD987C2F8DEBA400AE7D0A /* RollingNoiseFloor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30CD987B2F8DEBA400AE7D0A /* RollingNoiseFloor.swift */; };
 		30CD987E2F8DF27100AE7D0A /* SirenDopplerTracker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30CD987D2F8DF27100AE7D0A /* SirenDopplerTracker.swift */; };
@@ -51,6 +54,8 @@
 		308EF3E62F8755A300885DCB /* StartupVerificationViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StartupVerificationViewModel.swift; sourceTree = "<group>"; };
 		308EF3E82F8755BC00885DCB /* StartupVerificationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StartupVerificationView.swift; sourceTree = "<group>"; };
 		308EF3EB2F875A9400885DCB /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		30A396422F908D4800D441A0 /* GoogleService-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "GoogleService-Info.plist"; sourceTree = "<group>"; };
+		30A396472F90900700D441A0 /* CloudLogger.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CloudLogger.swift; sourceTree = "<group>"; };
 		30C55CC42F85FB1500D0B984 /* AcousticProcessingPipeline.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AcousticProcessingPipeline.swift; sourceTree = "<group>"; };
 		30CA44A52F88AB5D0059C1D7 /* Settings.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Settings.xcconfig; sourceTree = "<group>"; };
 		30CD987B2F8DEBA400AE7D0A /* RollingNoiseFloor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RollingNoiseFloor.swift; sourceTree = "<group>"; };
@@ -75,6 +80,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				30A396462F908DF700D441A0 /* FirebaseFirestore in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -109,6 +115,7 @@
 		3053DC922F83718A00241892 /* Core */ = {
 			isa = PBXGroup;
 			children = (
+				30A396472F90900700D441A0 /* CloudLogger.swift */,
 				303DF5382F8C6BBD00D814D7 /* VigilantTheme.swift */,
 				3053DC912F83718A00241892 /* DependencyContainer.swift */,
 			);
@@ -185,6 +192,7 @@
 		3053DCAD2F83718A00241892 /* VigilantEar */ = {
 			isa = PBXGroup;
 			children = (
+				30A396422F908D4800D441A0 /* GoogleService-Info.plist */,
 				3053A9F62F8FFF81008C5419 /* NightStyle.json */,
 				308EF3EB2F875A9400885DCB /* Info.plist */,
 				3053DCAB2F83718A00241892 /* Sources */,
@@ -214,6 +222,7 @@
 			);
 			name = VigilantEar;
 			packageProductDependencies = (
+				30A396452F908DF700D441A0 /* FirebaseFirestore */,
 			);
 			productName = VigilantEar;
 			productReference = 304F73C52F830A8800F67563 /* VigilantEar.app */;
@@ -244,6 +253,7 @@
 			mainGroup = 304F73BC2F830A8800F67563;
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
+				30A396442F908DF700D441A0 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 304F73C62F830A8800F67563 /* Products */;
@@ -262,6 +272,7 @@
 			files = (
 				3053DCBF2F83718A00241892 /* Assets.xcassets in Resources */,
 				3053A9F72F8FFF8C008C5419 /* NightStyle.json in Resources */,
+				30A396432F908D4800D441A0 /* GoogleService-Info.plist in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -275,6 +286,7 @@
 				308EF3E92F8755BC00885DCB /* StartupVerificationView.swift in Sources */,
 				3053DCAE2F83718A00241892 /* SettingsView.swift in Sources */,
 				3053DCAF2F83718A00241892 /* SoundEvent.swift in Sources */,
+				30A396482F90900700D441A0 /* CloudLogger.swift in Sources */,
 				3053AA002F901777008C5419 /* SoundProfile.swift in Sources */,
 				303DF5392F8C6BBD00D814D7 /* VigilantTheme.swift in Sources */,
 				3053DCB12F83718A00241892 /* HardwareCalibration.swift in Sources */,
@@ -522,6 +534,25 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		30A396442F908DF700D441A0 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/firebase/firebase-ios-sdk";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 12.12.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		30A396452F908DF700D441A0 /* FirebaseFirestore */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 30A396442F908DF700D441A0 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseFirestore;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 304F73BD2F830A8800F67563 /* Project object */;
 }
