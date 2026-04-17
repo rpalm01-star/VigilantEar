@@ -5,7 +5,6 @@
 //  Created by Robert Palmer on 4/15/26.
 //
 
-
 import Foundation
 import FirebaseFirestore
 
@@ -15,22 +14,24 @@ struct CloudLogger {
     // Grab a reference to the Google Cloud Database
     private let db = Firestore.firestore()
     
-    func logEvent(_ event: SoundEvent) {
-        // THE BOUNCER: If it's not an emergency, silently drop it and cancel the cloud write.
+    // 1. THE FIX: Mark the function as 'async' so it matches the caller!
+    func logEvent(_ event: SoundEvent) async {
+        
+        // THE BOUNCER: If it's not an emergency, silently drop it.
         guard event.isEmergency else { return }
         
         var eventData: [String: Any] = [
-            "id": event.id.uuidString,
+            // 2. THE FIX: Save the Session ID in the database so the row knows what it belongs to!
+            "sessionID": event.sessionID.uuidString,
             "threatLabel": event.threatLabel,
             "bearing": event.bearing,
             "distance": event.distance,
             "energy": event.energy,
             "emergency": event.isEmergency,
-            // Firestorm trick: Use Google's atomic server time, not the iPhone's local clock!
-            "timestamp": FieldValue.serverTimestamp() 
+            "timestamp": FieldValue.serverTimestamp()
         ]
         
-        // 2. Safely unwrap and append the Optionals
+        // Safely unwrap and append the Optionals
         if let lat = event.latitude, let lon = event.longitude {
             eventData["latitude"] = lat
             eventData["longitude"] = lon
@@ -40,14 +41,12 @@ struct CloudLogger {
             eventData["dopplerRate"] = doppler
         }
         
-        // 2. Teleport it to the cloud.
-        // If the phone is offline, Firebase silently caches this and sends it later.
-        db.collection("detected_threats").document(event.id.uuidString).setData(eventData) { error in
-            if let error = error {
-                print("⚠️ Cloud write queued (Offline): \(error.localizedDescription)")
-            } else {
-                print("☁️ SUCCESS: Threat logged to Google Cloud!")
-            }
+        // 3. THE FIX: Use modern Swift async/await instead of the messy closure
+        do {
+            try await db.collection("detected_threats").document(event.sessionID.uuidString).setData(eventData)
+            //print("☁️ SUCCESS: Threat logged to Google Cloud!")
+        } catch {
+            print("⚠️ Cloud write queued (Offline): \(error.localizedDescription)")
         }
     }
 }

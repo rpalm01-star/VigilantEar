@@ -27,6 +27,10 @@ actor AcousticProcessingPipeline {
     
     private var lastKnownLocation: CLLocationCoordinate2D? = nil
     
+    // --- THE FIX: COOLDOWN MEMORY ---
+    // Tracks when we last saw a specific threat to prevent CoreML spam
+    private var lastSeenThreats: [String: Date] = [:]
+    
     init() {
         let (stream, cont) = AsyncStream.makeStream(of: SoundEvent.self)
         self.eventStream = stream
@@ -44,11 +48,17 @@ actor AcousticProcessingPipeline {
         self.latestBuffer = buffer
         self.latestTime = time
         
-        // Feed ML continuously - removed the "Acoustic Event" volume gate!
+        // Feed ML continuously
         streamAnalyzer?.analyze(buffer, atAudioFramePosition: time.sampleTime)
     }
     
-    func confirmThreatAndTrack(label: String) {
+    func confirmThreatAndTrack(label: String, confidence: Double) {
+        // --- NEW: THE DEBOUNCER ---
+        // If we saw this exact sound less than 1.0 seconds ago, drop it!
+        if let lastSeen = lastSeenThreats[label], Date().timeIntervalSince(lastSeen) < 1.0 {
+            return
+        }
+        
         guard let buffer = latestBuffer,
               let channelData = buffer.floatChannelData else { return }
         
@@ -58,59 +68,77 @@ actor AcousticProcessingPipeline {
         
         let peak = leftSamples.map(abs).max() ?? 0.0
         
+        // The Acoustic Gate
+        guard peak > 0.15 else { return }
+        
+        // --- NEW: Update the cooldown memory! ---
+        lastSeenThreats[label] = Date()
+        
+        print("\n🚨 --- NEW THREAT DETECTED ---")
+        print("🧠 [CoreML] Label: \(label) | Confidence: \(String(format: "%.2f", confidence))")
+        print("📊 [Audio] Peak hit: \(String(format: "%.3f", peak)) (Passed > 0.15 gate)")
+        
         Task.detached(priority: .userInitiated) { [weak self] in
             guard let self = self else { return }
             
-            // --- 1. INVERSE SQUARE LAW DISTANCE CALIBRATION ---
-            // Establish the Acoustic Floor and Ceiling
-            let ambientFloor: Double = 0.01
-            let clippingCeiling: Double = 0.95
+            // --- 1. ACOUSTIC PROFILING & DISTANCE CALIBRATION ---
+            let ambientFloor: Double = 0.15
             
-            // Clamp the raw peak to prevent math crashes
+            // We safely hop to the main thread for a microsecond to grab the UI/Physics profile.
+            let profile = await MainActor.run { SoundProfile.classify(label) }
+            let clippingCeiling = profile.ceiling
+            let maxRangeInFeet = profile.maxRange
+            
             let safePeak = min(max(Double(peak), ambientFloor), clippingCeiling)
-            
-            // Logarithmic Scaling
             let linearRatio = (clippingCeiling - safePeak) / (clippingCeiling - ambientFloor)
-            let exponentialCurve = pow(linearRatio, 3.0)
+            let exponentialCurve = pow(linearRatio, 2.0)
             
-            // Map to the true Radar Horizon (1,000 feet)
-            let radarHorizonInFeet = 1000.0
-            let estimatedFeet = max(5.0, exponentialCurve * radarHorizonInFeet)
+            let estimatedFeet = max(5.0, exponentialCurve * maxRangeInFeet)
+            let uiMapScaleInFeet = 1000.0
+            let normalizedUI_Distance = estimatedFeet / uiMapScaleInFeet
             
-            // Normalize for the UI (1.0 = 1,000 feet)
-            let normalizedDistance = estimatedFeet / radarHorizonInFeet
+            // 🐞 TELEMETRY: Distance Math
+            print("📏 [Distance Profiler] Type: \(label) | Ceiling: \(clippingCeiling) | Max Range: \(maxRangeInFeet)ft")
+            print("📏 [Distance] Est Feet: \(String(format: "%.1f", estimatedFeet)) ft | UI Normalized: \(String(format: "%.3f", normalizedUI_Distance))")
             
             // --- 2. TDOA BEARING CALCULATION ---
-            var angle = self.fftProcessor.calculateTDOA(left: leftSamples, right: rightSamples, sampleRate: self.sampleRate) ?? 0.0
+            let rawAngle = self.fftProcessor.calculateTDOA(left: leftSamples, right: rightSamples, sampleRate: self.sampleRate) ?? 0.0
+            var angle = rawAngle
             
             // --- 3. HARDWARE POLARITY FIX ---
-            // If the user flips the phone so the notch is on the left, the Left and Right
-            // microphones are physically swapped. We must invert the math to match.
             let orientation = await MainActor.run { UIDevice.current.orientation }
             if orientation == .landscapeLeft {
                 angle *= -1.0
             }
             
-            // 1. SYNCHRONOUS READ: Grab the actor's state into local constants first!
+            // 🐞 TELEMETRY: Bearing Math
+            print("🧭 [Bearing] Raw TDOA: \(String(format: "%.1f", rawAngle))° | Polarity Fixed: \(String(format: "%.1f", angle))°")
+            
+            // SYNCHRONOUS READ: Grab the actor's state into local constants first!
             let currentLat = await lastKnownLocation?.latitude
             let currentLon = await lastKnownLocation?.longitude
             
-            // 2. BUILD THE COPY: Create the struct before crossing any thread boundaries
+            // BUILD THE EVENT
             let newEvent = SoundEvent(
+                timestamp: Date(),
                 threatLabel: label,
+                confidence: confidence,
                 bearing: angle,
-                distance: normalizedDistance,
-                energy: Float(peak),
+                distance: normalizedUI_Distance,
+                energy: Float(safePeak),
                 latitude: currentLat,
                 longitude: currentLon
             )
             
-            // 3. FIRE AND FORGET: Now it is safe to hand the finished copy to the background
+            print("✅ [Dispatch] Sending to Radar & Cloud...")
+            print("------------------------------")
+            
+            // FIRE AND FORGET: Hand it to the cloud
             Task.detached(priority: .background) {
                 await CloudLogger.shared.logEvent(newEvent)
             }
             
-            // 4. UI UPDATE
+            // UI UPDATE: Send to radar
             _ = await MainActor.run {
                 self.continuation.yield(newEvent)
             }
@@ -122,7 +150,7 @@ actor AcousticProcessingPipeline {
         
         let request = try SNClassifySoundRequest(classifierIdentifier: .version1)
         request.windowDuration = CMTime(seconds: 0.5, preferredTimescale: 1000)
-        request.overlapFactor = 0.9 // This is the "Rapid Fire" fix
+        request.overlapFactor = 0.9
         
         let observer = ThreatResultsObserver(pipeline: self)
         self.resultsObserver = observer
@@ -178,7 +206,7 @@ final class ThreatResultsObserver: NSObject, @unchecked Sendable, SNResultsObser
         if topClassification.confidence > 0.70 {
             let label = topClassification.identifier.lowercased()
             Task {
-                await pipeline?.confirmThreatAndTrack(label: label)
+                await pipeline?.confirmThreatAndTrack(label: label, confidence: topClassification.confidence)
             }
         }
     }

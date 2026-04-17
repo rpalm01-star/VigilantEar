@@ -46,28 +46,28 @@ class MicrophoneManager: NSObject, CLLocationManagerDelegate {
         // Start GPS
         locationManager.startUpdatingLocation()
     }
-    
-    // Updates Compass
-    func locationManager(_ manager: CLLocationManager, didUpdateHeading newHeading: CLHeading) {
-        Task { @MainActor in
-            self.currentHeading = newHeading.magneticHeading
-        }
-    }
-    
+        
     func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
         guard let location = locations.last else { return }
         
+        // TRIPWIRE 1: Are we actually catching the GPS here, or is MapKit doing it secretly?
+        //print("📍 HARDWARE: GPS ping caught by MicrophoneManager")
+        
+        Task {
+            // TRIPWIRE 2: Is the bridge connected?
+            if pipeline == nil {
+                print("⚠️ ERROR: GPS received, but Pipeline is NIL!")
+            }
+            await pipeline?.updateLocation(location.coordinate)
+        }
+
         // Your existing code saving the location for the UI
         Task { @MainActor in
             self.currentLocation = location
         }
-        
-        // THE BRIDGE: Send the new coordinates to the math engine!
-        Task {
-            await pipeline?.updateLocation(location.coordinate)
-        }
+
     }
-        
+    
     func startCapturing() {
         guard !isRunning else { return }
         

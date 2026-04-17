@@ -2,11 +2,19 @@ import Foundation
 import SwiftUI
 import CoreLocation
 
-// NOTE: SwiftData is gone! This is now a pure, thread-safe value type.
-struct SoundEvent: Identifiable, Sendable {
-    public let id: UUID
-    public let timestamp: Date
-    public let threatLabel: String
+struct SoundEvent: Identifiable {
+    // 1. For the UI: Automatically generates a brand new, unique ID every tick so MapKit draws a trail.
+    let id: UUID
+    
+    // 2. For the Cloud: The shared ID that groups this entire drive-by together.
+    var sessionID: UUID
+    
+    let timestamp: Date
+    let threatLabel: String
+    
+    // ML Certainty (0.0 to 1.0)
+    public let confidence: Double
+    
     public let isEmergency: Bool
     
     // MARK: - Spatial Data
@@ -21,8 +29,10 @@ struct SoundEvent: Identifiable, Sendable {
     
     public nonisolated init(
         id: UUID = UUID(),
+        sessionID: UUID = UUID(),
         timestamp: Date = .now,
         threatLabel: String,
+        confidence: Double = 1.0,
         bearing: Double,
         distance: Double,
         energy: Float,
@@ -32,8 +42,11 @@ struct SoundEvent: Identifiable, Sendable {
         longitude: Double? = nil
     ) {
         self.id = id
+        self.sessionID = sessionID
         self.timestamp = timestamp
         self.threatLabel = threatLabel
+        self.confidence = confidence
+        
         self.bearing = bearing
         self.distance = distance
         self.energy = energy
@@ -54,8 +67,22 @@ extension SoundEvent {
     
     var age: TimeInterval { Date().timeIntervalSince(timestamp) }
     
+    // Dynamic Lifespan based on ML certainty
+    var dynamicLifespan: TimeInterval {
+        // A perfectly confident dot lives 6 seconds.
+        // A highly uncertain (30%) dot vanishes in 1.8 seconds.
+        return max(0.1, 6.0 * confidence) // The max() prevents any divide-by-zero math crashes!
+    }
+    
     var opacity: Double {
-        return max(0, 1.0 - (age / 2.0))
+        // Fade out perfectly based on its custom lifespan
+        return max(0, 1.0 - (age / dynamicLifespan))
+    }
+    
+    // Base visual scale
+    var visualScale: Double {
+        // A 50% confident dot will be drawn physically half the size
+        return confidence
     }
     
     /// Returns a coordinate for Apple MapKit
@@ -75,6 +102,6 @@ extension SoundEvent {
     
     /// Instantly maps the pre-calculated boolean to a UI Color.
     var dotColor: Color {
-        return isEmergency ? VigilantTheme.emergencyDot : VigilantTheme.standardDot
+        return isEmergency ? Color.red : Color.cyan
     }
 }

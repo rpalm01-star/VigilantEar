@@ -13,38 +13,28 @@ class AppDelegate: NSObject, UIApplicationDelegate {
 @main
 struct VigilantEarApp: App {
     @UIApplicationDelegateAdaptor(AppDelegate.self) var delegate
-
+    
     @State private var isVerified = false
     @State private var verificationViewModel = StartupVerificationViewModel()
     
     @Environment(\.scenePhase) private var scenePhase
-
-    // Grab everything directly from your unified container
-    private let deps = DependencyContainer.shared
-
-    @State private var coordinator = AcousticCoordinator()
     
-    // 2. Create the background pipeline
-    let pipeline = AcousticProcessingPipeline()
+    // THE SINGLE SOURCE OF TRUTH
+    private let deps = DependencyContainer.shared
     
     var body: some Scene {
         WindowGroup {
             Group {
                 if isVerified {
                     ContentView()
-                    // Use the managers from your DependencyContainer
+                    // Pass exactly what the Container built into the environment
                         .environment(deps.microphoneManager)
                         .environment(deps.classificationService)
-                    // NEW: Inject the coordinator into the SwiftUI environment
-                        .environment(coordinator)
-                    // NEW: Wire the pipeline to the UI and Microphone once verified
-                        .task {
-                            // Tell the UI to start listening to the background math
-                            coordinator.startListeningToPipeline(pipeline)
-                            
-                            // Hand the pipeline to the microphone manager so it can feed it
-                            deps.microphoneManager.pipeline = pipeline
-                        }
+                        .environment(deps.acousticCoordinator)
+                    
+                    // We deleted the .task block!
+                    // The DependencyContainer already wired the pipeline together.
+                    
                 } else {
                     VStack(spacing: 0) {
                         StartupVerificationView(viewModel: verificationViewModel)

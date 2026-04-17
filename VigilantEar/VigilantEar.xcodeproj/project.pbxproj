@@ -7,7 +7,6 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		303DF5392F8C6BBD00D814D7 /* VigilantTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 303DF5382F8C6BBD00D814D7 /* VigilantTheme.swift */; };
 		3053A9F72F8FFF8C008C5419 /* NightStyle.json in Resources */ = {isa = PBXBuildFile; fileRef = 3053A9F62F8FFF81008C5419 /* NightStyle.json */; };
 		3053A9F92F900010008C5419 /* MapView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3053A9F82F900010008C5419 /* MapView.swift */; };
 		3053AA002F901777008C5419 /* SoundProfile.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3053A9FF2F901777008C5419 /* SoundProfile.swift */; };
@@ -34,7 +33,6 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
-		303DF5382F8C6BBD00D814D7 /* VigilantTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VigilantTheme.swift; sourceTree = "<group>"; };
 		304F73C52F830A8800F67563 /* VigilantEar.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = VigilantEar.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		3053A9F62F8FFF81008C5419 /* NightStyle.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = NightStyle.json; sourceTree = "<group>"; };
 		3053A9F82F900010008C5419 /* MapView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MapView.swift; sourceTree = "<group>"; };
@@ -116,7 +114,6 @@
 			isa = PBXGroup;
 			children = (
 				30A396472F90900700D441A0 /* CloudLogger.swift */,
-				303DF5382F8C6BBD00D814D7 /* VigilantTheme.swift */,
 				3053DC912F83718A00241892 /* DependencyContainer.swift */,
 			);
 			path = Core;
@@ -288,7 +285,6 @@
 				3053DCAF2F83718A00241892 /* SoundEvent.swift in Sources */,
 				30A396482F90900700D441A0 /* CloudLogger.swift in Sources */,
 				3053AA002F901777008C5419 /* SoundProfile.swift in Sources */,
-				303DF5392F8C6BBD00D814D7 /* VigilantTheme.swift in Sources */,
 				3053DCB12F83718A00241892 /* HardwareCalibration.swift in Sources */,
 				30C55CC52F85FB1900D0B984 /* AcousticProcessingPipeline.swift in Sources */,
 				3053DCB22F83718A00241892 /* ClassificationService.swift in Sources */,

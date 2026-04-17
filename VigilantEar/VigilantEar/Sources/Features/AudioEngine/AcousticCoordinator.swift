@@ -42,8 +42,9 @@ class AcousticCoordinator {
         }
         isCleaning = true
         let now = Date()
+        // Keep the trail on the screen for 15 seconds instead of 2!
         let updated = activeEvents.filter { event in
-            now.timeIntervalSince(event.timestamp) < 2.0
+            now.timeIntervalSince(event.timestamp) < 5.0
         }
         if updated.count != activeEvents.count {
             self.activeEvents = updated

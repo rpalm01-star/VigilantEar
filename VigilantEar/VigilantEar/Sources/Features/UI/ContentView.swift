@@ -1,10 +1,8 @@
 import SwiftUI
-import SwiftData
 
 struct ContentView: View {
     @Environment(MicrophoneManager.self) private var microphoneManager
     @Environment(AcousticCoordinator.self) private var coordinator
-    @Environment(\.modelContext) private var modelContext
     
     var body: some View {
         // GEOMETRY READER: Flawlessly detects the drawn frame instead of the gyroscope
@@ -63,23 +61,6 @@ struct ContentView: View {
                                 coordinator: coordinator
                             )
                             
-                            let newEvent = SoundEvent(
-                                timestamp: Date(),
-                                threatLabel: "Simulated_Firetruck_Database_Test",
-                                bearing: 45.0,
-                                distance: 0.5,
-                                energy: 0.8,
-                                dopplerRate: 15.6,
-                                isApproaching: true
-                            )
-                            
-                            // 1. FIRE AND FORGET: Spin up a side-task for the database write
-                            // so it doesn't block the UI from drawing the dot.
-                            Task.detached(priority: .background) {
-                                // If you updated CloudLogger to be async, keep your await here!
-                                await CloudLogger.shared.logEvent(newEvent)
-                            }
-                            
                         }) {
                             Image("firemanHat")
                                 .resizable()
@@ -96,7 +77,7 @@ struct ContentView: View {
                         .padding(.bottom, 40)
                         
                         Spacer()
-
+                        
                         ThreatHUD(events: coordinator.activeEvents)
                             .frame(height: 80) // Bumped height slightly to fit the new text labels
                             .padding(.bottom, 20)
