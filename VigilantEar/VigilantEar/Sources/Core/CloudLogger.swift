@@ -13,7 +13,7 @@ struct CloudLogger {
         guard event.isEmergency else { return }
         
         var eventData: [String: Any] = [
-            "sessionID": event.sessionID.uuidString, // Groups the whole drive-by together!
+            "sessionID": event.id.uuidString, // Groups the whole drive-by together!
             "threatLabel": event.threatLabel,
             "bearing": event.bearing,
             "distance": event.distance,
