@@ -14,6 +14,16 @@ actor AcousticProcessingPipeline {
     
     private let fftProcessor: FFTProcessor
     
+    // --- THE MULTI-TARGET TRACKER MEMORY ---
+    struct ActiveThreat {
+        var sessionID: UUID
+        var dopplerTracker: SirenDopplerTracker
+        var lastFrequency: Double
+        var lastSeen: Date
+    }
+    
+    private var activeThreats: [ActiveThreat] = []
+    
     // MARK: - Doppler State Tracking
     private var dopplerFrequencyBuffer: [Double] = []
     private let maxDopplerBufferSize = 40
@@ -53,12 +63,6 @@ actor AcousticProcessingPipeline {
     }
     
     func confirmThreatAndTrack(label: String, confidence: Double) {
-        // --- NEW: THE DEBOUNCER ---
-        // If we saw this exact sound less than 1.0 seconds ago, drop it!
-        if let lastSeen = lastSeenThreats[label], Date().timeIntervalSince(lastSeen) < 1.0 {
-            return
-        }
-        
         guard let buffer = latestBuffer,
               let channelData = buffer.floatChannelData else { return }
         
@@ -67,80 +71,131 @@ actor AcousticProcessingPipeline {
         let rightSamples = Array(UnsafeBufferPointer(start: channelData[1], count: min(frameLength, 4096)))
         
         let peak = leftSamples.map(abs).max() ?? 0.0
-        
-        // The Acoustic Gate
         guard peak > 0.15 else { return }
         
-        // --- NEW: Update the cooldown memory! ---
-        lastSeenThreats[label] = Date()
+        // 1. Scan for multiple cars simultaneously!
+        let targets = self.fftProcessor.analyzeMultiple(samples: leftSamples, sampleRate: self.sampleRate, maxPeaks: 3)
+        guard !targets.isEmpty else { return }
         
-        print("\n🚨 --- NEW THREAT DETECTED ---")
-        print("🧠 [CoreML] Label: \(label) | Confidence: \(String(format: "%.2f", confidence))")
-        print("📊 [Audio] Peak hit: \(String(format: "%.3f", peak)) (Passed > 0.15 gate)")
+        let now = Date()
+        // 2. Prune old cars that drove away more than 1.5 seconds ago
+        activeThreats.removeAll { now.timeIntervalSince($0.lastSeen) > 1.5 }
         
-        Task.detached(priority: .userInitiated) { [weak self] in
-            guard let self = self else { return }
+        // 3. Process every car we just heard
+        for target in targets {
+            let currentFreq = target.frequency
+            let currentConf = target.confidence
             
-            // --- 1. ACOUSTIC PROFILING & DISTANCE CALIBRATION ---
-            let ambientFloor: Double = 0.15
+            var matchIndex: Int? = nil
             
-            // We safely hop to the main thread for a microsecond to grab the UI/Physics profile.
-            let profile = await MainActor.run { SoundProfile.classify(label) }
-            let clippingCeiling = profile.ceiling
-            let maxRangeInFeet = profile.maxRange
-            
-            let safePeak = min(max(Double(peak), ambientFloor), clippingCeiling)
-            let linearRatio = (clippingCeiling - safePeak) / (clippingCeiling - ambientFloor)
-            let exponentialCurve = pow(linearRatio, 2.0)
-            
-            let estimatedFeet = max(5.0, exponentialCurve * maxRangeInFeet)
-            let uiMapScaleInFeet = 1000.0
-            let normalizedUI_Distance = estimatedFeet / uiMapScaleInFeet
-            
-            // 🐞 TELEMETRY: Distance Math
-            print("📏 [Distance Profiler] Type: \(label) | Ceiling: \(clippingCeiling) | Max Range: \(maxRangeInFeet)ft")
-            print("📏 [Distance] Est Feet: \(String(format: "%.1f", estimatedFeet)) ft | UI Normalized: \(String(format: "%.3f", normalizedUI_Distance))")
-            
-            // --- 2. TDOA BEARING CALCULATION ---
-            let rawAngle = self.fftProcessor.calculateTDOA(left: leftSamples, right: rightSamples, sampleRate: self.sampleRate) ?? 0.0
-            var angle = rawAngle
-            
-            // --- 3. HARDWARE POLARITY FIX ---
-            let orientation = await MainActor.run { UIDevice.current.orientation }
-            if orientation == .landscapeLeft {
-                angle *= -1.0
+            // Does this frequency match a car we are already tracking? (Allow +/- 40Hz for Doppler shifts)
+            for (index, threat) in activeThreats.enumerated() {
+                if abs(threat.lastFrequency - currentFreq) < 40.0 {
+                    matchIndex = index
+                    break
+                }
             }
             
-            // 🐞 TELEMETRY: Bearing Math
-            print("🧭 [Bearing] Raw TDOA: \(String(format: "%.1f", rawAngle))° | Polarity Fixed: \(String(format: "%.1f", angle))°")
+            var threatSessionID: UUID
+            var dopplerResult: (isApproaching: Bool, shiftHz: Double)?
             
-            // SYNCHRONOUS READ: Grab the actor's state into local constants first!
-            let currentLat = await lastKnownLocation?.latitude
-            let currentLon = await lastKnownLocation?.longitude
-            
-            // BUILD THE EVENT
-            let newEvent = SoundEvent(
-                timestamp: Date(),
-                threatLabel: label,
-                confidence: confidence,
-                bearing: angle,
-                distance: normalizedUI_Distance,
-                energy: Float(safePeak),
-                latitude: currentLat,
-                longitude: currentLon
-            )
-            
-            print("✅ [Dispatch] Sending to Radar & Cloud...")
-            print("------------------------------")
-            
-            // FIRE AND FORGET: Hand it to the cloud
-            Task.detached(priority: .background) {
-                await CloudLogger.shared.logEvent(newEvent)
+            if let index = matchIndex {
+                // UPDATE EXISTING CAR
+                activeThreats[index].lastFrequency = currentFreq
+                activeThreats[index].lastSeen = now
+                dopplerResult = activeThreats[index].dopplerTracker.update(with: currentFreq, confidence: currentConf)
+                threatSessionID = activeThreats[index].sessionID
+            } else {
+                // SPAWN NEW CAR
+                let newID = UUID()
+                var newTracker = SirenDopplerTracker()
+                dopplerResult = newTracker.update(with: currentFreq, confidence: currentConf)
+                
+                let newThreat = ActiveThreat(sessionID: newID, dopplerTracker: newTracker, lastFrequency: currentFreq, lastSeen: now)
+                activeThreats.append(newThreat)
+                threatSessionID = newID
+                print("🚘 [MTT] Spawning New Target Tracking ID: \(newID.uuidString.prefix(4)) at \(String(format: "%.1f", currentFreq))Hz")
             }
             
-            // UI UPDATE: Send to radar
-            _ = await MainActor.run {
-                self.continuation.yield(newEvent)
+            print("\n🚨 --- NEW THREAT DETECTED ---")
+            print("🧠 [CoreML] Label: \(label) | Confidence: \(String(format: "%.2f", confidence))")
+            print("📈 [Doppler] Freq: \(String(format: "%.1f", peak))Hz | Shift: \(String(format: "%.1f", dopplerResult?.shiftHz ?? 0.0))")
+            
+            Task.detached(priority: .userInitiated) { [weak self] in
+                guard let self = self else { return }
+                
+                // --- 1. ACOUSTIC PROFILING & DISTANCE CALIBRATION ---
+                let ambientFloor: Double = 0.15
+                
+                // We safely hop to the main thread for a microsecond to grab the UI/Physics profile.
+                let profile = await MainActor.run { SoundProfile.classify(label) }
+                let clippingCeiling = profile.ceiling
+                let maxRangeInFeet = profile.maxRange
+                
+                let safePeak = min(max(Double(peak), ambientFloor), clippingCeiling)
+                let linearRatio = (clippingCeiling - safePeak) / (clippingCeiling - ambientFloor)
+                let exponentialCurve = pow(linearRatio, 2.0)
+                
+                let estimatedFeet = max(5.0, exponentialCurve * maxRangeInFeet)
+                let uiMapScaleInFeet = 1000.0
+                let normalizedUI_Distance = estimatedFeet / uiMapScaleInFeet
+                
+                // 🐞 TELEMETRY: Distance Math
+                print("📏 [Distance Profiler] Type: \(label) | Ceiling: \(clippingCeiling) | Max Range: \(maxRangeInFeet)ft")
+                print("📏 [Distance] Est Feet: \(String(format: "%.1f", estimatedFeet)) ft | UI Normalized: \(String(format: "%.3f", normalizedUI_Distance))")
+                
+                // --- 2. TDOA BEARING CALCULATION ---
+                // THE FIX: Actually use the HardwareCalibration value!
+                let exactMicDistance = await HardwareCalibration.micBaseline
+                
+                let rawAngle = self.fftProcessor.calculateTDOA(
+                    left: leftSamples,
+                    right: rightSamples,
+                    sampleRate: self.sampleRate,
+                    micDistance: exactMicDistance // Injected here!
+                ) ?? 0.0
+                
+                // --- 3. HARDWARE POLARITY FIX ---
+                var angle = rawAngle
+                let orientation = await MainActor.run { UIDevice.current.orientation }
+                if orientation == .landscapeLeft {
+                    angle *= -1.0
+                }
+                
+                // 🐞 TELEMETRY: Bearing Math
+                print("🧭 [Bearing] Raw TDOA: \(String(format: "%.1f", rawAngle))° | Polarity Fixed: \(String(format: "%.1f", angle))")
+                
+                // SYNCHRONOUS READ
+                let currentLat = await lastKnownLocation?.latitude
+                let currentLon = await lastKnownLocation?.longitude
+                
+                // BUILD THE EVENT
+                let newEvent = SoundEvent(
+                    sessionID: threatSessionID, // THE FIX: Assign it to the specific tracked car!
+                    timestamp: Date(),
+                    threatLabel: label,
+                    confidence: confidence,
+                    bearing: angle,
+                    distance: normalizedUI_Distance,
+                    energy: Float(safePeak),
+                    dopplerRate: dopplerResult?.shiftHz != nil ? Float(dopplerResult!.shiftHz) : nil,
+                    isApproaching: dopplerResult?.isApproaching ?? false,
+                    latitude: currentLat,
+                    longitude: currentLon
+                )
+                                
+                print("✅ [Dispatch] Sending to Radar & Cloud...")
+                print("------------------------------")
+                
+                // FIRE AND FORGET: Hand it to the cloud
+                Task.detached(priority: .background) {
+                    await CloudLogger.shared.logEvent(newEvent)
+                }
+                
+                // UI UPDATE: Send to radar
+                _ = await MainActor.run {
+                    self.continuation.yield(newEvent)
+                }
             }
         }
     }
@@ -203,11 +258,13 @@ final class ThreatResultsObserver: NSObject, @unchecked Sendable, SNResultsObser
         guard let classificationResult = result as? SNClassificationResult else { return }
         guard let topClassification = classificationResult.classifications.first else { return }
         
-        if topClassification.confidence > 0.70 {
+        // THE FIX: Lowered from 0.70 to 0.50 to catch continuous "acoustic wash" like traffic!
+        if topClassification.confidence > 0.50 {
             let label = topClassification.identifier.lowercased()
             Task {
                 await pipeline?.confirmThreatAndTrack(label: label, confidence: topClassification.confidence)
             }
         }
     }
+    
 }

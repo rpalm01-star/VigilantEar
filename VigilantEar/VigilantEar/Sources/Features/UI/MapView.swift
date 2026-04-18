@@ -70,7 +70,8 @@ struct MapView: View {
             }
         }
         }
-        .mapStyle(.standard(elevation: .flat))
+        // THE FIX: .excludingAll strips away every business, landmark, and transit icon!
+        .mapStyle(.standard(elevation: .flat, pointsOfInterest: .excludingAll))
         .mapControls {
             MapCompass()
             MapUserLocationButton()

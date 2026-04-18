@@ -92,6 +92,19 @@ class MicrophoneManager: NSObject, CLLocationManagerDelegate {
     }
     
     private func configureHardwareForStereo(session: AVAudioSession) {
+        // --- THE FIX: ALWAYS PREFER USB-C ARRAYS IF CONNECTED ---
+        if let usbInput = session.availableInputs?.first(where: { $0.portType == .usbAudio }) {
+            do {
+                try session.setPreferredInput(usbInput)
+                try session.setPreferredInputNumberOfChannels(2)
+                print("🎙️ HARDWARE: External USB-C Stereo Array Connected!")
+                return // Skip the built-in mic configuration entirely!
+            } catch {
+                print("⚠️ USB Mic Config failed: \(error)")
+            }
+        }
+        
+        // --- Fallback to Internal Mics ---
         guard let builtInMic = session.availableInputs?.first(where: { $0.portType == .builtInMic }) else { return }
         do {
             try session.setPreferredInput(builtInMic)

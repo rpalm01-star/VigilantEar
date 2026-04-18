@@ -5,6 +5,11 @@ struct HardwareCalibration {
     
     /// The physical distance between the top/front and bottom microphones in meters.
     static var micBaseline: Double {
+        
+        if DependencyContainer.usbMicropohone {
+            return 0.3048 // Example: Exactly 1 foot apart (12 inches)
+        }
+        
         let model = deviceIdentifier
         
         // These are approximations based on chassis height.
@@ -54,13 +59,13 @@ extension HardwareCalibration {
         let model = deviceIdentifier
         
         switch model {
-        // MARK: - iPhone 16 Family
+            // MARK: - iPhone 16 Family
         case "iPhone17,1": return 1179.0 / 2556.0 // iPhone 16
         case "iPhone17,2": return 1290.0 / 2796.0 // iPhone 16 Plus
         case "iPhone17,3": return 1179.0 / 2556.0 // iPhone 16 Pro
         case "iPhone17,4": return 1290.0 / 2796.0 // iPhone 16 Pro Max
             
-        // MARK: - Older / Generic Fallbacks
+            // MARK: - Older / Generic Fallbacks
         case let x where x.hasPrefix("iPad"):
             return 3.0 / 4.0 // iPads are much wider relative to height
         default:

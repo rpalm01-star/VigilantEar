@@ -3,6 +3,8 @@ import Foundation
 
 final class DependencyContainer {
     static let shared = DependencyContainer()
+    static let usbMicropohone = false;
+    static let dataStoreName = "VE1_detected_threats"
     
     let classificationService: ClassificationService
     let microphoneManager: MicrophoneManager

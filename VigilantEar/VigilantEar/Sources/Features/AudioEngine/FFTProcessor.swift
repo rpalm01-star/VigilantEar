@@ -60,6 +60,56 @@ final class FFTProcessor: @unchecked Sendable {
         return (frequency, confidence)
     }
     
+    /// MULTI-TARGET TRACKER: Finds up to N independent frequency peaks in the audio wash
+    nonisolated func analyzeMultiple(samples: [Float], sampleRate: Double, maxPeaks: Int = 3) -> [(frequency: Double, confidence: Float)] {
+        guard samples.count == fftSize else { return [] }
+        
+        var windowed = [Float](repeating: 0, count: fftSize)
+        vDSP_vmul(samples, 1, window, 1, &windowed, 1, vDSP_Length(fftSize))
+        
+        let halfSize = fftSize / 2
+        var real = [Float](repeating: 0, count: halfSize)
+        var imag = [Float](repeating: 0, count: halfSize)
+        
+        forwardFFT(windowed, real: &real, imag: &imag)
+        
+        var magnitudes = [Float](repeating: 0.0, count: halfSize)
+        real.withUnsafeMutableBufferPointer { rPtr in
+            imag.withUnsafeMutableBufferPointer { iPtr in
+                var split = DSPSplitComplex(realp: rPtr.baseAddress!, imagp: iPtr.baseAddress!)
+                split.imagp[0] = 0.0
+                vDSP_zvmags(&split, 1, &magnitudes, 1, vDSP_Length(halfSize))
+            }
+        }
+        
+        // Find the noise floor so we don't track random static
+        let sum = magnitudes.reduce(0, +)
+        let avg = sum / Float(halfSize)
+        let threshold = avg * 2.5 // Must be 2.5x louder than the background noise
+        
+        var peaks: [(index: Int, mag: Float)] = []
+        
+        // Scan for local maxima (hills in the frequency spectrum)
+        for i in 1..<(halfSize - 1) {
+            let m = magnitudes[i]
+            if m > threshold && m > magnitudes[i-1] && m > magnitudes[i+1] {
+                peaks.append((index: i, mag: m))
+            }
+        }
+        
+        // Sort by the loudest targets and grab the top `maxPeaks`
+        peaks.sort { $0.mag > $1.mag }
+        let topTargets = peaks.prefix(maxPeaks)
+        
+        // Refine the frequencies
+        return topTargets.map { peak in
+            let refinedIndex = quadraticInterpolate(magnitudes: magnitudes, peakIndex: peak.index)
+            let freq = Double(refinedIndex) * (sampleRate / Double(fftSize))
+            let conf = min(peak.mag / avg, 1.0)
+            return (freq, conf)
+        }
+    }
+    
     nonisolated func calculateTDOA(left: [Float], right: [Float], sampleRate: Double, micDistance: Double = 0.15) -> Double? {
         // HEARTBEAT 1: Method Entry
         //print("🎙️ TDOA Step 1: Start Math (Left: \(left.count), Right: \(right.count))")

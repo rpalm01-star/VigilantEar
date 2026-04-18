@@ -8,8 +8,7 @@
 
 import Foundation
 
-/// A high-performance tracker designed to calculate Doppler shift on Frequency Modulated (sweeping) audio like sirens.
-struct SirenDopplerTracker: Sendable {
+nonisolated struct SirenDopplerTracker: Sendable {
     private var frequencyBuffer: [Double] = []
     private let maxBufferSize = 40 // roughly 2 seconds of audio frames
     private var baselineCenter: Double?
