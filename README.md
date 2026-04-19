@@ -1,36 +1,49 @@
-# VigilantEar 👂🛰️
+VigilantEar 👂🛰️
+VigilantEar is an iOS-based acoustic research and accessibility tool designed to provide real-time directional awareness for the deaf and hard-of-hearing (D/HH) community.
 
-**VigilantEar** is an iOS-based acoustic research and accessibility tool designed to provide real-time directional awareness for the deaf and hard-of-hearing (D/HH) community. 
+By leveraging on-device machine learning and advanced acoustic physics, the app acts as an "Air Traffic Control" radar for the street. It identifies emergency vehicles (sirens) and broadband mobile noise sources (tire roar/engines), tracking their movement through physical space using multi-target frequency isolation and Phase-Transform spatial mapping.
 
-By leveraging machine learning and advanced acoustic physics, the app identifies high-decibel mobile noise sources—such as un-muffled motorcycles and emergency vehicles—and tracks their movement using Center-Frequency Doppler shifts and Phase-Transform spatial mapping.
+🌟 Key Features
+Multi-Target Tracker (MTT): Capable of isolating and tracking multiple independent acoustic targets simultaneously in a crowded environment, generating unique sessions and trajectories for each vehicle.
 
-## 🌟 Key Features
-* **Tactical Radar View:** A real-time spatial display calibrated to a **30-foot research horizon**, providing visual distance markers at 7.5ft, 15ft, 22.5ft, and 30ft.
-* **Heartbeat Data Pruning:** A dedicated 10Hz "Heartbeat" timer ensures the radar remains snappy by independently pruning stale acoustic events every 100ms.
-* **High-Temporal Detection:** An optimized **0.9 overlap factor** allows the engine to track rapid, repeated events (like snaps or bell rings) without dropping detections.
-* **Emergency Breach Haptics:** Automatic triggering of **CoreHaptics** alerts when a classified emergency vehicle (Siren/Ambulance/Fire) enters the 7.5ft inner safety ring.
-* **Unique Event Tracking:** Every acoustic hit is assigned a unique UUID, allowing for overlapping "pulses" on the radar even if the sound type is identical.
+Tactical MapKit HUD: A real-time, auto-following MapKit display plotting targets dynamically up to a 1,000-foot research horizon. Features visual perimeter anchors at 30ft (Green), 500ft (Yellow), and 1,000ft (Red).
 
-## 🧬 The Physics Behind the App
-VigilantEar operates on a custom Digital Signal Processing (DSP) foundation:
-1. **GCC-PHAT Spatial Tracking:** Utilizes Generalized Cross-Correlation with Phase Transform to ignore urban multipath echoes and lock onto the true phase-alignment of sound waves.
-2. **FM Doppler Velocity:** Tracks the mathematical center of a siren's frequency sweep over a 2-second rolling window to accurately calculate approach vs. recession velocity.
-3. **Hardware-Specific Calibration:** Automatically adjusts TDOA math based on the physical microphone baseline of the specific iPhone model (e.g., **0.163m** for iPhone 16 Pro Max).
+Deep Acoustic Scanning: The CoreML pipeline doesn't just listen to the loudest foreground sound. It actively scans the top 5 confidence results to pull out the background broadband rumble of approaching vehicles hidden underneath environmental noise.
 
-## 🛠️ Tech Stack (2026)
-* **Language:** Swift 6 (Strict Concurrency & Actor-isolated pipelines)
-* **Frameworks:** SwiftUI, Accelerate (vDSP), SoundAnalysis, CoreHaptics, SwiftData
-* **Hardware Required:** iPhone 13 or newer configured for stereo capture (optimized for **iPhone 16 Pro Max**)
+Dynamic Volume Gating: Automatically lowers amplitude thresholds for broadband sounds (like tire wash) while maintaining strict gates for tonal sounds (like music or voices).
 
-## 🚀 Getting Started
-1. Clone the repository: `git clone https://github.com/rpalm01-star/VigilantEar.git`
-2. Open the project in **Xcode 16+**.
-3. Build & run on a physical device to enable the stereo microphone tap and ANE acceleration.
+Cloud Telemetry: Live, real-time spatial and diagnostic telemetry streaming to Google Cloud Firestore for post-test GIS trajectory analysis and debugging.
 
-## 📊 Research Goals & Data Privacy
-* **Privacy:** Audio buffers are processed entirely locally on-device. No raw audio recordings are uploaded or stored.
-* **Data Availability:** Logged events can be exported via CSV for use in GIS (Geographic Information Systems) platforms.
+🧬 The Physics Behind the App
+VigilantEar operates on a custom Digital Signal Processing (DSP) foundation built natively in Swift:
 
-## ⚖️ License & Disclaimer
-**License:** Distributed under the **Apache License 2.0**.
-**Disclaimer:** VigilantEar is an experimental research and accessibility aid. It is **not** a certified life-saving device. Accuracy may vary based on environmental factors and hardware calibration.
+GCC-PHAT Spatial Tracking: Utilizes Generalized Cross-Correlation with Phase Transform to process massive stereo buffers (4096 frames). It calculates Time Difference of Arrival (TDOA) to lock onto both tonal spikes and broadband white-noise with sub-millisecond precision.
+
+Independent FM Doppler: Every spawned target possesses its own independent 40-frame Doppler tracker, calculating specific approach vs. recession velocities simultaneously.
+
+Hardware-Specific Calibration: Automatically adjusts the spatial math based on the physical microphone baseline of the exact iPhone model running the code (e.g., 0.163m for iPhone 16 Pro Max).
+
+🛠️ Tech Stack (2026)
+Language: Swift 6 (Strict Concurrency & Actor-isolated pipelines)
+
+Frameworks: SwiftUI, MapKit, Accelerate (vDSP), SoundAnalysis, Firebase Firestore
+
+Hardware Required: iPhone 13 or newer configured for stereo capture (optimized for iPhone 16 Pro Max)
+
+🚀 Getting Started
+Clone the repository: git clone https://github.com/rpalm01-star/VigilantEar.git
+
+Open the project in Xcode 16+.
+
+Supply your own GoogleService-Info.plist for Firebase logging.
+
+Build & run on a physical device to enable the stereo microphone tap and ANE (Apple Neural Engine) acceleration.
+
+📊 Research Goals & Data Privacy
+Privacy: Audio buffers are processed entirely locally on-device in real-time. No raw audio recordings are ever uploaded, recorded, or stored.
+
+Data Availability: Only mathematical trajectories (bearing, distance, ML labels) are securely transmitted to your designated Firestore database for research use.
+
+⚖️ License & Disclaimer
+License: Distributed under the Apache License 2.0.
+Disclaimer: VigilantEar is an experimental research and accessibility aid. It is not a certified life-saving device. Accuracy may vary based on environmental factors, wind shear, multipath reflections, and hardware calibration.
