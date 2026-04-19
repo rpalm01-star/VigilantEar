@@ -5,12 +5,10 @@
 //  Created by Robert Palmer on 4/7/26.
 //
 
-
-/// PerformanceLogger.swift
-
 import Foundation
 import os.signpost
 import os.log
+import FirebaseFirestore // THE FIX: Add Firebase
 
 /// A thread-safe logger for tracking performance metrics and execution time.
 /// Supports both modern OSSignpost intervals and legacy string logging.
@@ -30,6 +28,11 @@ public final class PerformanceLogger: @unchecked Sendable {
     
     // A lock to prevent race conditions when accessing the dictionary
     private let lock = NSLock()
+    
+    // THE FIX: Add database reference and a unique ID for this app launch
+    private let db = Firestore.firestore()
+    private let sessionLaunchID = UUID().uuidString
+    
     
     // Private initializer to enforce the singleton pattern
     private init() {
@@ -70,5 +73,33 @@ public final class PerformanceLogger: @unchecked Sendable {
         
         // Remove the task from active tracking
         activeSignposts.removeValue(forKey: task)
+    }
+    
+    // MARK: - Remote Telemetry
+    
+    /// Beams a debug log to Firebase so you can read it after a field test
+    public func logTelemetry(step: String, message: String, isError: Bool = false) {
+        // 1. Print locally so you can see it in Xcode
+        let icon = isError ? "❌" : "🐞"
+        print("\(icon) [\(step)] \(message)")
+
+        guard DependencyContainer.logToCloud else { return }
+
+        // 2. Beam to Firebase
+        let logData: [String: Any] = [
+            "sessionID": sessionLaunchID,
+            "timestamp": FieldValue.serverTimestamp(),
+            "step": step,
+            "message": message,
+            "isError": isError
+        ]
+        
+        Task.detached(priority: .background) {
+            do {
+                try await self.db.collection(DependencyContainer.logDataStoreName).addDocument(data: logData)
+            } catch {
+                print("⚠️ Telemetry failed to send: \(error.localizedDescription)")
+            }
+        }
     }
 }

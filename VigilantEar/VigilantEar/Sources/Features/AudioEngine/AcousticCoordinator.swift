@@ -12,7 +12,7 @@ class AcousticCoordinator {
     var isTracking: Bool = false
     // Is the cleanup running?
     var isCleaning: Bool = false;
-    
+
     // Task to manage the async stream lifecycle
     private var streamTask: Task<Void, Never>?
     private var cleanupTimer: Timer?

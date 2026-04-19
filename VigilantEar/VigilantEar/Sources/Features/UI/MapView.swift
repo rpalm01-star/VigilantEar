@@ -78,9 +78,8 @@ struct MapView: View {
         .mapControlVisibility(.hidden)
         .overlay(alignment: .bottomTrailing) {
             Button(action: {
-                isTrackingUser = true // THE FIX: Re-engage the lock!
+                isTrackingUser = true
                 if let loc = userLocation {
-                    // withAnimation gives it that buttery smooth "swoop" back to center
                     withAnimation(.easeInOut(duration: 1.0)) {
                         cameraPosition = .camera(
                             MapCamera(
@@ -93,11 +92,11 @@ struct MapView: View {
                     }
                 }
             }) {
-                // THE FIX: Visual feedback! Solid blue when locked, hollow gray when panning.
+                // THE FIX: Increased font and frame sizes for a proper touch target
                 Image(systemName: isTrackingUser ? "location.fill" : "location")
-                    .font(.system(size: 20, weight: .semibold))
+                    .font(.system(size: 26, weight: .semibold))
                     .foregroundColor(isTrackingUser ? .blue : .gray)
-                    .frame(width: 50, height: 50)
+                    .frame(width: 65, height: 65)
                     .background(.thickMaterial)
                     .clipShape(Circle())
                     .shadow(color: .black.opacity(0.3), radius: 5, x: 0, y: 3)
@@ -119,12 +118,11 @@ struct MapView: View {
                 )
             }
         }
-        // THE FIX: 2. The Pan Detector
         .onMapCameraChange(frequency: .onEnd) { context in
             if let userLoc = userLocation {
                 let mapCenter = CLLocation(latitude: context.camera.centerCoordinate.latitude, longitude: context.camera.centerCoordinate.longitude)
-                // If the map center is more than 10 meters from your physical body, you must have panned!
-                if userLoc.distance(from: mapCenter) > 10.0 {
+                // THE FIX: Increased deadzone to 50 meters to stop false disconnects
+                if userLoc.distance(from: mapCenter) > 50.0 {
                     isTrackingUser = false
                 }
             }

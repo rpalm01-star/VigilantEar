@@ -36,6 +36,8 @@ actor AcousticProcessingPipeline {
     private var latestTime: AVAudioTime?
     
     private var lastKnownLocation: CLLocationCoordinate2D? = nil
+    // --- THE FIX: CPU THROTTLE STATE ---
+    private var lastProcessTime: Date = Date.distantPast
     
     // --- THE FIX: COOLDOWN MEMORY ---
     // Tracks when we last saw a specific threat to prevent CoreML spam
@@ -62,78 +64,100 @@ actor AcousticProcessingPipeline {
         streamAnalyzer?.analyze(buffer, atAudioFramePosition: time.sampleTime)
     }
     
-    func confirmThreatAndTrack(label: String, confidence: Double) {
-        guard let buffer = latestBuffer,
-              let channelData = buffer.floatChannelData else { return }
+    func confirmThreatAndTrack(label: String, confidence: Double) async {
+        let now = Date()
+        guard now.timeIntervalSince(lastProcessTime) > 0.2 else { return }
+        lastProcessTime = now
+        
+        // TRIPWIRE 1: Did CoreML trigger?
+        await MainActor.run {
+            PerformanceLogger.shared.logTelemetry(step: "1_ML_TRIGGER", message: "Heard: \(label) (Conf: \(String(format: "%.2f", confidence)))")
+        }
+        
+        guard let buffer = latestBuffer, let channelData = buffer.floatChannelData else { return }
         
         let frameLength = Int(buffer.frameLength)
         let leftSamples = Array(UnsafeBufferPointer(start: channelData[0], count: min(frameLength, 4096)))
         let rightSamples = Array(UnsafeBufferPointer(start: channelData[1], count: min(frameLength, 4096)))
         
         let peak = leftSamples.map(abs).max() ?? 0.0
-        guard peak > 0.15 else { return }
         
-        // 1. Scan for multiple cars simultaneously!
-        var targets = self.fftProcessor.analyzeMultiple(samples: leftSamples, sampleRate: self.sampleRate, maxPeaks: 3)
-        // THE FIX: The Broadband Noise Fallback
-        // Sirens are tonal (sharp peaks). Cars are broadband (white noise).
-        // If the FFT finds no sharp peaks, but CoreML heard a car, we force it onto the radar!
-        if targets.isEmpty {
-            // Assign a generic 100Hz "tire roar" frequency so the Doppler tracker has a hook
-            targets.append((frequency: 100.0, confidence: Float(confidence)))
+        let isVehicle = label.contains("car") || label.contains("traffic") || label.contains("engine")
+        let minimumPeak: Float = isVehicle ? 0.02 : 0.15
+        
+        // TRIPWIRE 2: The Volume Gate
+        guard peak > minimumPeak else {
+            await MainActor.run {
+                PerformanceLogger.shared.logTelemetry(step: "2_VOLUME_DROP", message: "Peak \(String(format: "%.3f", peak)) failed to pass \(minimumPeak)")
+            }
+            return
         }
         
-        let now = Date()
-        // 2. Prune old cars that drove away more than 1.5 seconds ago
+        var targets = self.fftProcessor.analyzeMultiple(samples: leftSamples, sampleRate: self.sampleRate, maxPeaks: 3)
+        
+        // TRIPWIRE 3: The FFT Fallback
+        if targets.isEmpty {
+            if isVehicle {
+                targets.append((frequency: 100.0, confidence: Float(confidence)))
+                await MainActor.run {
+                    PerformanceLogger.shared.logTelemetry(step: "3_FFT_FALLBACK", message: "Injected 100Hz broadband fallback")
+                }
+            } else {
+                await MainActor.run {
+                    PerformanceLogger.shared.logTelemetry(step: "3_FFT_DROP", message: "No targets, not a vehicle. Dropped.")
+                }
+                return
+            }
+        } else {
+            let baseTarget = targets[0]
+            let baseTargetsCount = targets.count
+            await MainActor.run {
+                PerformanceLogger.shared.logTelemetry(step: "3_FFT_SUCCESS", message: "Found \(baseTargetsCount) targets. Top: \(String(format: "%.1f", baseTarget.frequency))Hz")
+            }
+        }
+        
         activeThreats.removeAll { now.timeIntervalSince($0.lastSeen) > 1.5 }
         
-        // 3. Process every car we just heard
         for target in targets {
             let currentFreq = target.frequency
             let currentConf = target.confidence
             
             var matchIndex: Int? = nil
-            
-            // Does this frequency match a car we are already tracking? (Allow +/- 40Hz for Doppler shifts)
             for (index, threat) in activeThreats.enumerated() {
-                if abs(threat.lastFrequency - currentFreq) < 40.0 {
-                    matchIndex = index
-                    break
-                }
+                if abs(threat.lastFrequency - currentFreq) < 40.0 { matchIndex = index; break }
             }
             
             var threatSessionID: UUID
             var dopplerResult: (isApproaching: Bool, shiftHz: Double)?
             
             if let index = matchIndex {
-                // UPDATE EXISTING CAR
                 activeThreats[index].lastFrequency = currentFreq
                 activeThreats[index].lastSeen = now
                 dopplerResult = activeThreats[index].dopplerTracker.update(with: currentFreq, confidence: currentConf)
                 threatSessionID = activeThreats[index].sessionID
             } else {
-                // SPAWN NEW CAR
                 let newID = UUID()
                 var newTracker = SirenDopplerTracker()
                 dopplerResult = newTracker.update(with: currentFreq, confidence: currentConf)
-                
                 let newThreat = ActiveThreat(sessionID: newID, dopplerTracker: newTracker, lastFrequency: currentFreq, lastSeen: now)
                 activeThreats.append(newThreat)
                 threatSessionID = newID
-                print("🚘 [MTT] Spawning New Target Tracking ID: \(newID.uuidString.prefix(4)) at \(String(format: "%.1f", currentFreq))Hz")
             }
             
-            print("\n🚨 --- NEW THREAT DETECTED ---")
-            print("🧠 [CoreML] Label: \(label) | Confidence: \(String(format: "%.2f", confidence))")
-            print("📈 [Doppler] Freq: \(String(format: "%.1f", peak))Hz | Shift: \(String(format: "%.1f", dopplerResult?.shiftHz ?? 0.0))")
+            let capturedThreatSessionID = threatSessionID
             
-            Task.detached(priority: .userInitiated) { [weak self] in
+            await MainActor.run {
+                PerformanceLogger.shared.logTelemetry(step: "4_MATH_START", message: "Sending to GCC-PHAT. Session: \(capturedThreatSessionID.uuidString.prefix(4))")
+            }
+            
+            Task.detached(priority: .userInitiated) { [weak self, capturedThreatSessionID] in
                 guard let self = self else { return }
                 
                 // --- 1. ACOUSTIC PROFILING & DISTANCE CALIBRATION ---
-                let ambientFloor: Double = 0.15
-                
-                // We safely hop to the main thread for a microsecond to grab the UI/Physics profile.
+                // THE FIX: Lower the mathematical floor for vehicles so they plot correctly on the UI!
+                let isVehicle = label.contains("car") || label.contains("traffic") || label.contains("engine")
+                let ambientFloor: Double = isVehicle ? 0.02 : 0.15
+
                 let profile = await MainActor.run { SoundProfile.classify(label) }
                 let clippingCeiling = profile.ceiling
                 let maxRangeInFeet = profile.maxRange
@@ -147,9 +171,15 @@ actor AcousticProcessingPipeline {
                 let normalizedUI_Distance = estimatedFeet / uiMapScaleInFeet
                 
                 // 🐞 TELEMETRY: Distance Math
-                print("📏 [Distance Profiler] Type: \(label) | Ceiling: \(clippingCeiling) | Max Range: \(maxRangeInFeet)ft")
-                print("📏 [Distance] Est Feet: \(String(format: "%.1f", estimatedFeet)) ft | UI Normalized: \(String(format: "%.3f", normalizedUI_Distance))")
-                
+                await MainActor.run {
+                    let m = "Session: \(capturedThreatSessionID.uuidString.prefix(4)) 📏 [Distance Profiler] Type: \(label) | Ceiling: \(clippingCeiling) | Max Range: \(maxRangeInFeet)ft"
+                    PerformanceLogger.shared.logTelemetry(step: "5_TELEMETRY DISTANCE PROFILER", message: m)
+                }
+                await MainActor.run {
+                    let m = "Session: \(capturedThreatSessionID.uuidString.prefix(4)) 📏 [Distance] Est Feet: \(String(format: "%.1f", estimatedFeet))ft | UI Normalized: \(String(format: "%.3f", normalizedUI_Distance))"
+                    PerformanceLogger.shared.logTelemetry(step: "5_TELEMETRY DISTANCE FEET", message: m)
+                }
+
                 // --- 2. TDOA BEARING CALCULATION ---
                 // THE FIX: Actually use the HardwareCalibration value!
                 let exactMicDistance = await HardwareCalibration.micBaseline
@@ -167,17 +197,21 @@ actor AcousticProcessingPipeline {
                 if orientation == .landscapeLeft {
                     angle *= -1.0
                 }
+                let capturedAngle = angle
                 
                 // 🐞 TELEMETRY: Bearing Math
-                print("🧭 [Bearing] Raw TDOA: \(String(format: "%.1f", rawAngle))° | Polarity Fixed: \(String(format: "%.1f", angle))")
+                await MainActor.run {
+                    let m = "Session: \(capturedThreatSessionID.uuidString.prefix(4)) 📏 [Bearing] Raw TDOA: \(String(format: "%.1f", rawAngle))° | Polarity Fixed: \(String(format: "%.1f", capturedAngle))"
+                    PerformanceLogger.shared.logTelemetry(step: "5_TELEMETRY BEARING MATH", message: m)
+                }
                 
                 // SYNCHRONOUS READ
-                let currentLat = await lastKnownLocation?.latitude
-                let currentLon = await lastKnownLocation?.longitude
+                let currentLat = await self.lastKnownLocation?.latitude
+                let currentLon = await self.lastKnownLocation?.longitude
                 
                 // BUILD THE EVENT
                 let newEvent = SoundEvent(
-                    sessionID: threatSessionID, // THE FIX: Assign it to the specific tracked car!
+                    sessionID: capturedThreatSessionID, // THE FIX: Assign it to the specific tracked car!
                     timestamp: Date(),
                     threatLabel: label,
                     confidence: confidence,
@@ -189,9 +223,6 @@ actor AcousticProcessingPipeline {
                     latitude: currentLat,
                     longitude: currentLon
                 )
-                                
-                print("✅ [Dispatch] Sending to Radar & Cloud...")
-                print("------------------------------")
                 
                 // FIRE AND FORGET: Hand it to the cloud
                 Task.detached(priority: .background) {
@@ -262,15 +293,44 @@ final class ThreatResultsObserver: NSObject, @unchecked Sendable, SNResultsObser
     
     nonisolated func request(_ request: SNRequest, didProduce result: SNResult) {
         guard let classificationResult = result as? SNClassificationResult else { return }
-        guard let topClassification = classificationResult.classifications.first else { return }
         
-        // THE FIX: Lowered from 0.70 to 0.50 to catch continuous "acoustic wash" like traffic!
-        if topClassification.confidence > 0.50 {
-            let label = topClassification.identifier.lowercased()
+        var detectedLabel: String?
+        var highestConfidence: Double = 0.0
+        
+        // THE FIX: Scan the top 5 sounds, not just the 1st!
+        for classification in classificationResult.classifications.prefix(5) {
+            let label = classification.identifier.lowercased()
+            let conf = classification.confidence
+            
+            // PRIORITY 1: Emergencies (Siren, Fire, Ambulance).
+            // Even if it's hiding in the background at 25%, grab it immediately!
+            if (label.contains("siren") || label.contains("fire") || label.contains("ambulance")) && conf > 0.25 {
+                detectedLabel = label
+                highestConfidence = conf
+                break // Stop looking, this overrides everything
+            }
+            
+            // PRIORITY 2: Vehicles (Car, Traffic, Engine).
+            // Tire roar is a background wash. If it's in the top 5 at 20%+, grab it!
+            if (label.contains("car") || label.contains("traffic") || label.contains("engine")) && conf > 0.20 {
+                detectedLabel = label
+                highestConfidence = conf
+                break
+            }
+        }
+        
+        // PRIORITY 3: The standard fallback.
+        // If we didn't find a hidden car or siren, just use whatever is loudest (if > 50%)
+        if detectedLabel == nil, let top = classificationResult.classifications.first, top.confidence > 0.50 {
+            detectedLabel = top.identifier.lowercased()
+            highestConfidence = top.confidence
+        }
+        
+        // If we found something worth tracking, send it to the pipeline
+        if let finalLabel = detectedLabel {
             Task {
-                await pipeline?.confirmThreatAndTrack(label: label, confidence: topClassification.confidence)
+                await pipeline?.confirmThreatAndTrack(label: finalLabel, confidence: highestConfidence)
             }
         }
     }
-    
 }

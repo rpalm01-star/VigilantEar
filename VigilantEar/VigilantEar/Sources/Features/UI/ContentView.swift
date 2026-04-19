@@ -135,6 +135,47 @@ struct ContentView: View {
             .onDisappear {
                 microphoneManager.stopCapturing()
             }
+            .overlay(alignment: .topLeading) {
+                DebugHUD()
+                    .padding(.top, 50) // Clears the dynamic island
+                    .padding(.leading, 16)
+            }
+        }
+    }
+}
+
+struct DebugHUD: View {
+    @StateObject private var monitor = SystemMonitor.shared
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text("⚙️ SYSTEM TELEMETRY")
+                .font(.system(size: 10, weight: .bold, design: .monospaced))
+                .foregroundColor(.gray)
+            
+            HStack {
+                Text("CPU:")
+                    .font(.system(size: 12, weight: .medium, design: .monospaced))
+                // Changes color if CPU gets dangerously high
+                Text("\(String(format: "%.1f", monitor.cpuUsage))%")
+                    .font(.system(size: 12, weight: .bold, design: .monospaced))
+                    .foregroundColor(monitor.cpuUsage > 80.0 ? .red : .green)
+            }
+            
+            HStack {
+                Text("RAM:")
+                    .font(.system(size: 12, weight: .medium, design: .monospaced))
+                Text("\(String(format: "%.1f", monitor.memoryUsageMB)) MB")
+                    .font(.system(size: 12, weight: .bold, design: .monospaced))
+                    .foregroundColor(.cyan)
+            }
+        }
+        .padding(10)
+        .background(.ultraThinMaterial)
+        .cornerRadius(8)
+        .shadow(radius: 5)
+        .onAppear {
+            monitor.start()
         }
     }
 }
