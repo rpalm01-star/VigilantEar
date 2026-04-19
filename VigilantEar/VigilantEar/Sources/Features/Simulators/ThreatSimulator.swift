@@ -87,7 +87,7 @@ struct ThreatSimulator {
                     let newEvent = SoundEvent(
                         sessionID: threatSessionID,
                         timestamp: Date(),
-                        threatLabel: "simulated_firetruck_test",
+                        threatLabel: DependencyContainer.simluatedFiretruckLabel,
                         confidence: simulatedConfidence,
                         bearing: relativeBearing,
                         distance: normalizedDistance,

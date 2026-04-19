@@ -56,7 +56,11 @@ struct SoundProfile {
         (["bark", "animal", "pig"], "pawprint.fill", .green, 0.35, 30.0),
         
         // --- MISC ---
-        (["fan"], "fan", .gray, 0.35, 30.0)
+        (["fan"], "fan", .mint, 0.35, 30.0),
+        (["crumpl", "crush", "trash"], "trash.fill", .mint, 0.35, 30.0),
+        (["toilet", "flush"], "toilet.fill", .mint, 0.35, 30.0),
+        (["door"], "door.right.hand.closed", .mint, 0.35, 30.0),
+
     ]
     
     // 2. THE SEARCH ENGINE
@@ -88,7 +92,7 @@ struct ThreatHUD: View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 12) {
                 ForEach(consolidatedEvents, id: \.threatLabel) { event in
-                    AcousticInstrument(event: event)
+                    ThreatHUDItemInstance(event: event)
                         .transition(.scale.combined(with: .opacity))
                 }
             }
@@ -116,7 +120,7 @@ struct ThreatHUD: View {
 }
 
 // MARK: - The Individual Instrument UI
-struct AcousticInstrument: View {
+struct ThreatHUDItemInstance: View {
     var event: SoundEvent
     
     var body: some View {

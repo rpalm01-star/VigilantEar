@@ -74,8 +74,14 @@ actor AcousticProcessingPipeline {
         guard peak > 0.15 else { return }
         
         // 1. Scan for multiple cars simultaneously!
-        let targets = self.fftProcessor.analyzeMultiple(samples: leftSamples, sampleRate: self.sampleRate, maxPeaks: 3)
-        guard !targets.isEmpty else { return }
+        var targets = self.fftProcessor.analyzeMultiple(samples: leftSamples, sampleRate: self.sampleRate, maxPeaks: 3)
+        // THE FIX: The Broadband Noise Fallback
+        // Sirens are tonal (sharp peaks). Cars are broadband (white noise).
+        // If the FFT finds no sharp peaks, but CoreML heard a car, we force it onto the radar!
+        if targets.isEmpty {
+            // Assign a generic 100Hz "tire roar" frequency so the Doppler tracker has a hook
+            targets.append((frequency: 100.0, confidence: Float(confidence)))
+        }
         
         let now = Date()
         // 2. Prune old cars that drove away more than 1.5 seconds ago

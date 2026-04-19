@@ -5,6 +5,7 @@ final class DependencyContainer {
     static let shared = DependencyContainer()
     static let usbMicropohone = false;
     static let dataStoreName = "VE1_detected_threats"
+    static let simluatedFiretruckLabel = "simulated_firetruck"
     
     let classificationService: ClassificationService
     let microphoneManager: MicrophoneManager

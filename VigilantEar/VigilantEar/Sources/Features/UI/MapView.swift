@@ -4,7 +4,7 @@ import CoreLocation
 
 struct MapView: View {
     
-    static let CAMERA_DISTANCE = Double(400)
+    static let CAMERA_DISTANCE: Double = Double(400)
     
     var events: [SoundEvent]
     var userLocation: CLLocation?
@@ -16,6 +16,8 @@ struct MapView: View {
             distance: MapView.CAMERA_DISTANCE
         )
     )
+    
+    @State private var isTrackingUser: Bool = true
     
     var body: some View {
         // THE FIX: Tighten the bounds to 800 meters maximum!
@@ -55,18 +57,15 @@ struct MapView: View {
                 let absoluteBearing = userHeading + Double(event.bearing)
                 let projectedCoord = center.projected(by: distanceInMeters, bearingDegrees: absoluteBearing)
                 
-                let dotColor = event.isEmergency ? Color.red : Color.cyan
-                
                 Annotation("", coordinate: projectedCoord) {
                     Circle()
-                        .fill(dotColor)
+                        .fill(event.dotColor)
                         .frame(width: 16, height: 16)
                     // THE FIX: Apply the exact fade math from the struct
                         .opacity(event.opacity)
                     // THE FIX: Multiply size by confidence (visualScale) and shrink as it fades!
                         .scaleEffect(CGFloat(event.visualScale) * CGFloat(max(0.3, event.opacity)))
-                        .shadow(color: dotColor.opacity(0.8), radius: 8)
-                }
+                    .shadow(color: event.dotColor, radius: CGFloat(event.energy) * 15)                }
             }
         }
         }
@@ -79,13 +78,14 @@ struct MapView: View {
         .mapControlVisibility(.hidden)
         .overlay(alignment: .bottomTrailing) {
             Button(action: {
+                isTrackingUser = true // THE FIX: Re-engage the lock!
                 if let loc = userLocation {
                     // withAnimation gives it that buttery smooth "swoop" back to center
                     withAnimation(.easeInOut(duration: 1.0)) {
                         cameraPosition = .camera(
                             MapCamera(
                                 centerCoordinate: loc.coordinate,
-                                distance: 400, // Locks it right back into the Yellow Ring!
+                                distance: MapView.CAMERA_DISTANCE,
                                 heading: userHeading,
                                 pitch: 0
                             )
@@ -93,16 +93,41 @@ struct MapView: View {
                     }
                 }
             }) {
-                Image(systemName: "location.fill")
+                // THE FIX: Visual feedback! Solid blue when locked, hollow gray when panning.
+                Image(systemName: isTrackingUser ? "location.fill" : "location")
                     .font(.system(size: 20, weight: .semibold))
-                    .foregroundColor(.blue)
+                    .foregroundColor(isTrackingUser ? .blue : .gray)
                     .frame(width: 50, height: 50)
                     .background(.thickMaterial)
                     .clipShape(Circle())
                     .shadow(color: .black.opacity(0.3), radius: 5, x: 0, y: 3)
             }
             .padding(.trailing, 20)
-            .padding(.bottom, 40) // Adjust this to sit nicely above your HUD!
+            .padding(.bottom, 40)
+        }
+        // THE FIX: 1. Auto-Follow the GPS Stream
+        .onChange(of: userLocation) { _, newLocation in
+            guard isTrackingUser, let loc = newLocation else { return }
+            withAnimation(.default) {
+                cameraPosition = .camera(
+                    MapCamera(
+                        centerCoordinate: loc.coordinate,
+                        distance: MapView.CAMERA_DISTANCE,
+                        heading: userHeading, // Keeps the radar rotating with you!
+                        pitch: 0
+                    )
+                )
+            }
+        }
+        // THE FIX: 2. The Pan Detector
+        .onMapCameraChange(frequency: .onEnd) { context in
+            if let userLoc = userLocation {
+                let mapCenter = CLLocation(latitude: context.camera.centerCoordinate.latitude, longitude: context.camera.centerCoordinate.longitude)
+                // If the map center is more than 10 meters from your physical body, you must have panned!
+                if userLoc.distance(from: mapCenter) > 10.0 {
+                    isTrackingUser = false
+                }
+            }
         }
         .onAppear {
             if let loc = userLocation {
