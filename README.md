@@ -1,6 +1,6 @@
 # VigilantEar 👂🛰️
 
-* **VigilantEar** is an iOS-based acoustic research and accessibility tool designed to provide real-time directional awareness for the deaf and hard-of-hearing (D/HH) community.
+**VigilantEar** is an iOS-based acoustic research and accessibility tool designed to provide real-time directional awareness for the deaf and hard-of-hearing (D/HH) community.
 
 By leveraging on-device machine learning and advanced acoustic physics, the app acts as an "Air Traffic Control" radar for the street. It identifies emergency vehicles (sirens) and broadband mobile noise sources (tire roar/engines), tracking their movement through physical space using multi-target frequency isolation and Phase-Transform spatial mapping.
 
@@ -9,7 +9,7 @@ By leveraging on-device machine learning and advanced acoustic physics, the app 
 
 * **Tactical MapKit HUD**: A real-time, auto-following MapKit display plotting targets dynamically up to a 1,000-foot research horizon. Features visual perimeter anchors at 30ft (Green), 500ft (Yellow), and 1,000ft (Red).
 
-* **Deep Acoustic Scannin*g*: The CoreML pipeline doesn't just listen to the loudest foreground sound. It actively scans the top 5 confidence results to pull out the background broadband rumble of approaching vehicles hidden underneath environmental noise.
+* **Deep Acoustic Scannin*g**: The CoreML pipeline doesn't just listen to the loudest foreground sound. It actively scans the top 5 confidence results to pull out the background broadband rumble of approaching vehicles hidden underneath environmental noise.
 
 * **Dynamic Volume Gating**: Automatically lowers amplitude thresholds for broadband sounds (like tire wash) while maintaining strict gates for tonal sounds (like music or voices).
 
@@ -20,7 +20,7 @@ VigilantEar operates on a custom Digital Signal Processing (DSP) foundation buil
 
 * **GCC-PHAT Spatial Tracking**: Utilizes Generalized Cross-Correlation with Phase Transform to process massive stereo buffers (4096 frames). It calculates Time Difference of Arrival (TDOA) to lock onto both tonal spikes and broadband white-noise with sub-millisecond precision.
 
-* **Independent FM Dopple*r*: Every spawned target possesses its own independent 40-frame Doppler tracker, calculating specific approach vs. recession velocities simultaneously.
+* **Independent FM Dopple*r**: Every spawned target possesses its own independent 40-frame Doppler tracker, calculating specific approach vs. recession velocities simultaneously.
 
 * **Hardware-Specific Calibration**: Automatically adjusts the spatial math based on the physical microphone baseline of the exact iPhone model running the code (e.g., 0.163m for iPhone 16 Pro Max).
 
