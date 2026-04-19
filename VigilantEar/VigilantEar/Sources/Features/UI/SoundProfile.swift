@@ -1,86 +1,85 @@
-//
-//  SoundProfile.swift
-//  VigilantEar
-//
-//  Created by Robert Palmer on 4/15/26.
-//
-
 import SwiftUI
 
+// THE FIX 1: Strict categories so the whole app speaks the same language!
+enum ThreatCategory {
+    case emergency, vehicle, medium, quiet, animal, misc, unknown
+}
+
 // MARK: - Classification Engine
-// The unified source of truth for both UI rendering and Acoustic Physics
 struct SoundProfile {
     let icon: String
     let color: Color
     let ceiling: Double
     let maxRange: Double
+    let category: ThreatCategory
     
-    // 1. THE REGISTRY (Your internal "JSON" lookup table)
-    // Organized by physics class, then by specific icon
-    private static let registry: [(keywords: [String], icon: String, color: Color, ceiling: Double, maxRange: Double)] = [
+    var isEmergency: Bool { return category == .emergency }
+    var isVehicle: Bool { return category == .vehicle }
+    
+    // 1. THE REGISTRY
+    private static let registry: [(keywords: [String], icon: String, color: Color, ceiling: Double, maxRange: Double, category: ThreatCategory)] = [
         
-        // --- EMERGENCY (Loud: 0.80 / 1000ft) ---
-        (["ambulance", "siren", "alarm", "emergency", "fire", "detecctor"], "light.beacon.max.fill", .red, 0.80, 1000.0),
-        (["tornado"], "tornado", .teal, 0.80, 1000.0),
-        (["glass", "shatter", "crash"], "burst.fill", .pink, 0.80, 1000.0),
+        // --- EMERGENCY ---
+        (["ambulance", "siren", "alarm", "emergency", "fire", "detecctor"], "light.beacon.max.fill", .red, 0.80, 1000.0, .emergency),
+        (["tornado"], "tornado", .teal, 0.80, 1000.0, .emergency),
+        (["glass", "shatter", "crash"], "burst.fill", .pink, 0.80, 1000.0, .emergency),
         
-        // --- VEHICLES (Loud: 0.80 / 1000ft) ---
-        (["car", "engine", "traffic"], "car.fill", .blue, 0.80, 1000.0),
-        (["subway"], "tram.fill.tunnel", .blue, 0.80, 1000.0),
-        (["train", "rail"], "lightrail.fill", .blue, 0.80, 1000.0),
-        (["horn"], "horn", .purple, 0.80, 1000.0),
+        // --- VEHICLES ---
+        (["car", "engine", "traffic"], "car.fill", .blue, 0.15, 300.0, .vehicle),
+        (["subway"], "tram.fill.tunnel", .blue, 0.15, 300.0, .vehicle),
+        (["train", "rail"], "lightrail.fill", .blue, 0.15, 300.0, .vehicle),
+        (["horn"], "horn", .purple, 0.80, 1000.0, .vehicle),
         
-        // --- MEDIUM ACTION (Medium: 0.55 / 150ft) ---
-        (["speech", "voice", "talk", "person"], "waveform", .cyan, 0.55, 150.0),
-        (["bicycle"], "bicycle", .blue, 0.55, 150.0),
-        (["bell", "chime", "clock", "tick", "beep"], "bell.fill", .purple, 0.55, 150.0),
-        (["music", "choir", "song", "sing", "whistl", "didgeridoo", "bassoon", "tuning"], "music.note", .purple, 0.55, 150.0),
-        (["knock", "tap", "hammer", "chopping", "tennis"], "hand.tap.fill", .purple, 0.55, 150.0),
-        (["step", "walk", "foot", "bowling"], "figure.walk", .cyan, 0.55, 150.0),
-        (["water", "rain", "splash"], "drop.fill", .teal, 0.55, 150.0),
-        (["wind", "breeze"], "wind", .teal, 0.55, 150.0),
-        (["baby", "cry"], "stroller.fill", .pink, 0.55, 150.0),
+        // --- MEDIUM ACTION ---
+        (["speech", "voice", "talk", "person"], "waveform", .cyan, 0.55, 150.0, .medium),
+        (["bicycle"], "bicycle", .blue, 0.55, 150.0, .medium),
+        (["bell", "chime", "clock", "tick", "beep"], "bell.fill", .purple, 0.55, 150.0, .medium),
+        (["music", "choir", "song", "sing", "whistl", "didgeridoo", "bassoon", "tuning"], "music.note", .purple, 0.55, 150.0, .medium),
+        (["knock", "tap", "hammer", "chopping", "tennis"], "hand.tap.fill", .purple, 0.55, 150.0, .medium),
+        (["step", "walk", "foot", "bowling"], "figure.walk", .cyan, 0.55, 150.0, .medium),
+        (["water", "rain", "splash"], "drop.fill", .teal, 0.55, 150.0, .medium),
+        (["wind", "breeze"], "wind", .teal, 0.55, 150.0, .medium),
+        (["baby", "cry"], "stroller.fill", .pink, 0.55, 150.0, .medium),
         
-        // --- QUIET / BIOLOGICAL (Quiet: 0.35 / 30ft) ---
-        (["snap", "zipper", "keyboard", "typing"], "hand.point.up.left.fill", .purple, 0.35, 30.0),
-        (["breathing", "cough"], "lungs.fill", .cyan, 0.35, 30.0),
-        (["sneeze", "nose"], "nose.fill", .cyan, 0.35, 30.0),
-        (["snoring", "snore", "sleep"], "zzz", .cyan, 0.35, 30.0),
-        (["burp", "hiccup", "swallow"], "mouth.fill", .cyan, 0.35, 30.0),
-        (["laugh", "chuckle"], "face.smiling.fill", .cyan, 0.35, 30.0),
+        // --- QUIET / BIOLOGICAL ---
+        (["snap", "zipper", "keyboard", "typing"], "hand.point.up.left.fill", .purple, 0.35, 30.0, .quiet),
+        (["breathing", "cough"], "lungs.fill", .cyan, 0.35, 30.0, .quiet),
+        (["sneeze", "nose"], "nose.fill", .cyan, 0.35, 30.0, .quiet),
+        (["snoring", "snore", "sleep"], "zzz", .cyan, 0.35, 30.0, .quiet),
+        (["burp", "hiccup", "swallow"], "mouth.fill", .cyan, 0.35, 30.0, .quiet),
+        (["laugh", "chuckle"], "face.smiling.fill", .cyan, 0.35, 30.0, .quiet),
         
-        // --- ANIMALS (Quiet: 0.35 / 30ft) ---
-        (["bird", "chirp", "owl hoot"], "bird.fill", .green, 0.35, 30.0),
-        (["cat"], "cat", .green, 0.35, 30.0),
-        (["dog"], "dog", .green, 0.35, 30.0),
-        (["bark", "animal", "pig"], "pawprint.fill", .green, 0.35, 30.0),
+        // --- ANIMALS ---
+        (["bird", "chirp", "owl hoot"], "bird.fill", .green, 0.35, 30.0, .animal),
+        (["cat"], "cat", .green, 0.35, 30.0, .animal),
+        (["dog"], "dog", .green, 0.35, 30.0, .animal),
+        (["bark", "animal", "pig"], "pawprint.fill", .green, 0.35, 30.0, .animal),
         
         // --- MISC ---
-        (["fan"], "fan", .mint, 0.35, 30.0),
-        (["crumpl", "crush", "trash"], "trash.fill", .mint, 0.35, 30.0),
-        (["toilet", "flush"], "toilet.fill", .mint, 0.35, 30.0),
-        (["door"], "door.right.hand.closed", .mint, 0.35, 30.0),
-
+        (["fan"], "fan", .mint, 0.35, 30.0, .misc),
+        (["crumpl", "crush", "trash"], "trash.fill", .mint, 0.35, 30.0, .misc),
+        (["toilet", "flush"], "toilet.fill", .mint, 0.35, 30.0, .misc),
+        (["door"], "door.right.hand.closed", .mint, 0.35, 30.0, .misc),
     ]
     
     // 2. THE SEARCH ENGINE
     static func classify(_ label: String) -> SoundProfile {
         let lowerLabel = label.lowercased()
         
-        // Scan the registry for a keyword match
         for entry in registry {
             if entry.keywords.contains(where: { lowerLabel.contains($0) }) {
                 return SoundProfile(
                     icon: entry.icon,
                     color: entry.color,
                     ceiling: entry.ceiling,
-                    maxRange: entry.maxRange
+                    maxRange: entry.maxRange,
+                    category: entry.category // NEW
                 )
             }
         }
         
-        // THE FALLBACK: If we've never seen it before, assume it's medium
-        return SoundProfile(icon: "waveform", color: .gray, ceiling: 0.55, maxRange: 150.0)
+        // THE FALLBACK
+        return SoundProfile(icon: "waveform", color: .gray, ceiling: 0.55, maxRange: 150.0, category: .unknown)
     }
 }
 

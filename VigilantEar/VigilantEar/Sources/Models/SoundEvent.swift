@@ -15,15 +15,24 @@ struct SoundEvent: Identifiable {
     // ML Certainty (0.0 to 1.0)
     public let confidence: Double
     
-    public let isEmergency: Bool
+    public var isEmergency: Bool {
+        return SoundProfile.classify(threatLabel).isEmergency
+    }
     
+    public var isVehicle: Bool {
+        return SoundProfile.classify(threatLabel).isVehicle
+    }
+    
+    public var dotColor: Color {
+        if (SoundProfile.classify(threatLabel).isEmergency) {return Color.red} else {return Color.cyan}
+    }
+
     // MARK: - Spatial Data
     public let bearing: Double
     public let distance: Double
     public let energy: Float
     public let dopplerRate: Float?
     public let isApproaching: Bool
-    
     public let latitude: Double?
     public let longitude: Double?
     
@@ -39,14 +48,13 @@ struct SoundEvent: Identifiable {
         dopplerRate: Float? = nil,
         isApproaching: Bool = false,
         latitude: Double? = nil,
-        longitude: Double? = nil
+        longitude: Double? = nil,
     ) {
         self.id = id
         self.sessionID = sessionID
         self.timestamp = timestamp
         self.threatLabel = threatLabel
         self.confidence = confidence
-        
         self.bearing = bearing
         self.distance = distance
         self.energy = energy
@@ -54,17 +62,12 @@ struct SoundEvent: Identifiable {
         self.isApproaching = isApproaching
         self.latitude = latitude
         self.longitude = longitude
-        
-        let lowercased = threatLabel.lowercased()
-        self.isEmergency = lowercased.contains("siren") ||
-        lowercased.contains("ambulance") ||
-        lowercased.contains("fire")
     }
 }
 
 // MARK: - UI & MapKit Extensions
 extension SoundEvent {
-    
+
     var age: TimeInterval { Date().timeIntervalSince(timestamp) }
     
     // Dynamic Lifespan based on ML certainty
@@ -100,8 +103,4 @@ extension SoundEvent {
         return "\(direction) (\(String(format: "%.1f", abs(rate))) m/s)"
     }
     
-    /// Instantly maps the pre-calculated boolean to a UI Color.
-    var dotColor: Color {
-        return isEmergency ? Color.red : Color.cyan
-    }
 }

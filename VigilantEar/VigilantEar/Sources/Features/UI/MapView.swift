@@ -12,64 +12,103 @@ struct MapView: View {
     
     @State private var cameraPosition: MapCameraPosition = .camera(
         MapCamera(
-            centerCoordinate: CLLocationCoordinate2D(latitude: 32.7157, longitude: -117.1611), // It will auto-update to the user's GPS
+            centerCoordinate: CLLocationCoordinate2D(latitude: 32.7157, longitude: -117.1611),
             distance: MapView.CAMERA_DISTANCE
         )
     )
     
     @State private var isTrackingUser: Bool = true
     
+    // THE FIX 1: Safely and accurately identifies the exact ID of the newest dot in every active track
+    private var activeHeadIDs: Set<UUID> {
+        var heads: [UUID: SoundEvent] = [:]
+        for event in events {
+            if let existing = heads[event.sessionID] {
+                if event.timestamp > existing.timestamp {
+                    heads[event.sessionID] = event
+                }
+            } else {
+                heads[event.sessionID] = event
+            }
+        }
+        // Only consider it a "Head" if it was heard in the last 4 seconds
+        let freshHeads = heads.values.filter { $0.age < 4.0 }
+        return Set(freshHeads.map { $0.id })
+    }
+    
     var body: some View {
-        // THE FIX: Tighten the bounds to 800 meters maximum!
         Map(
             position: $cameraPosition,
             bounds: MapCameraBounds(
-                minimumDistance: 100, // Lets you zoom all the way in to your driveway
-                maximumDistance: 800  // Hard brick-wall stop just outside the 1,000ft red ring
+                minimumDistance: 100,
+                maximumDistance: 800
             )
         )
         {
-        // 1. User Location (The blue dot)
         UserAnnotation()
         
-        // 2. The Tactical Horizons
         if let location = userLocation {
             let center = location.coordinate
             
-            // Outer Ring (Bleeds off the screen for a cool radar effect)
             MapCircle(center: center, radius: 304.8)
                 .foregroundStyle(.red.opacity(0.05))
                 .stroke(.red.opacity(0.3), lineWidth: 1)
             
-            // Middle Tracking Ring
             MapCircle(center: center, radius: 152.4)
                 .foregroundStyle(.yellow.opacity(0.08))
                 .stroke(.yellow.opacity(0.5), lineWidth: 1.5)
             
-            // Inner 30ft Perimeter
             MapCircle(center: center, radius: 9.144)
                 .foregroundStyle(.green.opacity(0.15))
                 .stroke(.green.opacity(0.8), lineWidth: 2.5)
             
-            // 3. The Threat Dots
-            ForEach(events) { event in
+            ForEach(events, id: \.id) { event in
                 let distanceInMeters = Double(event.distance) * 304.8
-                let absoluteBearing = userHeading + Double(event.bearing)
-                let projectedCoord = center.projected(by: distanceInMeters, bearingDegrees: absoluteBearing)
+                let geographicBearing = (userHeading + Double(event.bearing)).truncatingRemainder(dividingBy: 360.0)
+                let projectedCoord = center.projected(by: distanceInMeters, bearingDegrees: geographicBearing)
+                
+                let profile = SoundProfile.classify(event.threatLabel)
+                
+                // Use the secure Set to confirm this specific dot is the leader
+                let isHeadOfTrack = activeHeadIDs.contains(event.id)
                 
                 Annotation("", coordinate: projectedCoord) {
-                    Circle()
-                        .fill(event.dotColor)
-                        .frame(width: 16, height: 16)
-                    // THE FIX: Apply the exact fade math from the struct
-                        .opacity(event.opacity)
-                    // THE FIX: Multiply size by confidence (visualScale) and shrink as it fades!
-                        .scaleEffect(CGFloat(event.visualScale) * CGFloat(max(0.3, event.opacity)))
-                    .shadow(color: event.dotColor, radius: CGFloat(event.energy) * 15)                }
+                    ZStack {
+                        
+                        // THE FIX 2: ONLY draw the Doppler velocity arrow if this is the HEAD of the track!
+                        if isHeadOfTrack, let rate = event.dopplerRate, abs(rate) > 1.0 {
+                            let screenRotation = event.bearing + (event.isApproaching ? 180.0 : 0.0)
+                            
+                            Image(systemName: "chevron.up")
+                                .font(.system(size: 14, weight: .black))
+                                .foregroundColor(profile.color.opacity(0.8)) // Darkened slightly so it pops
+                                .offset(y: -18) // Pushed outward so it clears the leading icon
+                                .scaleEffect(x: 1.0, y: 1.0 + CGFloat(abs(rate) / 10.0), anchor: .bottom)
+                                .rotationEffect(.degrees(screenRotation))
+                        }
+                        
+                        // THE ICONS
+                        if isHeadOfTrack && event.isEmergency {
+                            // The Leader (Emergency)
+                            Image(systemName: profile.icon)
+                                .font(.system(size: 24, weight: .bold))
+                                .foregroundColor(profile.color)
+                                .shadow(color: profile.color, radius: 10)
+                                .opacity(event.opacity)
+                        } else {
+                            // The Standard Traffic / Fading Tails
+                            Image(systemName: "circle.fill")
+                                .font(.system(size: 16))
+                                .foregroundColor(profile.color)
+                                .opacity(event.opacity)
+                                .scaleEffect(CGFloat(max(0.6, event.visualScale)) * CGFloat(max(0.3, event.opacity)))
+                                .shadow(color: profile.color, radius: CGFloat(event.energy) * 15)
+                        }
+                    }
+                }
             }
         }
         }
-        // THE FIX: .excludingAll strips away every business, landmark, and transit icon!
         .mapStyle(.standard(elevation: .flat, pointsOfInterest: .excludingAll))
         .mapControls {
             MapCompass()
@@ -92,7 +131,6 @@ struct MapView: View {
                     }
                 }
             }) {
-                // THE FIX: Increased font and frame sizes for a proper touch target
                 Image(systemName: isTrackingUser ? "location.fill" : "location")
                     .font(.system(size: 26, weight: .semibold))
                     .foregroundColor(isTrackingUser ? .blue : .gray)
@@ -104,7 +142,6 @@ struct MapView: View {
             .padding(.trailing, 20)
             .padding(.bottom, 40)
         }
-        // THE FIX: 1. Auto-Follow the GPS Stream
         .onChange(of: userLocation) { _, newLocation in
             guard isTrackingUser, let loc = newLocation else { return }
             withAnimation(.default) {
@@ -112,7 +149,20 @@ struct MapView: View {
                     MapCamera(
                         centerCoordinate: loc.coordinate,
                         distance: MapView.CAMERA_DISTANCE,
-                        heading: userHeading, // Keeps the radar rotating with you!
+                        heading: userHeading,
+                        pitch: 0
+                    )
+                )
+            }
+        }
+        .onChange(of: userHeading) { _, newHeading in
+            guard isTrackingUser, let loc = userLocation else { return }
+            withAnimation(.linear(duration: 0.2)) {
+                cameraPosition = .camera(
+                    MapCamera(
+                        centerCoordinate: loc.coordinate,
+                        distance: MapView.CAMERA_DISTANCE,
+                        heading: newHeading,
                         pitch: 0
                     )
                 )
@@ -121,7 +171,6 @@ struct MapView: View {
         .onMapCameraChange(frequency: .onEnd) { context in
             if let userLoc = userLocation {
                 let mapCenter = CLLocation(latitude: context.camera.centerCoordinate.latitude, longitude: context.camera.centerCoordinate.longitude)
-                // THE FIX: Increased deadzone to 50 meters to stop false disconnects
                 if userLoc.distance(from: mapCenter) > 50.0 {
                     isTrackingUser = false
                 }

@@ -43,6 +43,9 @@ actor AcousticProcessingPipeline {
     // Tracks when we last saw a specific threat to prevent CoreML spam
     private var lastSeenThreats: [String: Date] = [:]
     
+    private var logStep: String = ""
+    private var logMessage: String = ""
+    
     init() {
         let (stream, cont) = AsyncStream.makeStream(of: SoundEvent.self)
         self.eventStream = stream
@@ -70,8 +73,11 @@ actor AcousticProcessingPipeline {
         lastProcessTime = now
         
         // TRIPWIRE 1: Did CoreML trigger?
-        await MainActor.run {
-            PerformanceLogger.shared.logTelemetry(step: "1_ML_TRIGGER", message: "Heard: \(label) (Conf: \(String(format: "%.2f", confidence)))")
+        self.logStep = "1_ML_TRIGGER"
+        self.logMessage = "Heard: \(label) (Conf: \(String(format: "%.2f", confidence)))"
+        Task.detached(priority: .userInitiated) { [weak self] in
+            guard let self = self else { return }
+            await PerformanceLogger.shared.logTelemetry(step: self.logStep, message: self.logMessage)
         }
         
         guard let buffer = latestBuffer, let channelData = buffer.floatChannelData else { return }
@@ -82,13 +88,17 @@ actor AcousticProcessingPipeline {
         
         let peak = leftSamples.map(abs).max() ?? 0.0
         
-        let isVehicle = label.contains("car") || label.contains("traffic") || label.contains("engine")
+        let isVehicle = await SoundProfile.classify(label).isVehicle
         let minimumPeak: Float = isVehicle ? 0.02 : 0.15
         
         // TRIPWIRE 2: The Volume Gate
         guard peak > minimumPeak else {
-            await MainActor.run {
-                PerformanceLogger.shared.logTelemetry(step: "2_VOLUME_DROP", message: "Peak \(String(format: "%.3f", peak)) failed to pass \(minimumPeak)")
+            // TRIPWIRE 1: Did CoreML trigger?
+            self.logStep = "2_VOLUME_DROP"
+            self.logMessage = "Peak \(String(format: "%.3f", peak)) failed to pass \(minimumPeak)"
+            Task.detached(priority: .userInitiated) { [weak self] in
+                guard let self = self else { return }
+                await PerformanceLogger.shared.logTelemetry(step: self.logStep, message: self.logMessage)
             }
             return
         }
@@ -99,20 +109,29 @@ actor AcousticProcessingPipeline {
         if targets.isEmpty {
             if isVehicle {
                 targets.append((frequency: 100.0, confidence: Float(confidence)))
-                await MainActor.run {
-                    PerformanceLogger.shared.logTelemetry(step: "3_FFT_FALLBACK", message: "Injected 100Hz broadband fallback")
+                self.logStep = "3_FFT_FALLBACK"
+                self.logMessage = "Injected 100Hz broadband fallback"
+                Task.detached(priority: .userInitiated) { [weak self] in
+                    guard let self = self else { return }
+                    await PerformanceLogger.shared.logTelemetry(step: self.logStep, message: self.logMessage)
                 }
             } else {
-                await MainActor.run {
-                    PerformanceLogger.shared.logTelemetry(step: "3_FFT_DROP", message: "No targets, not a vehicle. Dropped.")
+                self.logStep = "3_FFT_DROP"
+                self.logMessage = "No targets, not a vehicle. Dropped."
+                Task.detached(priority: .userInitiated) { [weak self] in
+                    guard let self = self else { return }
+                    await PerformanceLogger.shared.logTelemetry(step: self.logStep, message: self.logMessage)
                 }
                 return
             }
         } else {
             let baseTarget = targets[0]
             let baseTargetsCount = targets.count
-            await MainActor.run {
-                PerformanceLogger.shared.logTelemetry(step: "3_FFT_SUCCESS", message: "Found \(baseTargetsCount) targets. Top: \(String(format: "%.1f", baseTarget.frequency))Hz")
+            self.logStep = "3_FFT_SUCCESS"
+            self.logMessage = "Found \(baseTargetsCount) targets. Top: \(String(format: "%.1f", baseTarget.frequency)) Hz"
+            Task.detached(priority: .userInitiated) { [weak self] in
+                guard let self = self else { return }
+                await PerformanceLogger.shared.logTelemetry(step: self.logStep, message: self.logMessage)
             }
         }
         
@@ -123,8 +142,21 @@ actor AcousticProcessingPipeline {
             let currentConf = target.confidence
             
             var matchIndex: Int? = nil
+            
+            let isVehicle = await SoundProfile.classify(label).isVehicle
+            
             for (index, threat) in activeThreats.enumerated() {
-                if abs(threat.lastFrequency - currentFreq) < 40.0 { matchIndex = index; break }
+                // THE FIX: If it's a vehicle, broadband frequency fluctuates wildly.
+                // Don't use the strict 40Hz rule. If an active vehicle track exists, bind to it!
+                if isVehicle {
+                    matchIndex = index
+                    break
+                }
+                // For tonal sirens, keep the strict 40Hz harmonic grouping
+                else if abs(threat.lastFrequency - currentFreq) < 40.0 {
+                    matchIndex = index
+                    break
+                }
             }
             
             var threatSessionID: UUID
@@ -145,9 +177,11 @@ actor AcousticProcessingPipeline {
             }
             
             let capturedThreatSessionID = threatSessionID
-            
-            await MainActor.run {
-                PerformanceLogger.shared.logTelemetry(step: "4_MATH_START", message: "Sending to GCC-PHAT. Session: \(capturedThreatSessionID.uuidString.prefix(4))")
+            self.logStep = "4_MATH_START"
+            self.logMessage = "Sending to GCC-PHAT. Session: \(capturedThreatSessionID.uuidString.prefix(4))"
+            Task.detached(priority: .userInitiated) { [weak self] in
+                guard let self = self else { return }
+                await PerformanceLogger.shared.logTelemetry(step: self.logStep, message: self.logMessage)
             }
             
             Task.detached(priority: .userInitiated) { [weak self, capturedThreatSessionID] in
@@ -155,9 +189,8 @@ actor AcousticProcessingPipeline {
                 
                 // --- 1. ACOUSTIC PROFILING & DISTANCE CALIBRATION ---
                 // THE FIX: Lower the mathematical floor for vehicles so they plot correctly on the UI!
-                let isVehicle = label.contains("car") || label.contains("traffic") || label.contains("engine")
                 let ambientFloor: Double = isVehicle ? 0.02 : 0.15
-
+                
                 let profile = await MainActor.run { SoundProfile.classify(label) }
                 let clippingCeiling = profile.ceiling
                 let maxRangeInFeet = profile.maxRange
@@ -171,15 +204,14 @@ actor AcousticProcessingPipeline {
                 let normalizedUI_Distance = estimatedFeet / uiMapScaleInFeet
                 
                 // 🐞 TELEMETRY: Distance Math
-                await MainActor.run {
-                    let m = "Session: \(capturedThreatSessionID.uuidString.prefix(4)) 📏 [Distance Profiler] Type: \(label) | Ceiling: \(clippingCeiling) | Max Range: \(maxRangeInFeet)ft"
-                    PerformanceLogger.shared.logTelemetry(step: "5_TELEMETRY DISTANCE PROFILER", message: m)
+                var logStep = "TELEMETRY: Session: \(capturedThreatSessionID.uuidString.prefix(4))"
+                var logMessage = "📏 [Distance Profiler] Type: \(label) | Ceiling: \(clippingCeiling) | Max Range: \(maxRangeInFeet)ft"
+                let logMessage2 = "📏 [Distance] Est Feet: \(String(format: "%.1f", estimatedFeet))ft | UI Normalized: \(String(format: "%.3f", normalizedUI_Distance))"
+                Task.detached(priority: .userInitiated) {
+                    await PerformanceLogger.shared.logTelemetry(step: logStep, message: logMessage)
+                    await PerformanceLogger.shared.logTelemetry(step: logStep, message: logMessage2)
                 }
-                await MainActor.run {
-                    let m = "Session: \(capturedThreatSessionID.uuidString.prefix(4)) 📏 [Distance] Est Feet: \(String(format: "%.1f", estimatedFeet))ft | UI Normalized: \(String(format: "%.3f", normalizedUI_Distance))"
-                    PerformanceLogger.shared.logTelemetry(step: "5_TELEMETRY DISTANCE FEET", message: m)
-                }
-
+                
                 // --- 2. TDOA BEARING CALCULATION ---
                 // THE FIX: Actually use the HardwareCalibration value!
                 let exactMicDistance = await HardwareCalibration.micBaseline
@@ -200,9 +232,10 @@ actor AcousticProcessingPipeline {
                 let capturedAngle = angle
                 
                 // 🐞 TELEMETRY: Bearing Math
-                await MainActor.run {
-                    let m = "Session: \(capturedThreatSessionID.uuidString.prefix(4)) 📏 [Bearing] Raw TDOA: \(String(format: "%.1f", rawAngle))° | Polarity Fixed: \(String(format: "%.1f", capturedAngle))"
-                    PerformanceLogger.shared.logTelemetry(step: "5_TELEMETRY BEARING MATH", message: m)
+                logStep = "6_TELEMETRY_BEARING_MATH: Session: \(capturedThreatSessionID.uuidString.prefix(4))"
+                logMessage = "📏 [Bearing] Raw TDOA: \(String(format: "%.1f", rawAngle))° | Polarity Fixed: \(String(format: "%.1f", capturedAngle))"
+                Task.detached(priority: .userInitiated) {
+                    await PerformanceLogger.shared.logTelemetry(step: logStep, message: logMessage)
                 }
                 
                 // SYNCHRONOUS READ
@@ -294,42 +327,42 @@ final class ThreatResultsObserver: NSObject, @unchecked Sendable, SNResultsObser
     nonisolated func request(_ request: SNRequest, didProduce result: SNResult) {
         guard let classificationResult = result as? SNClassificationResult else { return }
         
-        var detectedLabel: String?
-        var highestConfidence: Double = 0.0
+        // Gather top 5 candidates (label, confidence)
+        let topCandidates = classificationResult.classifications.prefix(5).map { ($0.identifier.lowercased(), $0.confidence) }
         
-        // THE FIX: Scan the top 5 sounds, not just the 1st!
-        for classification in classificationResult.classifications.prefix(5) {
-            let label = classification.identifier.lowercased()
-            let conf = classification.confidence
+        Task { @MainActor in
+            var detectedLabel: String?
+            var highestConfidence: Double = 0.0
             
-            // PRIORITY 1: Emergencies (Siren, Fire, Ambulance).
-            // Even if it's hiding in the background at 25%, grab it immediately!
-            if (label.contains("siren") || label.contains("fire") || label.contains("ambulance")) && conf > 0.25 {
-                detectedLabel = label
-                highestConfidence = conf
-                break // Stop looking, this overrides everything
+            // THE FIX: Scan the top 5 sounds, not just the 1st!
+            for (label, conf) in topCandidates {
+                let isVehicle = SoundProfile.classify(label).isVehicle
+                let isEmergency = SoundProfile.classify(label).isEmergency
+                
+                // PRIORITY 1: Emergencies (Siren, Fire, Ambulance).
+                // Even if it's hiding in the background at 25%, grab it immediately!
+                if isEmergency && conf > 0.5 {
+                    detectedLabel = label
+                    highestConfidence = conf
+                    break // Stop looking, this overrides everything
+                }
+                if isVehicle && !isEmergency && conf > 0.20 {
+                    detectedLabel = label
+                    highestConfidence = conf
+                    break
+                }
             }
-            
-            // PRIORITY 2: Vehicles (Car, Traffic, Engine).
-            // Tire roar is a background wash. If it's in the top 5 at 20%+, grab it!
-            if (label.contains("car") || label.contains("traffic") || label.contains("engine")) && conf > 0.20 {
-                detectedLabel = label
-                highestConfidence = conf
-                break
+            // PRIORITY 3: The standard fallback.
+            // If we didn't find a hidden car or siren, just use whatever is loudest (if > 50%)
+            if detectedLabel == nil, let top = topCandidates.first, top.1 > 0.50 {
+                detectedLabel = top.0
+                highestConfidence = top.1
             }
-        }
-        
-        // PRIORITY 3: The standard fallback.
-        // If we didn't find a hidden car or siren, just use whatever is loudest (if > 50%)
-        if detectedLabel == nil, let top = classificationResult.classifications.first, top.confidence > 0.50 {
-            detectedLabel = top.identifier.lowercased()
-            highestConfidence = top.confidence
-        }
-        
-        // If we found something worth tracking, send it to the pipeline
-        if let finalLabel = detectedLabel {
-            Task {
-                await pipeline?.confirmThreatAndTrack(label: finalLabel, confidence: highestConfidence)
+            // If we found something worth tracking, send it to the pipeline
+            if let finalLabel = detectedLabel {
+                Task {
+                    await self.pipeline?.confirmThreatAndTrack(label: finalLabel, confidence: highestConfidence)
+                }
             }
         }
     }
