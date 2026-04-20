@@ -8,7 +8,6 @@
 
 /* Begin PBXBuildFile section */
 		304F42F62F95E816001C3B6B /* AppGlobals.swift in Sources */ = {isa = PBXBuildFile; fileRef = 304F42F52F95E816001C3B6B /* AppGlobals.swift */; };
-		3053A9F72F8FFF8C008C5419 /* NightStyle.json in Resources */ = {isa = PBXBuildFile; fileRef = 3053A9F62F8FFF81008C5419 /* NightStyle.json */; };
 		3053A9F92F900010008C5419 /* MapView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3053A9F82F900010008C5419 /* MapView.swift */; };
 		3053AA002F901777008C5419 /* SoundProfile.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3053A9FF2F901777008C5419 /* SoundProfile.swift */; };
 		3053DCAF2F83718A00241892 /* SoundEvent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3053DCA92F83718A00241892 /* SoundEvent.swift */; };
@@ -36,7 +35,6 @@
 /* Begin PBXFileReference section */
 		304F42F52F95E816001C3B6B /* AppGlobals.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppGlobals.swift; sourceTree = "<group>"; };
 		304F73C52F830A8800F67563 /* VigilantEar.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = VigilantEar.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		3053A9F62F8FFF81008C5419 /* NightStyle.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = NightStyle.json; sourceTree = "<group>"; };
 		3053A9F82F900010008C5419 /* MapView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MapView.swift; sourceTree = "<group>"; };
 		3053A9FF2F901777008C5419 /* SoundProfile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SoundProfile.swift; sourceTree = "<group>"; };
 		3053DC8E2F83718A00241892 /* VigilantEarApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VigilantEarApp.swift; sourceTree = "<group>"; };
@@ -193,7 +191,6 @@
 			isa = PBXGroup;
 			children = (
 				30A396422F908D4800D441A0 /* GoogleService-Info.plist */,
-				3053A9F62F8FFF81008C5419 /* NightStyle.json */,
 				308EF3EB2F875A9400885DCB /* Info.plist */,
 				3053DCAB2F83718A00241892 /* Sources */,
 				3053DCAC2F83718A00241892 /* Assets.xcassets */,
@@ -271,7 +268,6 @@
 			buildActionMask = 2147483647;
 			files = (
 				3053DCBF2F83718A00241892 /* Assets.xcassets in Resources */,
-				3053A9F72F8FFF8C008C5419 /* NightStyle.json in Resources */,
 				30A396432F908D4800D441A0 /* GoogleService-Info.plist in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -444,7 +440,7 @@
 				INFOPLIST_FILE = VigilantEar/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = VigilantEar;
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "VigilantEar requires your location to map acoustic threats around you.";
-				INFOPLIST_KEY_NSMicrophoneUsageDescription = "The application uses the millisecond delay between sound captures to calculate distance.";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "VigilantEar uses the millisecond delay between sound captures to calculate distance.";
 				INFOPLIST_KEY_NSMotionUsageDescription = "VigilantEar uses the device's motion sensors to determine the real-world direction of detected sounds.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
@@ -485,7 +481,7 @@
 				INFOPLIST_FILE = VigilantEar/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = VigilantEar;
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "VigilantEar requires your location to map acoustic threats around you.";
-				INFOPLIST_KEY_NSMicrophoneUsageDescription = "The application uses the millisecond delay between sound captures to calculate distance.";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "VigilantEar uses the millisecond delay between sound captures to calculate distance.";
 				INFOPLIST_KEY_NSMotionUsageDescription = "VigilantEar uses the device's motion sensors to determine the real-world direction of detected sounds.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;

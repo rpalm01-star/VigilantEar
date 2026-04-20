@@ -72,205 +72,100 @@ actor AcousticProcessingPipeline {
         guard now.timeIntervalSince(lastProcessTime) > 0.2 else { return }
         lastProcessTime = now
         
-        // TRIPWIRE 1: Did CoreML trigger?
-        self.logStep = "1_ML_TRIGGER"
-        self.logMessage = "Heard: \(label) (Conf: \(String(format: "%.2f", confidence)))"
-        Task.detached(priority: .userInitiated) { [weak self] in
-            guard let self = self else { return }
-            await PerformanceLogger.shared.logTelemetry(step: self.logStep, message: self.logMessage)
-        }
+        let profile = await SoundProfile.classify(label)
+        let isVehicle = await profile.isVehicle
+        
+        // 1. ML TRIGGER LOG
+        let triggerMsg = "Heard: \(label) (Conf: \(String(format: "%.2f", confidence)))"
+        await PerformanceLogger.shared.logTelemetry(step: "1_ML_TRIGGER", message: triggerMsg)
         
         guard let buffer = latestBuffer, let channelData = buffer.floatChannelData else { return }
+        let peak = Array(UnsafeBufferPointer(start: channelData[0], count: min(Int(buffer.frameLength), 4096))).map(abs).max() ?? 0.0
         
-        let frameLength = Int(buffer.frameLength)
-        let leftSamples = Array(UnsafeBufferPointer(start: channelData[0], count: min(frameLength, 4096)))
-        let rightSamples = Array(UnsafeBufferPointer(start: channelData[1], count: min(frameLength, 4096)))
-        
-        let peak = leftSamples.map(abs).max() ?? 0.0
-        
-        let isVehicle = await SoundProfile.classify(label).isVehicle
-        let minimumPeak: Float = isVehicle ? 0.02 : 0.15
-        
-        // TRIPWIRE 2: The Volume Gate
+        // 2. VOLUME GATE
+        let minimumPeak: Float = isVehicle ? 0.02 : 0.04
         guard peak > minimumPeak else {
-            // TRIPWIRE 1: Did CoreML trigger?
-            self.logStep = "2_VOLUME_DROP"
-            self.logMessage = "Peak \(String(format: "%.3f", peak)) failed to pass \(minimumPeak)"
-            Task.detached(priority: .userInitiated) { [weak self] in
-                guard let self = self else { return }
-                await PerformanceLogger.shared.logTelemetry(step: self.logStep, message: self.logMessage)
-            }
+            await PerformanceLogger.shared.logTelemetry(step: "2_VOLUME_DROP", message: "Peak \(String(format: "%.3f", peak)) < \(minimumPeak)")
             return
         }
         
-        var targets = self.fftProcessor.analyzeMultiple(samples: leftSamples, sampleRate: self.sampleRate, maxPeaks: 3)
+        var targets = self.fftProcessor.analyzeMultiple(samples: Array(UnsafeBufferPointer(start: channelData[0], count: 4096)), sampleRate: self.sampleRate, maxPeaks: 3)
         
-        // TRIPWIRE 3: The FFT Fallback
-        if targets.isEmpty {
-            if isVehicle {
-                targets.append((frequency: 100.0, confidence: Float(confidence)))
-                self.logStep = "3_FFT_FALLBACK"
-                self.logMessage = "Injected 100Hz broadband fallback"
-                Task.detached(priority: .userInitiated) { [weak self] in
-                    guard let self = self else { return }
-                    await PerformanceLogger.shared.logTelemetry(step: self.logStep, message: self.logMessage)
-                }
-            } else {
-                self.logStep = "3_FFT_DROP"
-                self.logMessage = "No targets, not a vehicle. Dropped."
-                Task.detached(priority: .userInitiated) { [weak self] in
-                    guard let self = self else { return }
-                    await PerformanceLogger.shared.logTelemetry(step: self.logStep, message: self.logMessage)
-                }
-                return
-            }
-        } else {
-            let baseTarget = targets[0]
-            let baseTargetsCount = targets.count
-            self.logStep = "3_FFT_SUCCESS"
-            self.logMessage = "Found \(baseTargetsCount) targets. Top: \(String(format: "%.1f", baseTarget.frequency)) Hz"
-            Task.detached(priority: .userInitiated) { [weak self] in
-                guard let self = self else { return }
-                await PerformanceLogger.shared.logTelemetry(step: self.logStep, message: self.logMessage)
-            }
+        // 3. FFT HANDLING
+        if targets.isEmpty && isVehicle {
+            targets.append((frequency: 100.0, confidence: Float(confidence)))
+        } else if targets.isEmpty {
+            return
         }
         
         activeThreats.removeAll { now.timeIntervalSince($0.lastSeen) > 4.0 }
         
         for target in targets {
             let currentFreq = target.frequency
-            let currentConf = target.confidence
-            
             var matchIndex: Int? = nil
             
-            let isVehicle = await SoundProfile.classify(label).isVehicle
-            
+            // THREAT MATCHING
             for (index, threat) in activeThreats.enumerated() {
-                // THE FIX: If it's a vehicle, broadband frequency fluctuates wildly.
-                // Don't use the strict 40Hz rule. If an active vehicle track exists, bind to it!
-                if isVehicle {
-                    // Vehicles are broadband and fluctuate, but if two sounds are
-                    // wildly different pitches, they are two different cars!
-                    // Give them a 500Hz grace window instead of blindly merging them.
-                    if abs(threat.lastFrequency - currentFreq) < 500.0 {
-                        matchIndex = index
-                        break
-                    }
-                }
-                // For tonal sirens, keep the strict 40Hz harmonic grouping
-                else if abs(threat.lastFrequency - currentFreq) < 40.0 {
+                let threshold = isVehicle ? 500.0 : 40.0
+                if abs(threat.lastFrequency - currentFreq) < threshold {
                     matchIndex = index
                     break
                 }
             }
             
-            var threatSessionID: UUID
-            var dopplerResult: (isApproaching: Bool, shiftHz: Double)?
+            let threatSessionID: UUID
+            let dopplerResult: (isApproaching: Bool, shiftHz: Double)?
             
             if let index = matchIndex {
                 activeThreats[index].lastFrequency = currentFreq
                 activeThreats[index].lastSeen = now
-                dopplerResult = activeThreats[index].dopplerTracker.update(with: currentFreq, confidence: currentConf)
+                dopplerResult = activeThreats[index].dopplerTracker.update(with: currentFreq, confidence: target.confidence)
                 threatSessionID = activeThreats[index].sessionID
             } else {
                 let newID = UUID()
                 var newTracker = SirenDopplerTracker()
-                dopplerResult = newTracker.update(with: currentFreq, confidence: currentConf)
-                let newThreat = ActiveThreat(sessionID: newID, dopplerTracker: newTracker, lastFrequency: currentFreq, lastSeen: now)
-                activeThreats.append(newThreat)
+                dopplerResult = newTracker.update(with: currentFreq, confidence: target.confidence)
+                activeThreats.append(ActiveThreat(sessionID: newID, dopplerTracker: newTracker, lastFrequency: currentFreq, lastSeen: now))
                 threatSessionID = newID
             }
             
-            let capturedThreatSessionID = threatSessionID
-            self.logStep = "4_MATH_START"
-            self.logMessage = "Sending to GCC-PHAT. Session: \(capturedThreatSessionID.uuidString.prefix(4))"
-            Task.detached(priority: .userInitiated) { [weak self] in
-                guard let self = self else { return }
-                await PerformanceLogger.shared.logTelemetry(step: self.logStep, message: self.logMessage)
-            }
-            
-            Task.detached(priority: .userInitiated) { [weak self, capturedThreatSessionID] in
+            // 4. DISTANCE & BEARING MATH
+            Task.detached(priority: .userInitiated) { [weak self, threatSessionID] in
                 guard let self = self else { return }
                 
-                // --- 1. ACOUSTIC PROFILING & DISTANCE CALIBRATION ---
-                // THE FIX: Lower the mathematical floor for vehicles so they plot correctly on the UI!
-                let ambientFloor: Double = isVehicle ? 0.02 : 0.15
+                let ambientFloor: Double = isVehicle ? 0.02 : 0.04
+                let safePeak = min(max(Double(peak), ambientFloor), profile.ceiling)
+                let linearRatio = (profile.ceiling - safePeak) / (profile.ceiling - ambientFloor)
                 
-                let profile = await MainActor.run { SoundProfile.classify(label) }
-                let clippingCeiling = profile.ceiling
-                let maxRangeInFeet = profile.maxRange
+                // THE DISTANCE FIX
+                let adjustedMaxRange = isVehicle ? 400.0 : profile.maxRange
+                let curvePower = isVehicle ? 3.5 : 2.0
+                let estimatedFeet = max(10.0, pow(linearRatio, curvePower) * adjustedMaxRange)
+                let normalizedUI_Distance = estimatedFeet / 1000.0
                 
-                let safePeak = min(max(Double(peak), ambientFloor), clippingCeiling)
-                let linearRatio = (clippingCeiling - safePeak) / (clippingCeiling - ambientFloor)
-                let exponentialCurve = pow(linearRatio, 2.0)
-                
-                let estimatedFeet = max(5.0, exponentialCurve * maxRangeInFeet)
-                let uiMapScaleInFeet = 1000.0
-                let normalizedUI_Distance = estimatedFeet / uiMapScaleInFeet
-                
-                // 🐞 TELEMETRY: Distance Math
-                var logStep = "TELEMETRY: Session: \(capturedThreatSessionID.uuidString.prefix(4))"
-                var logMessage = "📏 [Distance Profiler] Type: \(label) | Ceiling: \(clippingCeiling) | Max Range: \(maxRangeInFeet)ft"
-                let logMessage2 = "📏 [Distance] Est Feet: \(String(format: "%.1f", estimatedFeet))ft | UI Normalized: \(String(format: "%.3f", normalizedUI_Distance))"
-                Task.detached(priority: .userInitiated) {
-                    await PerformanceLogger.shared.logTelemetry(step: logStep, message: logMessage)
-                    await PerformanceLogger.shared.logTelemetry(step: logStep, message: logMessage2)
-                }
-                
-                // --- 2. TDOA BEARING CALCULATION ---
-                // THE FIX: Actually use the HardwareCalibration value!
+                // BEARING FIX
                 let exactMicDistance = await HardwareCalibration.micBaseline
+                let rawAngle = self.fftProcessor.calculateTDOA(left: Array(UnsafeBufferPointer(start: channelData[0], count: 4096)),
+                                                               right: Array(UnsafeBufferPointer(start: channelData[1], count: 4096)),
+                                                               sampleRate: self.sampleRate,
+                                                               micDistance: exactMicDistance) ?? 0.0
                 
-                let rawAngle = self.fftProcessor.calculateTDOA(
-                    left: leftSamples,
-                    right: rightSamples,
-                    sampleRate: self.sampleRate,
-                    micDistance: exactMicDistance // Injected here!
-                ) ?? 0.0
-                
-                // --- 3. HARDWARE POLARITY FIX ---
-                var angle = rawAngle
-                let orientation = await MainActor.run { UIDevice.current.orientation }
-                if orientation == .landscapeLeft {
-                    angle *= -1.0
-                }
-                let capturedAngle = angle
-                
-                // 🐞 TELEMETRY: Bearing Math
-                logStep = "6_TELEMETRY_BEARING_MATH: Session: \(capturedThreatSessionID.uuidString.prefix(4))"
-                logMessage = "📏 [Bearing] Raw TDOA: \(String(format: "%.1f", rawAngle))° | Polarity Fixed: \(String(format: "%.1f", capturedAngle))"
-                Task.detached(priority: .userInitiated) {
-                    await PerformanceLogger.shared.logTelemetry(step: logStep, message: logMessage)
-                }
-                
-                // SYNCHRONOUS READ
-                let currentLat = await self.lastKnownLocation?.latitude
-                let currentLon = await self.lastKnownLocation?.longitude
-                
-                // BUILD THE EVENT
+                // EVENT YIELD
                 let newEvent = SoundEvent(
-                    sessionID: capturedThreatSessionID, // THE FIX: Assign it to the specific tracked car!
+                    sessionID: threatSessionID,
                     timestamp: Date(),
                     threatLabel: label,
                     confidence: confidence,
-                    bearing: angle,
+                    bearing: rawAngle,
                     distance: normalizedUI_Distance,
                     energy: Float(safePeak),
                     dopplerRate: dopplerResult?.shiftHz != nil ? Float(dopplerResult!.shiftHz) : nil,
                     isApproaching: dopplerResult?.isApproaching ?? false,
-                    latitude: currentLat,
-                    longitude: currentLon
+                    latitude: await self.lastKnownLocation?.latitude,
+                    longitude: await self.lastKnownLocation?.longitude
                 )
                 
-                // FIRE AND FORGET: Hand it to the cloud
-                Task.detached(priority: .background) {
-                    await CloudLogger.shared.logEvent(newEvent)
-                }
-                
-                // UI UPDATE: Send to radar
-                _ = await MainActor.run {
-                    self.continuation.yield(newEvent)
-                }
+                await MainActor.run { self.continuation.yield(newEvent) }
             }
         }
     }

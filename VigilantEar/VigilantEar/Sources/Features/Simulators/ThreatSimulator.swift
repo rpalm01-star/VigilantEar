@@ -12,18 +12,23 @@ struct ThreatSimulator {
     ) {
         guard let location = location else { return }
         
+        // 1. Clear any old routes before starting a new simulation
+        coordinator.simulatedRoute = nil
+        
         Task {
-            // 1. Cast a wide enough net (800ft / 243m) so MapKit stays on your street
-            // but has enough runway to create a clean route.
-            let startCoord = location.coordinate.projected(by: 243.8, bearingDegrees: heading + 90)
-            let endCoord = location.coordinate.projected(by: 243.8, bearingDegrees: heading - 90)
-            
-            let startLocation = CLLocation(latitude: startCoord.latitude, longitude: startCoord.longitude)
-            let endLocation = CLLocation(latitude: endCoord.latitude, longitude: endCoord.longitude)
+            // Cast a net (800ft / 243m) to find road-legal coordinates
+            let startCoord = location.coordinate.projected(by: 243.8, bearingDegrees: heading + 110)
+            let endCoord = location.coordinate.projected(by: 243.8, bearingDegrees: heading - 110)
             
             let request = MKDirections.Request()
-            request.source = MKMapItem(location: startLocation, address: nil)
-            request.destination = MKMapItem(location: endLocation, address: nil)
+            
+            // iOS 26.0 Syntax: Initialize directly with location and explicit nil for address/representations
+            let sourceLocation = CLLocation(latitude: startCoord.latitude, longitude: startCoord.longitude)
+            let destinationLocation = CLLocation(latitude: endCoord.latitude, longitude: endCoord.longitude)
+            
+            request.source = MKMapItem(location: sourceLocation, address: nil)
+            request.destination = MKMapItem(location: destinationLocation, address: nil)
+            
             request.transportType = .automobile
             
             let directions = MKDirections(request: request)
@@ -32,56 +37,51 @@ struct ThreatSimulator {
                 let response = try await directions.calculate()
                 guard let route = response.routes.first else { return }
                 
+                // --- THE ROTATION FIX ---
+                // Store the route in the coordinator so MapView draws a geographic Polyline
+                coordinator.simulatedRoute = route
+                
+                // --- THE TRUNCATION FIX ---
+                // We use 'var' so we can filter the densely sampled points
                 var pathCoordinates = route.polyline.denselySampled(spacingMeters: 2.0)
                 
-                // 2. THE FIX: The Truncate Logic!
-                // Change this number to strictly control where the truck spawns.
-                // <= 304.8 spawns on the Red Outer Circle (1000ft)
-                // <= 152.4 spawns on the Yellow Middle Circle (500ft)
+                // Truncate: Only keep points within the 500ft (152.4m) Yellow Circle
                 pathCoordinates = pathCoordinates.filter { coord in
                     let point = CLLocation(latitude: coord.latitude, longitude: coord.longitude)
                     return location.distance(from: point) <= 152.4
                 }
                 
-                guard !pathCoordinates.isEmpty else { return }
+                guard !pathCoordinates.isEmpty else {
+                    print("⚠️ Simulator: Truncation resulted in zero points.")
+                    coordinator.simulatedRoute = nil
+                    return
+                }
                 
+                // 2. SIMULATION STATE
                 var step = 0
                 var previousDistance: Double = 9999.0
                 var isApproaching = true
                 let threatSessionID = UUID()
                 
+                // 3. DRIVE LOGIC
                 Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { timer in
                     let currentCoord = pathCoordinates[step]
-                    
                     let truckLocation = CLLocation(latitude: currentCoord.latitude, longitude: currentCoord.longitude)
                     let distanceInMeters = location.distance(from: truckLocation)
                     let distanceInFeet = distanceInMeters * 3.28084
                     
+                    // Doppler & State
                     if distanceInFeet > previousDistance { isApproaching = false }
                     previousDistance = distanceInFeet
                     
-                    // Bearing Math
-                    let lat1 = location.coordinate.latitude * .pi / 180
-                    let lon1 = location.coordinate.longitude * .pi / 180
-                    let lat2 = currentCoord.latitude * .pi / 180
-                    let lon2 = currentCoord.longitude * .pi / 180
-                    
-                    let dLon = lon2 - lon1
-                    let y = sin(dLon) * cos(lat2)
-                    let x = cos(lat1) * sin(lat2) - sin(lat1) * cos(lat2) * cos(dLon)
-                    let absoluteBearing = atan2(y, x) * 180 / .pi
-                    
+                    // Relative Bearing Math (Target vs User Heading)
+                    let absoluteBearing = getBearingBetween(location.coordinate, currentCoord)
                     var relativeBearing = absoluteBearing - heading
                     if relativeBearing > 180 { relativeBearing -= 360 }
                     if relativeBearing < -180 { relativeBearing += 360 }
                     
-                    // Normalize distance for the UI (1.0 = 1000 feet)
                     let normalizedDistance = distanceInFeet / 1000.0
-                    
-                    // Smooth volume fade starting from 1,000 feet out
-                    let calculatedEnergy = max(0.05, 1.0 - (distanceInFeet / 1000.0))
-                    
-                    // Confidence climbs as it gets closer
+                    let simulatedEnergy = max(0.05, 1.0 - (distanceInFeet / 1000.0))
                     let simulatedConfidence = max(0.3, 1.0 - (distanceInFeet / 1000.0))
                     
                     let newEvent = SoundEvent(
@@ -91,7 +91,7 @@ struct ThreatSimulator {
                         confidence: simulatedConfidence,
                         bearing: relativeBearing,
                         distance: normalizedDistance,
-                        energy: Float(calculatedEnergy),
+                        energy: Float(simulatedEnergy),
                         dopplerRate: isApproaching ? 15.6 : -15.6,
                         isApproaching: isApproaching,
                         latitude: truckLocation.coordinate.latitude,
@@ -103,20 +103,34 @@ struct ThreatSimulator {
                         coordinator.addEvent(newEvent)
                     }
                     
-                    // Cloud Throttle
-                    if step % 10 == 0 {
-                        Task.detached(priority: .background) {
-                            await CloudLogger.shared.logEvent(newEvent)
+                    step += 1
+                    if step >= pathCoordinates.count {
+                        timer.invalidate()
+                        // Clean up the cyan line once the truck finishes the drive
+                        Task { @MainActor in
+                            coordinator.simulatedRoute = nil
                         }
                     }
-                    
-                    step += 1
-                    if step >= pathCoordinates.count { timer.invalidate() }
                 }
             } catch {
                 print("⚠️ Routing failed: \(error.localizedDescription)")
+                coordinator.simulatedRoute = nil
             }
         }
+    }
+    
+    // Helper for Bearing Math
+    private static func getBearingBetween(_ start: CLLocationCoordinate2D, _ end: CLLocationCoordinate2D) -> Double {
+        let lat1 = start.latitude * .pi / 180
+        let lon1 = start.longitude * .pi / 180
+        let lat2 = end.latitude * .pi / 180
+        let lon2 = end.longitude * .pi / 180
+        
+        let dLon = lon2 - lon1
+        let y = sin(dLon) * cos(lat2)
+        let x = cos(lat1) * sin(lat2) - sin(lat1) * cos(lat2) * cos(dLon)
+        let radiansBearing = atan2(y, x)
+        return radiansBearing * 180 / .pi
     }
 }
 

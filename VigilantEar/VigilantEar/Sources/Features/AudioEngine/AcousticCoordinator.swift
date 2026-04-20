@@ -1,5 +1,7 @@
 import Foundation
 import Observation
+import MapKit
+import CoreLocation // Required for the coordinate math that feeds MKRoute
 
 @MainActor
 @Observable
@@ -11,8 +13,9 @@ class AcousticCoordinator {
     /// Current listening status
     var isTracking: Bool = false
     // Is the cleanup running?
-    var isCleaning: Bool = false;
-
+    var isCleaning: Bool = false
+    // THE FIX: Add this to hold the simulation path
+    var simulatedRoute: MKRoute? = nil
     // Task to manage the async stream lifecycle
     private var streamTask: Task<Void, Never>?
     private var cleanupTimer: Timer?
