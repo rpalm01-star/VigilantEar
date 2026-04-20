@@ -135,7 +135,7 @@ actor AcousticProcessingPipeline {
             }
         }
         
-        activeThreats.removeAll { now.timeIntervalSince($0.lastSeen) > 1.5 }
+        activeThreats.removeAll { now.timeIntervalSince($0.lastSeen) > 4.0 }
         
         for target in targets {
             let currentFreq = target.frequency
@@ -149,8 +149,13 @@ actor AcousticProcessingPipeline {
                 // THE FIX: If it's a vehicle, broadband frequency fluctuates wildly.
                 // Don't use the strict 40Hz rule. If an active vehicle track exists, bind to it!
                 if isVehicle {
-                    matchIndex = index
-                    break
+                    // Vehicles are broadband and fluctuate, but if two sounds are
+                    // wildly different pitches, they are two different cars!
+                    // Give them a 500Hz grace window instead of blindly merging them.
+                    if abs(threat.lastFrequency - currentFreq) < 500.0 {
+                        matchIndex = index
+                        break
+                    }
                 }
                 // For tonal sirens, keep the strict 40Hz harmonic grouping
                 else if abs(threat.lastFrequency - currentFreq) < 40.0 {

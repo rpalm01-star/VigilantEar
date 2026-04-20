@@ -45,7 +45,7 @@ struct VigilantEarApp: App {
                                     isVerified = true
                                 }
                             }) {
-                                Text("Begin Monitoring")
+                                Text("Launch Application")
                                     .bold()
                                     .frame(maxWidth: .infinity)
                                     .padding()

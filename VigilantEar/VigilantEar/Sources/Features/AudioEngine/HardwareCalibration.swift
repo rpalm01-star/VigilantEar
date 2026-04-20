@@ -44,7 +44,7 @@ struct HardwareCalibration {
     // --- 3. THE PUBLIC ACCESSORS ---
     /// The physical distance between the top/front and bottom microphones in meters.
     static var micBaseline: Double {
-        if DependencyContainer.usbMicropohone {
+        if AppGlobals.usbMicropohone {
             return 0.3048 // External USB Array Override (1 foot)
         }
         return currentProfile.micDistance

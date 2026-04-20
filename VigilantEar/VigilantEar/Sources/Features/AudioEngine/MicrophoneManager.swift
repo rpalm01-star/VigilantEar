@@ -47,25 +47,29 @@ class MicrophoneManager: NSObject, CLLocationManagerDelegate {
         locationManager.startUpdatingLocation()
     }
         
+    // 1. Leave your location method exactly like this (restored):
     func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
         guard let location = locations.last else { return }
         
-        // TRIPWIRE 1: Are we actually catching the GPS here, or is MapKit doing it secretly?
-        //print("📍 HARDWARE: GPS ping caught by MicrophoneManager")
-        
         Task {
-            // TRIPWIRE 2: Is the bridge connected?
             if pipeline == nil {
                 print("⚠️ ERROR: GPS received, but Pipeline is NIL!")
             }
             await pipeline?.updateLocation(location.coordinate)
         }
-
-        // Your existing code saving the location for the UI
+        
+        // Keep the blue dot moving!
         Task { @MainActor in
             self.currentLocation = location
         }
-
+    }
+    
+    // 2. ADD THIS AS A BRAND NEW FUNCTION right beneath it:
+    func locationManager(_ manager: CLLocationManager, didUpdateHeading newHeading: CLHeading) {
+        Task { @MainActor in
+            // Prefer True North if the GPS has it, otherwise fallback to Magnetic North
+            self.currentHeading = newHeading.trueHeading > 0 ? newHeading.trueHeading : newHeading.magneticHeading
+        }
     }
     
     func startCapturing() {

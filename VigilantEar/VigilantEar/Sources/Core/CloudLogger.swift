@@ -6,13 +6,14 @@ actor CloudLogger {
     static let shared = CloudLogger()
     
     private let db = Firestore.firestore()
-    
+        
     // Memory bank to cache the most recent frame of an active vehicle
     private var activeSessions: [UUID: (lastEvent: SoundEvent, lastSeen: Date)] = [:]
     private var isCleanupRunning = false
     
     func logEvent(_ event: SoundEvent) async {
-        guard event.isEmergency else { return }
+        guard AppGlobals.logToCloud else { return }
+        guard await event.isEmergency else { return }
         
         let now = Date()
         let sessionID = event.sessionID
@@ -65,7 +66,7 @@ actor CloudLogger {
             "bearing": event.bearing,
             "distance": event.distance,
             "energy": event.energy,
-            "emergency": event.isEmergency,
+            "emergency": await event.isEmergency,
             "isApproaching": event.isApproaching,
             "contactPhase": status, // THE FIX: Flags it as FIRST_CONTACT or LAST_CONTACT
             "timestamp": FieldValue.serverTimestamp()
@@ -81,7 +82,7 @@ actor CloudLogger {
         }
         
         do {
-            try await db.collection(DependencyContainer.dataStoreName).document(event.id.uuidString).setData(eventData)
+            try await db.collection(AppGlobals.dataStoreName).document(event.id.uuidString).setData(eventData)
         } catch {
             print("⚠️ Cloud write queued (Offline): \(error.localizedDescription)")
         }

@@ -50,7 +50,7 @@ struct SoundProfile {
         (["laugh", "chuckle"], "face.smiling.fill", .cyan, 0.35, 30.0, .quiet),
         
         // --- ANIMALS ---
-        (["bird", "chirp", "owl hoot"], "bird.fill", .green, 0.35, 30.0, .animal),
+        (["bird", "chirp", "owl"], "bird.fill", .green, 0.35, 30.0, .animal),
         (["cat"], "cat", .green, 0.35, 30.0, .animal),
         (["dog"], "dog", .green, 0.35, 30.0, .animal),
         (["bark", "animal", "pig"], "pawprint.fill", .green, 0.35, 30.0, .animal),
@@ -95,6 +95,7 @@ struct ThreatHUD: View {
                         .transition(.scale.combined(with: .opacity))
                 }
             }
+            .allowsHitTesting(false)
             .padding(.horizontal, 20)
         }
         .animation(.spring(response: 0.4, dampingFraction: 0.7), value: consolidatedEvents.count)
@@ -127,7 +128,7 @@ struct ThreatHUDItemInstance: View {
         let profile = SoundProfile.classify(event.threatLabel)
         let displayLabel = event.threatLabel.replacingOccurrences(of: "_", with: " ").capitalized
         
-        VStack(spacing: 6) {
+        VStack(spacing: 5) {
             ZStack {
                 Circle()
                     .fill(.regularMaterial)

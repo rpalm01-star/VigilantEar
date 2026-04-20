@@ -83,8 +83,6 @@ public final class PerformanceLogger: @unchecked Sendable {
         let icon = isError ? "❌" : "🐞"
         print("\(icon) [\(step)] \(message)")
 
-        guard DependencyContainer.logToCloud else { return }
-
         // 2. Beam to Firebase
         let logData: [String: Any] = [
             "sessionID": sessionLaunchID,
@@ -96,7 +94,7 @@ public final class PerformanceLogger: @unchecked Sendable {
         
         Task.detached(priority: .background) {
             do {
-                try await self.db.collection(DependencyContainer.logDataStoreName).addDocument(data: logData)
+                try await self.db.collection(AppGlobals.logDataStoreName).addDocument(data: logData)
             } catch {
                 print("⚠️ Telemetry failed to send: \(error.localizedDescription)")
             }

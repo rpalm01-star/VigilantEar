@@ -2,12 +2,8 @@
 import Foundation
 
 final class DependencyContainer {
+
     static let shared = DependencyContainer()
-    static let usbMicropohone = false
-    static let dataStoreName = "threats"
-    static let simluatedFiretruckLabel = "simulated_firetruck"
-    static let logDataStoreName = "logs"
-    static let logToCloud = false
     
     let classificationService: ClassificationService
     let microphoneManager: MicrophoneManager

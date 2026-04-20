@@ -7,10 +7,10 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		304F42F62F95E816001C3B6B /* AppGlobals.swift in Sources */ = {isa = PBXBuildFile; fileRef = 304F42F52F95E816001C3B6B /* AppGlobals.swift */; };
 		3053A9F72F8FFF8C008C5419 /* NightStyle.json in Resources */ = {isa = PBXBuildFile; fileRef = 3053A9F62F8FFF81008C5419 /* NightStyle.json */; };
 		3053A9F92F900010008C5419 /* MapView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3053A9F82F900010008C5419 /* MapView.swift */; };
 		3053AA002F901777008C5419 /* SoundProfile.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3053A9FF2F901777008C5419 /* SoundProfile.swift */; };
-		3053DCAE2F83718A00241892 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3053DCA22F83718A00241892 /* SettingsView.swift */; };
 		3053DCAF2F83718A00241892 /* SoundEvent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3053DCA92F83718A00241892 /* SoundEvent.swift */; };
 		3053DCB12F83718A00241892 /* HardwareCalibration.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3053DC952F83718A00241892 /* HardwareCalibration.swift */; };
 		3053DCB22F83718A00241892 /* ClassificationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3053DC9A2F83718A00241892 /* ClassificationService.swift */; };
@@ -34,6 +34,7 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		304F42F52F95E816001C3B6B /* AppGlobals.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppGlobals.swift; sourceTree = "<group>"; };
 		304F73C52F830A8800F67563 /* VigilantEar.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = VigilantEar.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		3053A9F62F8FFF81008C5419 /* NightStyle.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = NightStyle.json; sourceTree = "<group>"; };
 		3053A9F82F900010008C5419 /* MapView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MapView.swift; sourceTree = "<group>"; };
@@ -46,7 +47,6 @@
 		3053DC962F83718A00241892 /* MicrophoneManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MicrophoneManager.swift; sourceTree = "<group>"; };
 		3053DC972F83718A00241892 /* PermissionManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PermissionManager.swift; sourceTree = "<group>"; };
 		3053DC9A2F83718A00241892 /* ClassificationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClassificationService.swift; sourceTree = "<group>"; };
-		3053DCA22F83718A00241892 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		3053DCA42F83718A00241892 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		3053DCA92F83718A00241892 /* SoundEvent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SoundEvent.swift; sourceTree = "<group>"; };
 		3053DCAC2F83718A00241892 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
@@ -115,6 +115,7 @@
 		3053DC922F83718A00241892 /* Core */ = {
 			isa = PBXGroup;
 			children = (
+				304F42F52F95E816001C3B6B /* AppGlobals.swift */,
 				30774C902F946CE5008C16E9 /* SystemMonitor.swift */,
 				30A396472F90900700D441A0 /* CloudLogger.swift */,
 				3053DC912F83718A00241892 /* DependencyContainer.swift */,
@@ -148,7 +149,6 @@
 		3053DCA52F83718A00241892 /* UI */ = {
 			isa = PBXGroup;
 			children = (
-				3053DCA22F83718A00241892 /* SettingsView.swift */,
 				3053A9FF2F901777008C5419 /* SoundProfile.swift */,
 				3053A9F82F900010008C5419 /* MapView.swift */,
 				308EF3E82F8755BC00885DCB /* StartupVerificationView.swift */,
@@ -285,10 +285,10 @@
 			files = (
 				308EF3E92F8755BC00885DCB /* StartupVerificationView.swift in Sources */,
 				30774C912F946CE5008C16E9 /* SystemMonitor.swift in Sources */,
-				3053DCAE2F83718A00241892 /* SettingsView.swift in Sources */,
 				3053DCAF2F83718A00241892 /* SoundEvent.swift in Sources */,
 				30A396482F90900700D441A0 /* CloudLogger.swift in Sources */,
 				3053AA002F901777008C5419 /* SoundProfile.swift in Sources */,
+				304F42F62F95E816001C3B6B /* AppGlobals.swift in Sources */,
 				3053DCB12F83718A00241892 /* HardwareCalibration.swift in Sources */,
 				30C55CC52F85FB1900D0B984 /* AcousticProcessingPipeline.swift in Sources */,
 				3053DCB22F83718A00241892 /* ClassificationService.swift in Sources */,

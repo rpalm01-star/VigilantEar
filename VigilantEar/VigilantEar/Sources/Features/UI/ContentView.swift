@@ -5,7 +5,6 @@ struct ContentView: View {
     @Environment(AcousticCoordinator.self) private var coordinator
     
     var body: some View {
-        // GEOMETRY READER: Flawlessly detects the drawn frame instead of the gyroscope
         GeometryReader { geo in
             let isPortrait = geo.size.height > geo.size.width
             
@@ -50,42 +49,45 @@ struct ContentView: View {
                     
                     Spacer()
                     
-                    // Bottom Section: Floating Button & Threat Scroller
-                    HStack(alignment: .bottom) {
+                    // --- THE FIX: LEFT-JUSTIFIED & CENTER-ALIGNED BOTTOM BAR ---
+                    HStack(alignment: .top, spacing: 6) {
                         
-                        // Floating Simulation Button
+                        // 1. Simulation Button
                         Button(action: {
                             ThreatSimulator.runFireTruckDriveBy(
                                 location: microphoneManager.currentLocation,
                                 heading: microphoneManager.currentHeading,
                                 coordinator: coordinator
                             )
-                            
                         }) {
                             Image("firemanHat")
                                 .resizable()
                                 .scaledToFit()
-                                .frame(width: 32, height: 32)
+                                .frame(width: 34, height: 34)
                                 .padding(12)
                                 .background(.ultraThinMaterial)
                                 .environment(\.colorScheme, .dark)
                                 .clipShape(Circle())
                                 .overlay(Circle().stroke(Color.white.opacity(0.2), lineWidth: 1))
-                                .shadow(color: .black.opacity(0.5), radius: 5, x: 0, y: 5)
+                                .shadow(color: .black.opacity(0.3), radius: 4)
                         }
-                        .padding(.leading, 20)
-                        .padding(.bottom, 40)
-                        
+
+                        // Push everything to the left
                         Spacer()
-                        
+
+                        // 3. The Threat Scroller
                         ThreatHUD(events: coordinator.activeEvents)
-                            .frame(height: 80) // Bumped height slightly to fit the new text labels
-                            .padding(.bottom, 20)
+                            .frame(height: 80)
+                            .allowsHitTesting(false)
+                        
+                        // Push everything to the left
+                        Spacer()
                     }
+                    .padding(.horizontal, 5)
+                    .padding(.bottom, 10)
                 }
                 
                 // --- 3. TACTICAL WARNING OVERLAY ---
-                // Because the app rotates freely, this VStack naturally aligns perfectly upright!
                 if isPortrait {
                     ZStack {
                         Color.black.opacity(0.85)
@@ -103,7 +105,7 @@ struct ContentView: View {
                                 .foregroundStyle(.red)
                                 .multilineTextAlignment(.center)
                             
-                            Text("VigilantEar requires Landscape orientation to track acoustic phase delays. Please rotate your device.")
+                            Text("VigilantEar requires Landscape orientation to track acoustic phase delays.")
                                 .font(.callout.monospaced())
                                 .foregroundStyle(.gray)
                                 .multilineTextAlignment(.center)
@@ -113,14 +115,10 @@ struct ContentView: View {
                     .zIndex(100)
                 }
             }
-            // --- 4. HARDWARE LISTENERS ---
-            // Reacts instantly to the layout engine changing shapes
-            .onChange(of: isPortrait) { oldValue, newValue in
+            .onChange(of: isPortrait) { _, newValue in
                 if newValue {
-                    // Switched to Portrait: Kill the mic so we don't log bad math
                     microphoneManager.stopCapturing()
                 } else {
-                    // Switched to Landscape: Give the UI 500ms to settle, then fire up the array
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                         microphoneManager.startCapturing()
                     }
@@ -135,15 +133,17 @@ struct ContentView: View {
             .onDisappear {
                 microphoneManager.stopCapturing()
             }
+            // --- 4. SYSTEM TELEMETRY OVERLAY ---
             .overlay(alignment: .topLeading) {
                 DebugHUD()
-                    .padding(.top, 50) // Clears the dynamic island
+                    .padding(.top, 50)
                     .padding(.leading, 16)
             }
         }
     }
 }
 
+// MARK: - Debug HUD Component
 struct DebugHUD: View {
     @StateObject private var monitor = SystemMonitor.shared
     
@@ -156,7 +156,6 @@ struct DebugHUD: View {
             HStack {
                 Text("CPU:")
                     .font(.system(size: 12, weight: .medium, design: .monospaced))
-                // Changes color if CPU gets dangerously high
                 Text("\(String(format: "%.1f", monitor.cpuUsage))%")
                     .font(.system(size: 12, weight: .bold, design: .monospaced))
                     .foregroundColor(monitor.cpuUsage > 80.0 ? .red : .green)
