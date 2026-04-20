@@ -5,10 +5,9 @@
 //  Created by Robert Palmer on 4/19/26.
 //
 
-// Globals.swift (or any file)
 import Synchronization
 
-actor AppGlobals {
+nonisolated struct AppGlobals {
     
     private static let _dataStoreName = Mutex<String>("threats")
     public static var dataStoreName: String {

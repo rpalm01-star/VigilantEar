@@ -8,7 +8,7 @@
 import Foundation
 import os.signpost
 import os.log
-import FirebaseFirestore // THE FIX: Add Firebase
+import FirebaseFirestore
 
 /// A thread-safe logger for tracking performance metrics and execution time.
 /// Supports both modern OSSignpost intervals and legacy string logging.
@@ -42,8 +42,6 @@ public final class PerformanceLogger: @unchecked Sendable {
     
     // MARK: - Modern Signpost Tracking
     
-    /// Starts a performance tracking interval for a specific task.
-    /// - Parameter task: A unique string identifying the task being timed.
     public func start(task: String) {
         lock.lock()
         defer { lock.unlock() }
@@ -79,10 +77,9 @@ public final class PerformanceLogger: @unchecked Sendable {
     
     /// Beams a debug log to Firebase so you can read it after a field test
     public func logTelemetry(step: String, message: String, isError: Bool = false) {
-        // 1. Print locally so you can see it in Xcode
         let icon = isError ? "❌" : "🐞"
         print("\(icon) [\(step)] \(message)")
-
+        
         // 2. Beam to Firebase
         let logData: [String: Any] = [
             "sessionID": sessionLaunchID,
@@ -92,12 +89,15 @@ public final class PerformanceLogger: @unchecked Sendable {
             "isError": isError
         ]
         
-        Task.detached(priority: .background) {
-            do {
-                try await self.db.collection(AppGlobals.logDataStoreName).addDocument(data: logData)
-            } catch {
-                print("⚠️ Telemetry failed to send: \(error.localizedDescription)")
+        if (AppGlobals.logToCloud) {
+            Task.detached(priority: .background) {
+                do {
+                    try await self.db.collection(AppGlobals.logDataStoreName).addDocument(data: logData)
+                } catch {
+                    print("⚠️ Telemetry failed to send: \(error.localizedDescription)")
+                }
             }
+            
         }
     }
 }

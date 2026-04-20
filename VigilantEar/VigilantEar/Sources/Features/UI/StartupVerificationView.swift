@@ -12,7 +12,7 @@ struct StartupVerificationView: View {
                 Text("VIGILANT EAR")
                     .font(.largeTitle.monospaced().bold())
                 
-                Text("Pre-flight Check")
+                Text("Initialization Check")
                     .font(.subheadline.monospaced())
                     .foregroundStyle(.secondary)
                 

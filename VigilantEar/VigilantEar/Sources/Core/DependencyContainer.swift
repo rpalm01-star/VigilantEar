@@ -2,13 +2,13 @@
 import Foundation
 
 final class DependencyContainer {
-
+    
     static let shared = DependencyContainer()
     
     let classificationService: ClassificationService
     let microphoneManager: MicrophoneManager
     let acousticCoordinator: AcousticCoordinator
-    let pipeline: AcousticProcessingPipeline // 1. Added the property
+    let pipeline: AcousticProcessingPipeline
     
     private init() {
         let coordinator = AcousticCoordinator()
@@ -23,15 +23,13 @@ final class DependencyContainer {
         
         self.microphoneManager = MicrophoneManager(
             coordinator: coordinator,
-            classificationService: classifier
+            classificationService: classifier,
         )
         
-        // --- THE CRITICAL FIXES ---
-        
-        // 3. Plug the pipeline into the microphone manager so it gets GPS
+        // Plug the pipeline into the microphone manager so it gets GPS
         self.microphoneManager.pipeline = processingPipeline
         
-        // 4. Tell the UI Coordinator to start listening for threats
+        // Tell the UI Coordinator to start listening for threats
         coordinator.startListeningToPipeline(processingPipeline)
     }
 }

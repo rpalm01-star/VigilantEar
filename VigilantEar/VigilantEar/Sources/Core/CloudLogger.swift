@@ -3,6 +3,7 @@ import FirebaseFirestore
 
 // THE FIX: Upgraded to an 'actor' to safely handle high-speed concurrent data from the pipeline
 actor CloudLogger {
+    
     static let shared = CloudLogger()
     
     private let db = Firestore.firestore()
