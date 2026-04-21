@@ -34,7 +34,7 @@ struct SoundProfile {
         (["speech", "voice", "talk", "person"], "waveform", .cyan, 0.55, 150.0, .medium),
         (["bicycle"], "bicycle", .blue, 0.55, 150.0, .medium),
         (["bell", "chime", "clock", "tick", "beep"], "bell.fill", .purple, 0.55, 150.0, .medium),
-        (["music", "choir", "song", "sing", "whistl", "didgeridoo", "bassoon", "tuning"], "music.note", .purple, 0.55, 150.0, .medium),
+        (["music", "choir", "song", "sing", "whistl", "didgeridoo", "bassoon", "tuning", "theremin"], "music.note", .purple, 0.55, 125.0, .medium),
         (["knock", "tap", "hammer", "chopping", "tennis"], "hand.tap.fill", .purple, 0.55, 150.0, .medium),
         (["step", "walk", "foot", "bowling"], "figure.walk", .cyan, 0.55, 150.0, .medium),
         (["water", "rain", "splash"], "drop.fill", .teal, 0.55, 150.0, .medium),

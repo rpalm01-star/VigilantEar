@@ -136,11 +136,23 @@ struct ContentView: View {
 struct DebugHUD: View {
     @StateObject private var monitor = SystemMonitor.shared
     
+    // Create a local UI state synced to your global default
+    @State private var isCloudLoggingEnabled: Bool = AppGlobals.logToCloud
+    
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text("⚙️ SYSTEM TELEMETRY")
-                .font(.system(size: 10, weight: .bold, design: .monospaced))
-                .foregroundColor(.gray)
+            HStack {
+                Text("⚙️ SYSTEM TELEMETRY")
+                    .font(.system(size: 10, weight: .bold, design: .monospaced))
+                    .foregroundColor(.gray)
+                
+                Spacer()
+                
+                // Visual indicator for the cloud connection
+                Image(systemName: isCloudLoggingEnabled ? "cloud.fill" : "cloud")
+                    .font(.system(size: 10))
+                    .foregroundColor(isCloudLoggingEnabled ? .cyan : .gray)
+            }
             
             HStack {
                 Text("CPU:")
@@ -159,11 +171,32 @@ struct DebugHUD: View {
             }
         }
         .padding(10)
-        .background(.ultraThinMaterial)
+        // Set a fixed width so the spacer pushes the cloud icon to the right edge
+        .frame(width: 180)
+        // THE BACKGROUND TOGGLE
+        .background(
+            ZStack {
+                Rectangle().fill(.ultraThinMaterial)
+                if isCloudLoggingEnabled {
+                    Rectangle().fill(Color.blue.opacity(0.3)) // Tints it blue when active
+                }
+            }
+        )
         .cornerRadius(8)
         .shadow(radius: 5)
         .onAppear {
             monitor.start()
+        }
+        // THE TAP ACTION
+        .onTapGesture {
+            withAnimation(.easeInOut(duration: 0.2)) {
+                isCloudLoggingEnabled.toggle()
+                AppGlobals.logToCloud = isCloudLoggingEnabled // Sync with the global math engine
+                
+                // Optional: Provide a tiny bit of haptic feedback on tap
+                let generator = UIImpactFeedbackGenerator(style: .medium)
+                generator.impactOccurred()
+            }
         }
     }
 }

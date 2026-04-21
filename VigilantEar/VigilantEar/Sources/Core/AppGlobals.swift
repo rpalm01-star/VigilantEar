@@ -29,6 +29,9 @@ nonisolated struct AppGlobals {
         get {
             _logToCloud.withLock { $0 }      // safe read
         }
+        set {
+            _logToCloud.withLock { $0 = newValue } // THE FIX: safe write
+        }
     }
 
     private static let _usbMicropohone = Mutex<Bool>(false)   // initial value

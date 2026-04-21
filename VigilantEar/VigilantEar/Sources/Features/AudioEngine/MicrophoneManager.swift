@@ -161,7 +161,6 @@ class MicrophoneManager: NSObject, CLLocationManagerDelegate {
     func stopCapturing() {
         guard isRunning else { return }
         audioEngine.stop()
-        locationManager.stopUpdatingHeading()
         if tapInstalled {
             audioEngine.inputNode.removeTap(onBus: 0)
             tapInstalled = false

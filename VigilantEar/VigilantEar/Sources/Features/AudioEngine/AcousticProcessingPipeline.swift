@@ -12,9 +12,9 @@ actor AcousticProcessingPipeline {
     nonisolated let eventStream: AsyncStream<SoundEvent>
     private let continuation: AsyncStream<SoundEvent>.Continuation
     
-    // THE NEW PIPE: Just for Shazam strings
-    nonisolated let songStream: AsyncStream<String>
-    private let songContinuation: AsyncStream<String>.Continuation
+    // --- THE NEW PIPE: Shazam strings (now Optional to handle fades) ---
+    nonisolated let songStream: AsyncStream<String?>
+    private let songContinuation: AsyncStream<String?>.Continuation
     
     private let fftProcessor: FFTProcessor
     
@@ -39,21 +39,25 @@ actor AcousticProcessingPipeline {
     // --- SHAZAM STATE ---
     private var shazamSession: SHSession?
     private var shazamDelegate: ShazamResultsObserver?
-    private var lastShazamMatchTime: Date = Date.distantPast
     private var signatureGenerator = SHSignatureGenerator()
     private var accumulatedFrames: AVAudioFrameCount = 0
     private var sampleRate: Double = 44100.0
-    private var framesPerSecond: Double = 44100.0
+    
+    // --- THE NEW SHAZAM STATE MACHINE ---
+    private var isMusicCurrentlyPlaying = false
+    private var lastMusicDetectedTime: Date = .distantPast
+    private var lastShazamMatchTime: Date = .distantPast
+    private var hasMatchedCurrentSong = false
+    private var currentSongLabel: String? = nil
     
     private var latestBuffer: AVAudioPCMBuffer?
     private var latestTime: AVAudioTime?
     
     private var lastKnownLocation: CLLocationCoordinate2D? = nil
     
-    // --- THE FIX: CPU THROTTLE STATE ---
-    private var lastProcessTime: Date = Date.distantPast
+    // --- CPU THROTTLE STATE ---
+    private var lastProcessTime: Date = .distantPast
     
-    // --- THE FIX: COOLDOWN MEMORY ---
     // Tracks when we last saw a specific threat to prevent CoreML spam
     private var lastSeenThreats: [String: Date] = [:]
     
@@ -65,15 +69,14 @@ actor AcousticProcessingPipeline {
         self.eventStream = stream
         self.continuation = cont
         
-        // Init the new pipe
-        let (sStream, sCont) = AsyncStream.makeStream(of: String.self)
+        // Init the new pipe (Now accepts String? so we can yield nil)
+        let (sStream, sCont) = AsyncStream.makeStream(of: String?.self)
         self.songStream = sStream
         self.songContinuation = sCont
         
         self.fftProcessor = FFTProcessor(fftSize: Int(self.bufferSize))
     }
     
-    // Called by the MicrophoneManager whenever the GPS updates
     public func updateLocation(_ coordinate: CLLocationCoordinate2D) {
         self.lastKnownLocation = coordinate
     }
@@ -85,14 +88,35 @@ actor AcousticProcessingPipeline {
         // 1. CoreML (Still the hero)
         streamAnalyzer?.analyze(buffer, atAudioFramePosition: time.sampleTime)
         
-        // 2. Shazam Matching Logic
-        guard Date().timeIntervalSince(lastShazamMatchTime) > 15.0 else { return }
+        // --- 2. MUSIC FADE CHECK ---
+        // If 5 seconds pass without hearing music, clear the UI and go to sleep
+        if isMusicCurrentlyPlaying && Date().timeIntervalSince(lastMusicDetectedTime) > 5.0 {
+            isMusicCurrentlyPlaying = false
+            hasMatchedCurrentSong = false
+            currentSongLabel = nil
+            print("🎵 Music vanished from radar. Clearing UI.")
+            _ = songContinuation.yield(nil)
+            return
+        }
         
-        // --- THE FIX: Create a proper Shazam-compatible format ---
-        // ShazamKit loves 44100 or 48000 Mono.
+        // --- 3. THE "SMART TTL" SONG CHECKER ---
+        if isMusicCurrentlyPlaying && hasMatchedCurrentSong {
+            // It's been 3 minutes. The track probably changed. Wake up Shazam!
+            if Date().timeIntervalSince(lastShazamMatchTime) > 180.0 {
+                hasMatchedCurrentSong = false
+                self.signatureGenerator = SHSignatureGenerator()
+                self.accumulatedFrames = 0
+                print("🎵 3-minute TTL hit. Waking Shazam to check for a track change...")
+            } else {
+                return // Still locked, save CPU
+            }
+        }
+        
+        // --- 4. SMART SHAZAM MATCHING ---
+        // ONLY collect audio if we are actively searching
+        guard isMusicCurrentlyPlaying && !hasMatchedCurrentSong else { return }
+        
         let shazamFormat = AVAudioFormat(standardFormatWithSampleRate: buffer.format.sampleRate, channels: 1)!
-        
-        // Convert your stereo buffer to mono
         let converter = AVAudioConverter(from: buffer.format, to: shazamFormat)
         let monoBuffer = AVAudioPCMBuffer(pcmFormat: shazamFormat, frameCapacity: buffer.frameLength)!
         
@@ -102,40 +126,37 @@ actor AcousticProcessingPipeline {
             return buffer
         }
         
-        // Append the converted mono buffer
         try? signatureGenerator.append(monoBuffer, at: time)
         accumulatedFrames += monoBuffer.frameLength
         
-        // Match every ~10 seconds
-        if accumulatedFrames >= AVAudioFrameCount(shazamFormat.sampleRate * 10) {
+        // Try matching every ~8 seconds while searching
+        if accumulatedFrames >= AVAudioFrameCount(shazamFormat.sampleRate * 8) {
             let signature = signatureGenerator.signature()
-            
-            // LOG THIS: If this is 0.0, the append failed!
-            print("🎵 Final Signature Duration: \(signature.duration)s")
-            
             if signature.duration > 3.0 {
                 shazamSession?.match(signature)
             }
-            
-            // RESET
             self.signatureGenerator = SHSignatureGenerator()
             self.accumulatedFrames = 0
         }
     }
     
     func registerSongMatch(title: String, artist: String) async {
-        let now = Date()
-        
-        // THE COOLDOWN: Only announce a new song once every 60 seconds
-        guard now.timeIntervalSince(lastShazamMatchTime) > 60.0 else { return }
-        self.lastShazamMatchTime = now
-        
         let customLabel = "🎵 \(title) by \(artist)"
         
-        await PerformanceLogger.shared.logTelemetry(step: "SHAZAM", message: "Identified: \(customLabel)")
+        // If it's the exact same song, just silently reset the 3-minute timer and go back to sleep
+        if customLabel == currentSongLabel {
+            hasMatchedCurrentSong = true
+            lastShazamMatchTime = Date()
+            return
+        }
         
-        // THE FIX: Yield the string directly to the UI, ignoring the map entirely!
-        songContinuation.yield(customLabel)
+        // NEW SONG FOUND!
+        currentSongLabel = customLabel
+        hasMatchedCurrentSong = true
+        lastShazamMatchTime = Date()
+        
+        await PerformanceLogger.shared.logTelemetry(step: "SHAZAM", message: "Identified: \(customLabel)")
+        _ = songContinuation.yield(customLabel)
     }
     
     func confirmThreatAndTrack(label: String, confidence: Double) async {
@@ -143,9 +164,6 @@ actor AcousticProcessingPipeline {
         guard now.timeIntervalSince(lastProcessTime) > 0.2 else { return }
         lastProcessTime = now
         
-        // --- THE SWIFT 6 CONCURRENCY FIX ---
-        // Safely hop to the MainActor ONCE to extract thread-safe values.
-        // This prevents cross-actor violations later in the detached task!
         let (isVehicle, profileCeiling, profileMaxRange) = await MainActor.run {
             let p = SoundProfile.classify(label)
             return (p.isVehicle, p.ceiling, p.maxRange)
@@ -154,6 +172,21 @@ actor AcousticProcessingPipeline {
         // 1. ML TRIGGER LOG
         let triggerMsg = "Heard: \(label) (Conf: \(String(format: "%.2f", confidence)))"
         await PerformanceLogger.shared.logTelemetry(step: "1_ML_TRIGGER", message: triggerMsg)
+        
+        // --- NEW: THE MUSIC STATE TRIGGER ---
+        let isMusic = label.lowercased() == "music"
+        if isMusic {
+            lastMusicDetectedTime = now
+            
+            // If this is a BRAND NEW music event, wake up the Shazam search!
+            if !isMusicCurrentlyPlaying {
+                isMusicCurrentlyPlaying = true
+                hasMatchedCurrentSong = false // Unlock the search
+                self.signatureGenerator = SHSignatureGenerator() // Fresh bucket
+                self.accumulatedFrames = 0
+                print("🎵 Radar detected music. Waking up Shazam...")
+            }
+        }
         
         guard let buffer = latestBuffer, let channelData = buffer.floatChannelData else { return }
         let peak = Array(UnsafeBufferPointer(start: channelData[0], count: min(Int(buffer.frameLength), 4096))).map(abs).max() ?? 0.0
@@ -182,14 +215,14 @@ actor AcousticProcessingPipeline {
             
             // THREAT MATCHING
             for (index, threat) in activeThreats.enumerated() {
-                let threshold = isVehicle ? 500.0 : 40.0
+                // THE FIX: Give music a massive 8000Hz threshold so note-changes don't spawn new dots!
+                let threshold = isVehicle ? 500.0 : (isMusic ? 8000.0 : 40.0)
                 if abs(threat.lastFrequency - currentFreq) < threshold {
                     matchIndex = index
                     break
                 }
             }
             
-            // When updating the tracker, only use the frequency doppler if it's NOT a vehicle.
             let threatSessionID: UUID
             let dopplerResult: (isApproaching: Bool, shiftHz: Double)?
             
@@ -197,8 +230,8 @@ actor AcousticProcessingPipeline {
                 activeThreats[index].lastFrequency = currentFreq
                 activeThreats[index].lastSeen = now
                 
-                // THE FIX: Ignore frequency doppler for broadband vehicles
-                if isVehicle {
+                // THE FIX: Ignore frequency doppler for music (just like vehicles)
+                if isVehicle || isMusic {
                     dopplerResult = nil
                 } else {
                     dopplerResult = activeThreats[index].dopplerTracker.update(with: currentFreq, confidence: target.confidence)
@@ -220,25 +253,21 @@ actor AcousticProcessingPipeline {
                 
                 let ambientFloor: Double = isVehicle ? 0.02 : 0.04
                 
-                // THE FIX: Use the extracted thread-safe constants instead of 'profile'
                 let safePeak = min(max(Double(peak), ambientFloor), profileCeiling)
                 let linearRatio = (profileCeiling - safePeak) / (profileCeiling - ambientFloor)
                 
-                // THE DISTANCE FIX
-                // Decrease the vehicle curve from 3.5 to 2.2 to stop the "ganging up"
                 let adjustedMaxRange = isVehicle ? 400.0 : profileMaxRange
-                let curvePower = isVehicle ? 2.2 : 2.0 // <-- Relaxed this value
+                // Increased from 2.0 to 2.5 to pull reflected/indoor sounds closer
+                let curvePower = isVehicle ? 2.2 : 2.5
                 let estimatedFeet = max(10.0, pow(linearRatio, curvePower) * adjustedMaxRange)
                 let normalizedUI_Distance = estimatedFeet / 1000.0
                 
-                // BEARING FIX
                 let exactMicDistance = await HardwareCalibration.micBaseline
                 let rawAngle = self.fftProcessor.calculateTDOA(left: Array(UnsafeBufferPointer(start: channelData[0], count: 4096)),
                                                                right: Array(UnsafeBufferPointer(start: channelData[1], count: 4096)),
                                                                sampleRate: localSampleRate,
                                                                micDistance: exactMicDistance) ?? 0.0
                 
-                // EVENT YIELD
                 let newEvent = SoundEvent(
                     sessionID: threatSessionID,
                     timestamp: Date(),
@@ -249,21 +278,17 @@ actor AcousticProcessingPipeline {
                     energy: Float(safePeak),
                     dopplerRate: dopplerResult?.shiftHz != nil ? Float(dopplerResult!.shiftHz) : nil,
                     isApproaching: dopplerResult?.isApproaching ?? false,
-                    latitude: await self.lastKnownLocation?.latitude,
-                    longitude: await self.lastKnownLocation?.longitude
+                    latitude: nil,  // <--- FIX: Force the map to use relative projection
+                    longitude: nil  // <--- FIX: Force the map to use relative projection
                 )
                 
-                // THE FIX: Explicitly ignore the yield result with "_ ="
                 await MainActor.run { _ = self.continuation.yield(newEvent) }
             }
         }
     }
     
-    
     func setupAnalyzer(format: AVAudioFormat) throws {
-        // Update the actor's math to match the actual hardware speed
         self.sampleRate = format.sampleRate
-        self.framesPerSecond = format.sampleRate
         
         streamAnalyzer = SNAudioStreamAnalyzer(format: format)
         
@@ -408,7 +433,7 @@ final class ShazamResultsObserver: NSObject, @unchecked Sendable, SHSessionDeleg
             print("🎵 Shazam Error: \(err.localizedDescription)")
         } else {
             // This prints every few seconds while it's trying to listen
-            print("🎵 Shazam: Listening for The Doors... no match yet.")
+            print("🎵 Shazam: Listening... no match yet.")
         }
     }
 }
