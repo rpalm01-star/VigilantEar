@@ -212,6 +212,8 @@ actor AcousticProcessingPipeline {
                 threatSessionID = newID
             }
             
+            let localSampleRate = self.sampleRate
+            
             // 4. DISTANCE & BEARING MATH
             Task.detached(priority: .userInitiated) { [weak self, threatSessionID] in
                 guard let self = self else { return }
@@ -233,7 +235,7 @@ actor AcousticProcessingPipeline {
                 let exactMicDistance = await HardwareCalibration.micBaseline
                 let rawAngle = self.fftProcessor.calculateTDOA(left: Array(UnsafeBufferPointer(start: channelData[0], count: 4096)),
                                                                right: Array(UnsafeBufferPointer(start: channelData[1], count: 4096)),
-                                                               sampleRate: Double(44100),
+                                                               sampleRate: localSampleRate,
                                                                micDistance: exactMicDistance) ?? 0.0
                 
                 // EVENT YIELD
