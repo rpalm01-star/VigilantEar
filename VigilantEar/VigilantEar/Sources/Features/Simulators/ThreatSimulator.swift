@@ -22,13 +22,12 @@ struct ThreatSimulator {
             
             let request = MKDirections.Request()
             
-            // iOS 26.0 Syntax: Initialize directly with location and explicit nil for address/representations
+            // iOS 26.0 Syntax: Initialize directly with location and explicit nil for address
             let sourceLocation = CLLocation(latitude: startCoord.latitude, longitude: startCoord.longitude)
             let destinationLocation = CLLocation(latitude: endCoord.latitude, longitude: endCoord.longitude)
             
             request.source = MKMapItem(location: sourceLocation, address: nil)
             request.destination = MKMapItem(location: destinationLocation, address: nil)
-            
             request.transportType = .automobile
             
             let directions = MKDirections(request: request)
@@ -42,7 +41,6 @@ struct ThreatSimulator {
                 coordinator.simulatedRoute = route
                 
                 // --- THE TRUNCATION FIX ---
-                // We use 'var' so we can filter the densely sampled points
                 var pathCoordinates = route.polyline.denselySampled(spacingMeters: 2.0)
                 
                 // Truncate: Only keep points within the 500ft (152.4m) Yellow Circle
@@ -106,7 +104,7 @@ struct ThreatSimulator {
                     step += 1
                     if step >= pathCoordinates.count {
                         timer.invalidate()
-                        // Clean up the cyan line once the truck finishes the drive
+                        // Clean up the line once the truck finishes the drive
                         Task { @MainActor in
                             coordinator.simulatedRoute = nil
                         }
@@ -120,7 +118,7 @@ struct ThreatSimulator {
     }
     
     // Helper for Bearing Math
-    private static func getBearingBetween(_ start: CLLocationCoordinate2D, _ end: CLLocationCoordinate2D) -> Double {
+    private nonisolated static func getBearingBetween(_ start: CLLocationCoordinate2D, _ end: CLLocationCoordinate2D) -> Double {
         let lat1 = start.latitude * .pi / 180
         let lon1 = start.longitude * .pi / 180
         let lat2 = end.latitude * .pi / 180

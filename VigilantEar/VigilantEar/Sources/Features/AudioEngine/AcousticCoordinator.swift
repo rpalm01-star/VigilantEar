@@ -2,6 +2,7 @@ import Foundation
 import Observation
 import MapKit
 import CoreLocation // Required for the coordinate math that feeds MKRoute
+import SwiftUI
 
 @MainActor
 @Observable
@@ -19,11 +20,13 @@ class AcousticCoordinator {
     // Task to manage the async stream lifecycle
     private var streamTask: Task<Void, Never>?
     private var cleanupTimer: Timer?
-
+    // The new variable your SwiftUI views will read from
+    var activeSong: String? = nil
+    
     init() {
         startHeartbeat()
     }
-
+    
     private func startHeartbeat() {
         // Independent loop: Prunes the radar 5 times a second
         cleanupTimer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
@@ -32,12 +35,12 @@ class AcousticCoordinator {
             }
         }
     }
-
+    
     @MainActor
     private func refreshRadar() {
         if (activeEvents.isEmpty)
         {
-            return;
+        return;
         }
         if (isCleaning) {
             print("❌ Active event cleanup is already running. Bypassing.")
@@ -68,6 +71,18 @@ class AcousticCoordinator {
             for await event in pipeline.eventStream {
                 activeEvents.append(event)
                 self.latestEvent = event
+            }
+        }
+        // Listen for Shazam Song Matches
+        // Updated listener in AcousticCoordinator
+        Task {
+            for await songTitle in pipeline.songStream {
+                await MainActor.run {
+                    // Simply update the song. We don't need a timer here anymore!
+                    withAnimation(.spring()) {
+                        self.activeSong = songTitle
+                    }
+                }
             }
         }
     }

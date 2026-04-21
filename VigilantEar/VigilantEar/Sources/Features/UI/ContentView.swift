@@ -9,7 +9,7 @@ struct ContentView: View {
             let isPortrait = geo.size.height > geo.size.width
             
             ZStack {
-                // 1. Map Stays at the Bottom
+                // 1. Map Layer
                 MapView(events: coordinator.activeEvents,
                         userLocation: microphoneManager.currentLocation,
                         userHeading: microphoneManager.currentHeading)
@@ -17,56 +17,90 @@ struct ContentView: View {
                 
                 // 2. Main UI Layer
                 VStack {
-                    // Top Bar
+                    // TOP BAR
                     HStack {
-                        Text("VIGILANT EAR").font(.system(.headline, design: .monospaced)).tracking(3).foregroundStyle(.green)
+                        Text("VIGILANT EAR")
+                            .font(.system(.headline, design: .monospaced))
+                            .tracking(3)
+                            .foregroundStyle(.green)
                         Spacer()
                         HStack(spacing: 8) {
-                            Circle().fill(microphoneManager.isListening ? Color.green : Color.gray).frame(width: 8, height: 8)
-                            Text(coordinator.activeEvents.last?.threatLabel.uppercased() ?? (microphoneManager.isListening ? "LISTENING..." : "OFFLINE")).font(.caption2.monospaced()).foregroundStyle(.green)
+                            Circle()
+                                .fill(microphoneManager.isListening ? Color.green : Color.gray)
+                                .frame(width: 8, height: 8)
+                            Text(coordinator.activeEvents.last?.threatLabel.uppercased() ?? (microphoneManager.isListening ? "LISTENING..." : "OFFLINE"))
+                                .font(.caption2.monospaced())
+                                .foregroundStyle(.green)
                         }
-                        .padding(8).background(.ultraThinMaterial).environment(\.colorScheme, .dark).clipShape(RoundedRectangle(cornerRadius: 8))
-                    }.padding()
+                        .padding(8)
+                        .background(.ultraThinMaterial)
+                        .environment(\.colorScheme, .dark)
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                    }
+                    .padding()
                     
+                    // THIS SPACER pushes everything below it to the bottom
                     Spacer()
                     
-                    // --- BOTTOM OVERLAY (The Fix) ---
-                    ZStack(alignment: .bottom) {
-                        // ThreatHUD: Forced width and height so it can't be crushed
-                        HStack {
+                    // BOTTOM OVERLAY AREA
+                    HStack(alignment: .bottom) {
+                        // LEFT COLUMN: Threat HUD and Shazam Text
+                        VStack(alignment: .leading, spacing: 12) {
+                            // 1. Threat HUD (70% of screen width)
                             ThreatHUD(events: coordinator.activeEvents)
-                                .frame(width: geo.size.width * 0.7, height: 100) // Fixed height & 70% width
-                                .background(Color.black.opacity(0.01)) // Invisible bg to help hit testing if needed
+                                .frame(width: geo.size.width * 0.7, height: 100)
                                 .allowsHitTesting(false)
-                            Spacer()
+                            
+                            // 2. Shazam Text (Now spanning the full width of the HUD)
+                            if let songTitle = coordinator.activeSong,
+                                coordinator.activeEvents.contains(where: { $0.threatLabel.lowercased() == "music" }) {
+                                
+                                HStack(alignment: .center, spacing: 8) {
+                                    Image(systemName: "waveform")
+                                        .font(.system(size: 14, weight: .bold))
+                                        .foregroundColor(.white)
+                                    
+                                    Text(songTitle)
+                                        .font(.system(size: 14, weight: .semibold, design: .monospaced))
+                                        .foregroundColor(.white)
+                                        .lineLimit(1)
+                                        .truncationMode(.tail)
+                                }
+                                .id(songTitle)
+                                .frame(width: geo.size.width * 0.7, alignment: .leading)
+                                .transition(.asymmetric(
+                                    insertion: .move(edge: .leading).combined(with: .opacity),
+                                    removal: .opacity
+                                ))
+                            }
                         }
                         .padding(.leading, 20)
                         
-                        // Control Column: Floating on the right
-                        HStack {
-                            Spacer()
-                            VStack(spacing: 20) {
-                                // Simulation
-                                Button(action: {
-                                    ThreatSimulator.runFireTruckDriveBy(location: microphoneManager.currentLocation, heading: microphoneManager.currentHeading, coordinator: coordinator)
-                                }) {
-                                    Image("firemanHat").resizable().scaledToFit().frame(width: 28, height: 28).padding(12).background(.ultraThinMaterial).environment(\.colorScheme, .dark).clipShape(Circle()).overlay(Circle().stroke(Color.white.opacity(0.2), lineWidth: 1))
-                                }
-                                
-                                // Snap
-                                Button(action: {
-                                    NotificationCenter.default.post(name: NSNotification.Name("SnapToUser"), object: nil)
-                                }) {
-                                    Image(systemName: "location.fill").font(.system(size: 28, weight: .semibold)).foregroundColor(.blue).frame(width: 28, height: 28).padding(12).background(.ultraThinMaterial).environment(\.colorScheme, .dark).clipShape(Circle()).overlay(Circle().stroke(Color.white.opacity(0.2), lineWidth: 1))
-                                }
+                        Spacer() // Pushes the control column to the far right
+                        
+                        // RIGHT COLUMN: Controls
+                        VStack(spacing: 20) {
+                            // Simulation Button
+                            Button(action: {
+                                ThreatSimulator.runFireTruckDriveBy(location: microphoneManager.currentLocation, heading: microphoneManager.currentHeading, coordinator: coordinator)
+                            }) {
+                                Image("firemanHat").resizable().scaledToFit().frame(width: 28, height: 28).padding(12).background(.ultraThinMaterial).environment(\.colorScheme, .dark).clipShape(Circle()).overlay(Circle().stroke(Color.white.opacity(0.2), lineWidth: 1))
                             }
-                            .padding(.trailing, 20)
+                            
+                            // Snap to User Button
+                            Button(action: {
+                                NotificationCenter.default.post(name: NSNotification.Name("SnapToUser"), object: nil)
+                            }) {
+                                Image(systemName: "location.fill").font(.system(size: 28, weight: .semibold)).foregroundColor(.blue).frame(width: 28, height: 28).padding(12).background(.ultraThinMaterial).environment(\.colorScheme, .dark).clipShape(Circle()).overlay(Circle().stroke(Color.white.opacity(0.2), lineWidth: 1))
+                            }
                         }
+                        .padding(.trailing, 20)
                     }
-                    .padding(.bottom, 30) // Lifted slightly off the bottom edge
+                    .padding(.bottom, 30) // Final lift off the bottom edge
                 }
+                .animation(.easeInOut, value: coordinator.activeSong)
                 
-                // 3. System Overlays (Portrait Lock / Debug)
+                // 3. Orientation Lock Overlay
                 if isPortrait {
                     Color.black.opacity(0.85).ignoresSafeArea()
                     VStack(spacing: 20) {
@@ -78,13 +112,11 @@ struct ContentView: View {
             .overlay(alignment: .topLeading) {
                 DebugHUD().padding(.top, 60).padding(.leading, 16)
             }
-            // Inside ContentView's ZStack...
+            // ... (Rest of your onChange and task logic exactly as before)
             .onChange(of: isPortrait) { _, newValue in
                 if newValue {
-                    print("DEBUG: Orientation is Portrait. Stopping Mic.")
                     microphoneManager.stopCapturing()
                 } else {
-                    print("DEBUG: Orientation is Landscape. Attempting to start Mic...")
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                         microphoneManager.startCapturing()
                     }
@@ -93,7 +125,6 @@ struct ContentView: View {
             .task {
                 try? await Task.sleep(for: .milliseconds(300))
                 if !isPortrait {
-                    print("DEBUG: Task Start - Attempting to start Mic...")
                     microphoneManager.startCapturing()
                 }
             }

@@ -1,16 +1,20 @@
-import AVFoundation
+@preconcurrency import AVFoundation
 import Accelerate
 import SoundAnalysis
 import SwiftUI
 import CoreLocation
+import ShazamKit
 
 actor AcousticProcessingPipeline {
     
-    private let sampleRate: Double = 44100.0
     private let bufferSize: AVAudioFrameCount = 4096
     
     nonisolated let eventStream: AsyncStream<SoundEvent>
     private let continuation: AsyncStream<SoundEvent>.Continuation
+    
+    // THE NEW PIPE: Just for Shazam strings
+    nonisolated let songStream: AsyncStream<String>
+    private let songContinuation: AsyncStream<String>.Continuation
     
     private let fftProcessor: FFTProcessor
     
@@ -32,10 +36,20 @@ actor AcousticProcessingPipeline {
     private var streamAnalyzer: SNAudioStreamAnalyzer?
     private var resultsObserver: ThreatResultsObserver?
     
+    // --- SHAZAM STATE ---
+    private var shazamSession: SHSession?
+    private var shazamDelegate: ShazamResultsObserver?
+    private var lastShazamMatchTime: Date = Date.distantPast
+    private var signatureGenerator = SHSignatureGenerator()
+    private var accumulatedFrames: AVAudioFrameCount = 0
+    private var sampleRate: Double = 44100.0
+    private var framesPerSecond: Double = 44100.0
+    
     private var latestBuffer: AVAudioPCMBuffer?
     private var latestTime: AVAudioTime?
     
     private var lastKnownLocation: CLLocationCoordinate2D? = nil
+    
     // --- THE FIX: CPU THROTTLE STATE ---
     private var lastProcessTime: Date = Date.distantPast
     
@@ -51,6 +65,11 @@ actor AcousticProcessingPipeline {
         self.eventStream = stream
         self.continuation = cont
         
+        // Init the new pipe
+        let (sStream, sCont) = AsyncStream.makeStream(of: String.self)
+        self.songStream = sStream
+        self.songContinuation = sCont
+        
         self.fftProcessor = FFTProcessor(fftSize: Int(self.bufferSize))
     }
     
@@ -63,8 +82,60 @@ actor AcousticProcessingPipeline {
         self.latestBuffer = buffer
         self.latestTime = time
         
-        // Feed ML continuously
+        // 1. CoreML (Still the hero)
         streamAnalyzer?.analyze(buffer, atAudioFramePosition: time.sampleTime)
+        
+        // 2. Shazam Matching Logic
+        guard Date().timeIntervalSince(lastShazamMatchTime) > 15.0 else { return }
+        
+        // --- THE FIX: Create a proper Shazam-compatible format ---
+        // ShazamKit loves 44100 or 48000 Mono.
+        let shazamFormat = AVAudioFormat(standardFormatWithSampleRate: buffer.format.sampleRate, channels: 1)!
+        
+        // Convert your stereo buffer to mono
+        let converter = AVAudioConverter(from: buffer.format, to: shazamFormat)
+        let monoBuffer = AVAudioPCMBuffer(pcmFormat: shazamFormat, frameCapacity: buffer.frameLength)!
+        
+        var error: NSError?
+        converter?.convert(to: monoBuffer, error: &error) { inNumPackets, outStatus in
+            outStatus.pointee = .haveData
+            return buffer
+        }
+        
+        // Append the converted mono buffer
+        try? signatureGenerator.append(monoBuffer, at: time)
+        accumulatedFrames += monoBuffer.frameLength
+        
+        // Match every ~10 seconds
+        if accumulatedFrames >= AVAudioFrameCount(shazamFormat.sampleRate * 10) {
+            let signature = signatureGenerator.signature()
+            
+            // LOG THIS: If this is 0.0, the append failed!
+            print("🎵 Final Signature Duration: \(signature.duration)s")
+            
+            if signature.duration > 3.0 {
+                shazamSession?.match(signature)
+            }
+            
+            // RESET
+            self.signatureGenerator = SHSignatureGenerator()
+            self.accumulatedFrames = 0
+        }
+    }
+    
+    func registerSongMatch(title: String, artist: String) async {
+        let now = Date()
+        
+        // THE COOLDOWN: Only announce a new song once every 60 seconds
+        guard now.timeIntervalSince(lastShazamMatchTime) > 60.0 else { return }
+        self.lastShazamMatchTime = now
+        
+        let customLabel = "🎵 \(title) by \(artist)"
+        
+        await PerformanceLogger.shared.logTelemetry(step: "SHAZAM", message: "Identified: \(customLabel)")
+        
+        // THE FIX: Yield the string directly to the UI, ignoring the map entirely!
+        songContinuation.yield(customLabel)
     }
     
     func confirmThreatAndTrack(label: String, confidence: Double) async {
@@ -72,8 +143,13 @@ actor AcousticProcessingPipeline {
         guard now.timeIntervalSince(lastProcessTime) > 0.2 else { return }
         lastProcessTime = now
         
-        let profile = await SoundProfile.classify(label)
-        let isVehicle = await profile.isVehicle
+        // --- THE SWIFT 6 CONCURRENCY FIX ---
+        // Safely hop to the MainActor ONCE to extract thread-safe values.
+        // This prevents cross-actor violations later in the detached task!
+        let (isVehicle, profileCeiling, profileMaxRange) = await MainActor.run {
+            let p = SoundProfile.classify(label)
+            return (p.isVehicle, p.ceiling, p.maxRange)
+        }
         
         // 1. ML TRIGGER LOG
         let triggerMsg = "Heard: \(label) (Conf: \(String(format: "%.2f", confidence)))"
@@ -113,13 +189,20 @@ actor AcousticProcessingPipeline {
                 }
             }
             
+            // When updating the tracker, only use the frequency doppler if it's NOT a vehicle.
             let threatSessionID: UUID
             let dopplerResult: (isApproaching: Bool, shiftHz: Double)?
             
             if let index = matchIndex {
                 activeThreats[index].lastFrequency = currentFreq
                 activeThreats[index].lastSeen = now
-                dopplerResult = activeThreats[index].dopplerTracker.update(with: currentFreq, confidence: target.confidence)
+                
+                // THE FIX: Ignore frequency doppler for broadband vehicles
+                if isVehicle {
+                    dopplerResult = nil
+                } else {
+                    dopplerResult = activeThreats[index].dopplerTracker.update(with: currentFreq, confidence: target.confidence)
+                }
                 threatSessionID = activeThreats[index].sessionID
             } else {
                 let newID = UUID()
@@ -134,12 +217,15 @@ actor AcousticProcessingPipeline {
                 guard let self = self else { return }
                 
                 let ambientFloor: Double = isVehicle ? 0.02 : 0.04
-                let safePeak = min(max(Double(peak), ambientFloor), profile.ceiling)
-                let linearRatio = (profile.ceiling - safePeak) / (profile.ceiling - ambientFloor)
+                
+                // THE FIX: Use the extracted thread-safe constants instead of 'profile'
+                let safePeak = min(max(Double(peak), ambientFloor), profileCeiling)
+                let linearRatio = (profileCeiling - safePeak) / (profileCeiling - ambientFloor)
                 
                 // THE DISTANCE FIX
-                let adjustedMaxRange = isVehicle ? 400.0 : profile.maxRange
-                let curvePower = isVehicle ? 3.5 : 2.0
+                // Decrease the vehicle curve from 3.5 to 2.2 to stop the "ganging up"
+                let adjustedMaxRange = isVehicle ? 400.0 : profileMaxRange
+                let curvePower = isVehicle ? 2.2 : 2.0 // <-- Relaxed this value
                 let estimatedFeet = max(10.0, pow(linearRatio, curvePower) * adjustedMaxRange)
                 let normalizedUI_Distance = estimatedFeet / 1000.0
                 
@@ -147,7 +233,7 @@ actor AcousticProcessingPipeline {
                 let exactMicDistance = await HardwareCalibration.micBaseline
                 let rawAngle = self.fftProcessor.calculateTDOA(left: Array(UnsafeBufferPointer(start: channelData[0], count: 4096)),
                                                                right: Array(UnsafeBufferPointer(start: channelData[1], count: 4096)),
-                                                               sampleRate: self.sampleRate,
+                                                               sampleRate: Double(44100),
                                                                micDistance: exactMicDistance) ?? 0.0
                 
                 // EVENT YIELD
@@ -165,12 +251,18 @@ actor AcousticProcessingPipeline {
                     longitude: await self.lastKnownLocation?.longitude
                 )
                 
-                await MainActor.run { self.continuation.yield(newEvent) }
+                // THE FIX: Explicitly ignore the yield result with "_ ="
+                await MainActor.run { _ = self.continuation.yield(newEvent) }
             }
         }
     }
     
+    
     func setupAnalyzer(format: AVAudioFormat) throws {
+        // Update the actor's math to match the actual hardware speed
+        self.sampleRate = format.sampleRate
+        self.framesPerSecond = format.sampleRate
+        
         streamAnalyzer = SNAudioStreamAnalyzer(format: format)
         
         let request = try SNClassifySoundRequest(classifierIdentifier: .version1)
@@ -180,6 +272,14 @@ actor AcousticProcessingPipeline {
         let observer = ThreatResultsObserver(pipeline: self)
         self.resultsObserver = observer
         try streamAnalyzer?.add(request, withObserver: observer)
+        
+        self.signatureGenerator = SHSignatureGenerator()
+        
+        // --- SHAZAM SETUP ---
+        let shazamObs = ShazamResultsObserver(pipeline: self)
+        self.shazamDelegate = shazamObs
+        self.shazamSession = SHSession()
+        self.shazamSession?.delegate = shazamObs
     }
     
     private func updateDoppler(frequency: Double, confidence: Float) -> (isApproaching: Bool, shiftHz: Double)? {
@@ -231,39 +331,82 @@ final class ThreatResultsObserver: NSObject, @unchecked Sendable, SNResultsObser
         let topCandidates = classificationResult.classifications.prefix(5).map { ($0.identifier.lowercased(), $0.confidence) }
         
         Task { @MainActor in
-            var detectedLabel: String?
-            var highestConfidence: Double = 0.0
+            var finalLabel: String?
+            var finalConfidence: Double = 0.0
             
-            // THE FIX: Scan the top 5 sounds, not just the 1st!
+            var pendingVehicleLabel: String?
+            var pendingVehicleConf: Double = 0.0
+            
+            // Mutually Exclusive Priority Scanning
             for (label, conf) in topCandidates {
-                let isVehicle = SoundProfile.classify(label).isVehicle
-                let isEmergency = SoundProfile.classify(label).isEmergency
+                let profile = SoundProfile.classify(label)
                 
-                // PRIORITY 1: Emergencies (Siren, Fire, Ambulance).
-                // Even if it's hiding in the background at 25%, grab it immediately!
-                if isEmergency && conf > 0.5 {
-                    detectedLabel = label
-                    highestConfidence = conf
-                    break // Stop looking, this overrides everything
+                // PRIORITY 1: Emergencies.
+                if profile.isEmergency && conf > 0.25 {
+                    finalLabel = label
+                    finalConfidence = conf
+                    break // Emergency found. Stop scanning entirely.
                 }
-                if isVehicle && !isEmergency && conf > 0.20 {
-                    detectedLabel = label
-                    highestConfidence = conf
-                    break
+                
+                // PRIORITY 2: Vehicles.
+                else if profile.isVehicle && conf > 0.20 && pendingVehicleLabel == nil {
+                    pendingVehicleLabel = label
+                    pendingVehicleConf = conf
+                    // Do NOT break here. Keep scanning in case an emergency is lower in the list.
                 }
             }
-            // PRIORITY 3: The standard fallback.
-            // If we didn't find a hidden car or siren, just use whatever is loudest (if > 50%)
-            if detectedLabel == nil, let top = topCandidates.first, top.1 > 0.50 {
-                detectedLabel = top.0
-                highestConfidence = top.1
+            
+            // Resolution Phase: Assign the final threat based on priority rank
+            if finalLabel == nil {
+                if let vLabel = pendingVehicleLabel {
+                    finalLabel = vLabel
+                    finalConfidence = pendingVehicleConf
+                }
+                // PRIORITY 3: The standard fallback.
+                else if let top = topCandidates.first, top.1 > 0.50 {
+                    finalLabel = top.0
+                    finalConfidence = top.1
+                }
             }
-            // If we found something worth tracking, send it to the pipeline
-            if let finalLabel = detectedLabel {
+            
+            // Send it to the pipeline
+            if let detectedLabel = finalLabel {
                 Task {
-                    await self.pipeline?.confirmThreatAndTrack(label: finalLabel, confidence: highestConfidence)
+                    await self.pipeline?.confirmThreatAndTrack(label: detectedLabel, confidence: finalConfidence)
                 }
             }
+        }
+    }
+}
+
+// MARK: - Shazam Results Observer
+final class ShazamResultsObserver: NSObject, @unchecked Sendable, SHSessionDelegate {
+    private weak var pipeline: AcousticProcessingPipeline?
+    
+    nonisolated init(pipeline: AcousticProcessingPipeline) {
+        self.pipeline = pipeline
+        super.init()
+    }
+    
+    nonisolated func session(_ session: SHSession, didFind match: SHMatch) {
+        guard let mediaItem = match.mediaItems.first,
+              let title = mediaItem.title,
+              let artist = mediaItem.artist else { return }
+        
+        print("🎵 Shazam Match Found: \(title)")
+        
+        Task {
+            await pipeline?.registerSongMatch(title: title, artist: artist)
+        }
+    }
+    
+    nonisolated func session(_ session: SHSession, didNotFindMatchFor signature: SHSignature, error: Error?) {
+        if let err = error {
+            // This will tell us if it's a network issue or a signature issue
+            print("🎵 Shazam Error: \(err.localizedDescription)")
+        } else {
+            // This prints every few seconds while it's trying to listen
+            print("🎵 Shazam: Listening for The Doors... no match yet.")
         }
     }
 }
