@@ -13,6 +13,7 @@ struct ContentView: View {
                 MapView(events: coordinator.activeEvents,
                         userLocation: microphoneManager.currentLocation,
                         userHeading: microphoneManager.currentHeading)
+                .ignoresSafeArea()
                 
                 // 2. Main UI Layer
                 VStack {
@@ -36,8 +37,8 @@ struct ContentView: View {
                                     Image("firemanHat")
                                         .resizable()
                                         .scaledToFit()
-                                        .frame(width: 20, height: 20)
-                                        .padding(10)
+                                        .frame(width: 45, height: 45)
+                                        .padding(2)
                                         .background(.ultraThinMaterial)
                                         .environment(\.colorScheme, .dark)
                                         .clipShape(Circle())
@@ -49,10 +50,10 @@ struct ContentView: View {
                                     NotificationCenter.default.post(name: NSNotification.Name("SnapToUser"), object: nil)
                                 }) {
                                     Image(systemName: "location.fill")
-                                        .font(.system(size: 20, weight: .semibold))
+                                        .font(.system(size: 24, weight: .semibold))
                                         .foregroundColor(.blue)
-                                        .frame(width: 20, height: 20)
-                                        .padding(10)
+                                        .frame(width: 45, height: 45)
+                                        .padding(2)
                                         .background(.ultraThinMaterial)
                                         .environment(\.colorScheme, .dark)
                                         .clipShape(Circle())
@@ -193,8 +194,8 @@ struct DebugHUD: View {
                 }
             }
         }
-        .padding(10)
-        .frame(width: 135, alignment: .leading)
+        .padding(6)
+        .frame(width: 115, alignment: .leading)
         .background(
             ZStack {
                 Rectangle().fill(.ultraThinMaterial)
