@@ -187,18 +187,20 @@ actor AcousticProcessingPipeline {
                 print("🎵 Radar detected music. Waking up Shazam...")
             }
         }
-        
+
         guard let buffer = latestBuffer, let channelData = buffer.floatChannelData else { return }
-        let peak = Array(UnsafeBufferPointer(start: channelData[0], count: min(Int(buffer.frameLength), 4096))).map(abs).max() ?? 0.0
+        
+        // --- THE CRASH FIX: Dynamically size the read buffer to prevent EXC_BAD_ACCESS ---
+        let safeCount = min(Int(buffer.frameLength), 4096)
+        
+        let peak = Array(UnsafeBufferPointer(start: channelData[0], count: safeCount)).map(abs).max() ?? 0.0
         
         // 2. VOLUME GATE
         let minimumPeak: Float = isVehicle ? 0.02 : 0.04
-        guard peak > minimumPeak else {
-            await PerformanceLogger.shared.logTelemetry(step: "2_VOLUME_DROP", message: "Peak \(String(format: "%.3f", peak)) < \(minimumPeak)")
-            return
-        }
+        guard peak > minimumPeak else { return }
         
-        var targets = self.fftProcessor.analyzeMultiple(samples: Array(UnsafeBufferPointer(start: channelData[0], count: 4096)), sampleRate: self.sampleRate, maxPeaks: 3)
+        // Use 'safeCount' instead of the hardcoded 4096
+        var targets = self.fftProcessor.analyzeMultiple(samples: Array(UnsafeBufferPointer(start: channelData[0], count: safeCount)), sampleRate: self.sampleRate, maxPeaks: 3)
         
         // 3. FFT HANDLING
         if targets.isEmpty && isVehicle {
@@ -263,10 +265,14 @@ actor AcousticProcessingPipeline {
                 let normalizedUI_Distance = estimatedFeet / 1000.0
                 
                 let exactMicDistance = await HardwareCalibration.micBaseline
-                let rawAngle = self.fftProcessor.calculateTDOA(left: Array(UnsafeBufferPointer(start: channelData[0], count: 4096)),
-                                                               right: Array(UnsafeBufferPointer(start: channelData[1], count: 4096)),
-                                                               sampleRate: localSampleRate,
-                                                               micDistance: exactMicDistance) ?? 0.0
+                
+                // Use 'safeCount' here as well for both channels!
+                let rawAngle = self.fftProcessor.calculateTDOA(
+                    left: Array(UnsafeBufferPointer(start: channelData[0], count: safeCount)),
+                    right: Array(UnsafeBufferPointer(start: channelData[1], count: safeCount)),
+                    sampleRate: localSampleRate,
+                    micDistance: exactMicDistance
+                ) ?? 0.0
                 
                 let newEvent = SoundEvent(
                     sessionID: threatSessionID,
@@ -366,6 +372,12 @@ final class ThreatResultsObserver: NSObject, @unchecked Sendable, SNResultsObser
             
             // Mutually Exclusive Priority Scanning
             for (label, conf) in topCandidates {
+                
+                // --- THE WIND & NOISE FILTER ---
+                // Block the ML from hallucinating these sounds when wind hits the mic
+                let ignoredLabels = ["fire", "thunderstorm", "wind", "breathing", "burp", "snore"]
+                if ignoredLabels.contains(label) { continue }
+                
                 let profile = SoundProfile.classify(label)
                 
                 // PRIORITY 1: Emergencies.
@@ -379,7 +391,6 @@ final class ThreatResultsObserver: NSObject, @unchecked Sendable, SNResultsObser
                 else if profile.isVehicle && conf > 0.20 && pendingVehicleLabel == nil {
                     pendingVehicleLabel = label
                     pendingVehicleConf = conf
-                    // Do NOT break here. Keep scanning in case an emergency is lower in the list.
                 }
             }
             

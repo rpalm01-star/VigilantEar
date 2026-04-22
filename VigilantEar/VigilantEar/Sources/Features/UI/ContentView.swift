@@ -13,17 +13,57 @@ struct ContentView: View {
                 MapView(events: coordinator.activeEvents,
                         userLocation: microphoneManager.currentLocation,
                         userHeading: microphoneManager.currentHeading)
-                .ignoresSafeArea()
                 
                 // 2. Main UI Layer
                 VStack {
                     // TOP BAR
-                    HStack {
-                        Text("VIGILANT EAR")
-                            .font(.system(.headline, design: .monospaced))
-                            .tracking(3)
-                            .foregroundStyle(.green)
+                    HStack(alignment: .top) {
+                        // TOP LEFT: Title & Compact Controls
+                        VStack(alignment: .leading, spacing: 12) {
+                            Text("VIGILANT EAR")
+                                .font(.system(.headline, design: .monospaced))
+                                .tracking(3)
+                                .foregroundStyle(.green)
+                            
+                            // THE COMPACT CONTROLS (Size locked to 40x40)
+                            HStack(spacing: 12) {
+                                // Simulation Button (Fire First)
+                                Button(action: {
+                                    ThreatSimulator.runFireTruckDriveBy(location: microphoneManager.currentLocation,
+                                                                        heading: microphoneManager.currentHeading,
+                                                                        coordinator: coordinator)
+                                }) {
+                                    Image("firemanHat")
+                                        .resizable()
+                                        .scaledToFit()
+                                        .frame(width: 20, height: 20)
+                                        .padding(10)
+                                        .background(.ultraThinMaterial)
+                                        .environment(\.colorScheme, .dark)
+                                        .clipShape(Circle())
+                                        .overlay(Circle().stroke(Color.white.opacity(0.2), lineWidth: 1))
+                                }
+                                
+                                // Snap to User Button (Nav Second)
+                                Button(action: {
+                                    NotificationCenter.default.post(name: NSNotification.Name("SnapToUser"), object: nil)
+                                }) {
+                                    Image(systemName: "location.fill")
+                                        .font(.system(size: 20, weight: .semibold))
+                                        .foregroundColor(.blue)
+                                        .frame(width: 20, height: 20)
+                                        .padding(10)
+                                        .background(.ultraThinMaterial)
+                                        .environment(\.colorScheme, .dark)
+                                        .clipShape(Circle())
+                                        .overlay(Circle().stroke(Color.white.opacity(0.2), lineWidth: 1))
+                                }
+                            }
+                        }
+                        
                         Spacer()
+                        
+                        // TOP RIGHT: Status Pill
                         HStack(spacing: 8) {
                             Circle()
                                 .fill(microphoneManager.isListening ? Color.green : Color.gray)
@@ -39,21 +79,17 @@ struct ContentView: View {
                     }
                     .padding()
                     
-                    // THIS SPACER pushes everything below it to the bottom
                     Spacer()
                     
-                    // BOTTOM OVERLAY AREA
+                    // BOTTOM OVERLAY AREA (Threats & Shazam)
                     HStack(alignment: .bottom) {
-                        // LEFT COLUMN: Threat HUD and Shazam Text
                         VStack(alignment: .leading, spacing: 12) {
-                            // 1. Threat HUD (70% of screen width)
                             ThreatHUD(events: coordinator.activeEvents)
                                 .frame(width: geo.size.width * 0.7, height: 100)
                                 .allowsHitTesting(false)
                             
-                            // 2. Shazam Text (Now spanning the full width of the HUD)
                             if let songTitle = coordinator.activeSong,
-                                coordinator.activeEvents.contains(where: { $0.threatLabel.lowercased() == "music" }) {
+                               coordinator.activeEvents.contains(where: { $0.threatLabel.lowercased() == "music" }) {
                                 
                                 HStack(alignment: .center, spacing: 8) {
                                     Image(systemName: "waveform")
@@ -76,31 +112,12 @@ struct ContentView: View {
                         }
                         .padding(.leading, 20)
                         
-                        Spacer() // Pushes the control column to the far right
-                        
-                        // RIGHT COLUMN: Controls
-                        VStack(spacing: 20) {
-                            // Simulation Button
-                            Button(action: {
-                                ThreatSimulator.runFireTruckDriveBy(location: microphoneManager.currentLocation, heading: microphoneManager.currentHeading, coordinator: coordinator)
-                            }) {
-                                Image("firemanHat").resizable().scaledToFit().frame(width: 28, height: 28).padding(12).background(.ultraThinMaterial).environment(\.colorScheme, .dark).clipShape(Circle()).overlay(Circle().stroke(Color.white.opacity(0.2), lineWidth: 1))
-                            }
-                            
-                            // Snap to User Button
-                            Button(action: {
-                                NotificationCenter.default.post(name: NSNotification.Name("SnapToUser"), object: nil)
-                            }) {
-                                Image(systemName: "location.fill").font(.system(size: 28, weight: .semibold)).foregroundColor(.blue).frame(width: 28, height: 28).padding(12).background(.ultraThinMaterial).environment(\.colorScheme, .dark).clipShape(Circle()).overlay(Circle().stroke(Color.white.opacity(0.2), lineWidth: 1))
-                            }
-                        }
-                        .padding(.trailing, 20)
+                        Spacer()
                     }
-                    .padding(.bottom, 30) // Final lift off the bottom edge
+                    .padding(.bottom, 30)
                 }
                 .animation(.easeInOut, value: coordinator.activeSong)
                 
-                // 3. Orientation Lock Overlay
                 if isPortrait {
                     Color.black.opacity(0.85).ignoresSafeArea()
                     VStack(spacing: 20) {
@@ -109,10 +126,11 @@ struct ContentView: View {
                     }.zIndex(100)
                 }
             }
-            .overlay(alignment: .topLeading) {
-                DebugHUD().padding(.top, 60).padding(.leading, 16)
+            .overlay(alignment: .bottomTrailing) {
+                DebugHUD()
+                    .padding(.bottom, 12)
+                    .padding(.trailing, 12)
             }
-            // ... (Rest of your onChange and task logic exactly as before)
             .onChange(of: isPortrait) { _, newValue in
                 if newValue {
                     microphoneManager.stopCapturing()
@@ -135,24 +153,14 @@ struct ContentView: View {
 // MARK: - Debug HUD Component
 struct DebugHUD: View {
     @StateObject private var monitor = SystemMonitor.shared
-    
-    // Create a local UI state synced to your global default
     @State private var isCloudLoggingEnabled: Bool = AppGlobals.logToCloud
     
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
-            HStack {
-                Text("⚙️ SYSTEM TELEMETRY")
-                    .font(.system(size: 10, weight: .bold, design: .monospaced))
-                    .foregroundColor(.gray)
-                
-                Spacer()
-                
-                // Visual indicator for the cloud connection
-                Image(systemName: isCloudLoggingEnabled ? "cloud.fill" : "cloud")
-                    .font(.system(size: 10))
-                    .foregroundColor(isCloudLoggingEnabled ? .cyan : .gray)
-            }
+            Text("⚙️ TELEMETRY")
+                .font(.system(size: 10, weight: .bold, design: .monospaced))
+                .foregroundColor(isCloudLoggingEnabled ? .cyan : .gray)
+                .padding(.bottom, 2)
             
             HStack {
                 Text("CPU:")
@@ -169,16 +177,29 @@ struct DebugHUD: View {
                     .font(.system(size: 12, weight: .bold, design: .monospaced))
                     .foregroundColor(.cyan)
             }
+            
+            HStack(spacing: 4) {
+                Text("PWR:")
+                    .font(.system(size: 12, weight: .medium, design: .monospaced))
+                
+                Text("\(monitor.batteryLevel)%")
+                    .font(.system(size: 12, weight: .bold, design: .monospaced))
+                    .foregroundColor(monitor.batteryLevel > 20 ? .green : .red)
+                
+                if monitor.isCharging {
+                    Image(systemName: "bolt.fill")
+                        .foregroundColor(.yellow)
+                        .font(.system(size: 10))
+                }
+            }
         }
         .padding(10)
-        // Set a fixed width so the spacer pushes the cloud icon to the right edge
-        .frame(width: 180)
-        // THE BACKGROUND TOGGLE
+        .frame(width: 135, alignment: .leading)
         .background(
             ZStack {
                 Rectangle().fill(.ultraThinMaterial)
                 if isCloudLoggingEnabled {
-                    Rectangle().fill(Color.blue.opacity(0.3)) // Tints it blue when active
+                    Rectangle().fill(Color.blue.opacity(0.3))
                 }
             }
         )
@@ -187,13 +208,11 @@ struct DebugHUD: View {
         .onAppear {
             monitor.start()
         }
-        // THE TAP ACTION
         .onTapGesture {
             withAnimation(.easeInOut(duration: 0.2)) {
                 isCloudLoggingEnabled.toggle()
-                AppGlobals.logToCloud = isCloudLoggingEnabled // Sync with the global math engine
+                AppGlobals.logToCloud = isCloudLoggingEnabled
                 
-                // Optional: Provide a tiny bit of haptic feedback on tap
                 let generator = UIImpactFeedbackGenerator(style: .medium)
                 generator.impactOccurred()
             }

@@ -17,8 +17,8 @@ struct ThreatSimulator {
         
         Task {
             // Cast a net (800ft / 243m) to find road-legal coordinates
-            let startCoord = location.coordinate.projected(by: 243.8, bearingDegrees: heading + 110)
-            let endCoord = location.coordinate.projected(by: 243.8, bearingDegrees: heading - 110)
+            let startCoord = location.coordinate.projected(by: 243.8, bearingDegrees: heading + 90)
+            let endCoord = location.coordinate.projected(by: 243.8, bearingDegrees: heading - 90)
             
             let request = MKDirections.Request()
             
@@ -34,13 +34,15 @@ struct ThreatSimulator {
             
             do {
                 let response = try await directions.calculate()
-                guard let route = response.routes.first else { return }
+                guard let route = response.routes.first else {
+                    print("⚠️ Simulator: No routes found.")
+                    return
+                }
                 
-                // --- THE ROTATION FIX ---
-                // Store the route in the coordinator so MapView draws a geographic Polyline
+                // Store the route so MapView draws the geographic line
                 coordinator.simulatedRoute = route
                 
-                // --- THE TRUNCATION FIX ---
+                // Densely sample the line for smooth movement
                 var pathCoordinates = route.polyline.denselySampled(spacingMeters: 2.0)
                 
                 // Truncate: Only keep points within the 500ft (152.4m) Yellow Circle
@@ -55,13 +57,13 @@ struct ThreatSimulator {
                     return
                 }
                 
-                // 2. SIMULATION STATE
+                // SIMULATION STATE
                 var step = 0
                 var previousDistance: Double = 9999.0
                 var isApproaching = true
                 let threatSessionID = UUID()
                 
-                // 3. DRIVE LOGIC
+                // DRIVE LOGIC
                 Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { timer in
                     let currentCoord = pathCoordinates[step]
                     let truckLocation = CLLocation(latitude: currentCoord.latitude, longitude: currentCoord.longitude)
@@ -104,7 +106,6 @@ struct ThreatSimulator {
                     step += 1
                     if step >= pathCoordinates.count {
                         timer.invalidate()
-                        // Clean up the line once the truck finishes the drive
                         Task { @MainActor in
                             coordinator.simulatedRoute = nil
                         }
@@ -117,7 +118,6 @@ struct ThreatSimulator {
         }
     }
     
-    // Helper for Bearing Math
     private nonisolated static func getBearingBetween(_ start: CLLocationCoordinate2D, _ end: CLLocationCoordinate2D) -> Double {
         let lat1 = start.latitude * .pi / 180
         let lon1 = start.longitude * .pi / 180

@@ -1,6 +1,7 @@
 import Foundation
 import SwiftUI
 import Combine
+import UIKit // <--- ADD THIS for UIDevice
 
 @MainActor
 final class SystemMonitor: ObservableObject {
@@ -9,19 +10,25 @@ final class SystemMonitor: ObservableObject {
     @Published var cpuUsage: Double = 0.0
     @Published var memoryUsageMB: Double = 0.0
     
+    // --- THE NEW BATTERY STATE ---
+    @Published var batteryLevel: Int = 0
+    @Published var isCharging: Bool = false
+    
     private var timer: Timer?
     
-    private init() {}
+    private init() {
+        // Enable battery monitoring when the monitor is created
+        UIDevice.current.isBatteryMonitoringEnabled = true
+    }
     
     func start() {
-        timer?.invalidate() // Prevent double-firing
+        timer?.invalidate()
         
-        // Poll the CPU twice a second
+        // Poll the system twice a second
         timer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
-            // Push the heavy kernel math to a background thread
             Task.detached(priority: .background) {
                 let metrics = SystemMonitor.fetchMetrics()
-                // Safely hop back to the main thread to update the UI
+                
                 await self?.updateUI(cpu: metrics.cpu, mem: metrics.mem)
             }
         }
@@ -30,7 +37,17 @@ final class SystemMonitor: ObservableObject {
     private func updateUI(cpu: Double, mem: Double) {
         self.cpuUsage = cpu
         self.memoryUsageMB = mem
+        
+        // --- READ BATTERY ON MAIN THREAD ---
+        let level = UIDevice.current.batteryLevel
+        // batteryLevel returns -1.0 if the simulator or device doesn't support it
+        self.batteryLevel = level >= 0 ? Int(level * 100) : 0
+        
+        let state = UIDevice.current.batteryState
+        self.isCharging = (state == .charging || state == .full)
     }
+    
+    // ... keep your existing fetchMetrics() exactly as it is ...
     
     // THE FIX: A much safer way to bridge C-structs into Swift memory
     nonisolated private static func fetchMetrics() -> (cpu: Double, mem: Double) {

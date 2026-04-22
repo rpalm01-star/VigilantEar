@@ -106,11 +106,13 @@ final class FFTProcessor: @unchecked Sendable {
     }
     
     // MARK: - TDOA
-    
     nonisolated func calculateTDOA(left: [Float], right: [Float], sampleRate: Double, micDistance: Double = 0.15) -> Double? {
+        // --- THE CRASH FIX ---
+        // Ensure we never process more than the internal FFT setup can handle
         let safeLeft = Array(left.prefix(fftSize))
         let safeRight = Array(right.prefix(fftSize))
         
+        // If we don't have enough data to fill a single FFT window, abort safely
         guard safeLeft.count == fftSize, safeRight.count == fftSize else { return 0.0 }
         
         let halfSize = fftSize / 2

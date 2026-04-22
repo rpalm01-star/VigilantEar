@@ -34,7 +34,7 @@ struct SoundProfile {
         (["speech", "voice", "talk", "person"], "waveform", .cyan, 0.55, 150.0, .medium),
         (["bicycle"], "bicycle", .blue, 0.55, 150.0, .medium),
         (["bell", "chime", "clock", "tick", "beep"], "bell.fill", .purple, 0.55, 150.0, .medium),
-        (["music", "choir", "song", "sing", "whistl", "didgeridoo", "bassoon", "tuning", "theremin"], "music.note", .purple, 0.55, 125.0, .medium),
+        (["music", "choir", "song", "sing", "whistl", "didgeridoo", "bassoon", "tuning", "theremin", "flute"], "music.note", .purple, 0.55, 125.0, .medium),
         (["knock", "tap", "hammer", "chopping", "tennis"], "hand.tap.fill", .purple, 0.55, 150.0, .medium),
         (["step", "walk", "foot", "bowling"], "figure.walk", .cyan, 0.55, 150.0, .medium),
         (["water", "rain", "splash"], "drop.fill", .teal, 0.55, 150.0, .medium),
@@ -50,11 +50,12 @@ struct SoundProfile {
         (["laugh", "chuckle"], "face.smiling.fill", .cyan, 0.35, 30.0, .quiet),
         
         // --- ANIMALS ---
-        (["bird", "chirp", "owl"], "bird.fill", .green, 0.35, 30.0, .animal),
+        (["whale"], "fish.fill", .green, 0.35, 30.0, .animal),
         (["cat"], "cat", .green, 0.35, 30.0, .animal),
-        (["dog"], "dog", .green, 0.35, 30.0, .animal),
+        (["dog", "coyote"], "dog", .green, 0.35, 30.0, .animal),
         (["bark", "animal", "pig"], "pawprint.fill", .green, 0.35, 30.0, .animal),
-        
+        (["bird", "chirp", "owl"], "bird.fill", .green, 0.35, 30.0, .animal),
+
         // --- MISC ---
         (["fan"], "fan", .mint, 0.35, 30.0, .misc),
         (["crumpl", "crush", "trash"], "trash.fill", .mint, 0.35, 30.0, .misc),

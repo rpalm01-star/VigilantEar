@@ -32,33 +32,23 @@ struct VigilantEarApp: App {
                         .environment(deps.classificationService)
                         .environment(deps.acousticCoordinator)
                     
-                    // We deleted the .task block!
-                    // The DependencyContainer already wired the pipeline together.
-                    
                 } else {
                     VStack(spacing: 0) {
                         StartupVerificationView(viewModel: verificationViewModel)
-                        
-                        if verificationViewModel.isFinished {
-                            Button(action: {
-                                withAnimation(.spring()) {
-                                    isVerified = true
-                                }
-                            }) {
-                                Text("Launch Application")
-                                    .bold()
-                                    .frame(maxWidth: .infinity)
-                                    .padding()
-                                    .background(Color.blue)
-                                    .foregroundColor(.white)
-                                    .cornerRadius(12)
-                            }
-                            .padding(.horizontal, 24)
-                            .padding(.bottom, 20)
-                            .transition(.move(edge: .bottom).combined(with: .opacity))
-                        }
                     }
                     .background(Color(.systemGroupedBackground))
+                    // --- THE AUTO-LAUNCH WATCHER ---
+                    .onChange(of: verificationViewModel.isFinished) { _, isFinished in
+                        if isFinished && verificationViewModel.allPassed {
+                            // A tiny half-second delay gives the user a micro-burst of
+                            // visual confirmation (seeing all green checks) before animating away.
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                                withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
+                                    isVerified = true
+                                }
+                            }
+                        }
+                    }
                 }
             }
             .defersSystemGestures(on: .all)
