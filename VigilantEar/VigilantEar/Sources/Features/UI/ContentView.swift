@@ -4,6 +4,8 @@ struct ContentView: View {
     @Environment(MicrophoneManager.self) private var microphoneManager
     @Environment(AcousticCoordinator.self) private var coordinator
     
+    let title = "VIGILANT EAR"
+
     var body: some View {
         GeometryReader { geo in
             let isPortrait = geo.size.height > geo.size.width
@@ -21,10 +23,26 @@ struct ContentView: View {
                     HStack(alignment: .top) {
                         // TOP LEFT: Title & Compact Controls
                         VStack(alignment: .leading, spacing: 12) {
-                            Text("VIGILANT EAR")
+                                                                                    
+                            Text(title)
                                 .font(.system(.headline, design: .monospaced))
                                 .tracking(3)
-                                .foregroundStyle(.green)
+                                .foregroundStyle(.black)
+                                .background {
+                                    // Soft mint background glow (behind everything)
+                                    Text(title)
+                                        .font(.system(.headline, design: .monospaced))
+                                        .tracking(3)
+                                        .foregroundStyle(.mint.opacity(0.9))
+                                        .blur(radius: 10)
+                                }
+                                .overlay {
+                                    Text(title)
+                                        .font(.system(.headline, design: .monospaced))
+                                        .tracking(3)
+                                        .foregroundStyle(.green)
+                                        .blur(radius: 0.9)                   // ← tweak this for outline thickness
+                                }
                             
                             // THE COMPACT CONTROLS (Size locked to 40x40)
                             HStack(spacing: 12) {
@@ -156,10 +174,12 @@ struct DebugHUD: View {
     @StateObject private var monitor = SystemMonitor.shared
     @State private var isCloudLoggingEnabled: Bool = AppGlobals.logToCloud
     
+    let telemetryTitle = "⚙️ Telemetry" + AppGlobals.appVersion
+    
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text("⚙️ TELEMETRY")
-                .font(.system(size: 10, weight: .bold, design: .monospaced))
+            Text(telemetryTitle)
+                .font(.system(size: 9, weight: .bold, design: .monospaced))
                 .foregroundColor(isCloudLoggingEnabled ? .cyan : .gray)
                 .padding(.bottom, 2)
             

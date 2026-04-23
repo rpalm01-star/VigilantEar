@@ -23,7 +23,9 @@ actor AcousticProcessingPipeline {
         var sessionID: UUID
         var dopplerTracker: SirenDopplerTracker
         var lastFrequency: Double
+        var lastBearing: Double // <-- NEW: Remember the spatial angle
         var lastSeen: Date
+        var category: ThreatCategory
     }
     
     private var activeThreats: [ActiveThreat] = []
@@ -164,9 +166,10 @@ actor AcousticProcessingPipeline {
         guard now.timeIntervalSince(lastProcessTime) > 0.2 else { return }
         lastProcessTime = now
         
-        let (isVehicle, profileCeiling, profileMaxRange) = await MainActor.run {
+        // FETCH EVERYTHING AT ONCE ON THE MAIN ACTOR
+        let (isVehicle, profileCeiling, profileMaxRange, currentCategory) = await MainActor.run {
             let p = SoundProfile.classify(label)
-            return (p.isVehicle, p.ceiling, p.maxRange)
+            return (p.isVehicle, p.ceiling, p.maxRange, p.category)
         }
         
         // 1. ML TRIGGER LOG
@@ -184,10 +187,10 @@ actor AcousticProcessingPipeline {
                 hasMatchedCurrentSong = false // Unlock the search
                 self.signatureGenerator = SHSignatureGenerator() // Fresh bucket
                 self.accumulatedFrames = 0
-                print("🎵 Radar detected music. Waking up Shazam...")
+                //print("🎵 Radar detected music. Waking up Shazam...")
             }
         }
-
+        
         guard let buffer = latestBuffer, let channelData = buffer.floatChannelData else { return }
         
         // --- THE CRASH FIX: Dynamically size the read buffer to prevent EXC_BAD_ACCESS ---
@@ -199,14 +202,29 @@ actor AcousticProcessingPipeline {
         let minimumPeak: Float = isVehicle ? 0.02 : 0.04
         guard peak > minimumPeak else { return }
         
-        // Use 'safeCount' instead of the hardcoded 4096
+        // 3. FFT HANDLING
         var targets = self.fftProcessor.analyzeMultiple(samples: Array(UnsafeBufferPointer(start: channelData[0], count: safeCount)), sampleRate: self.sampleRate, maxPeaks: 3)
         
-        // 3. FFT HANDLING
-        if targets.isEmpty && isVehicle {
-            targets.append((frequency: 100.0, confidence: Float(confidence)))
+        if isVehicle {
+            targets = [(frequency: 100.0, confidence: Float(confidence))]
         } else if targets.isEmpty {
             return
+        }
+        
+        let localSampleRate = self.sampleRate
+        let exactMicDistance = await HardwareCalibration.micBaseline
+        
+        // --- NEW: CALCULATE BEARING BEFORE MATCHING ---
+        let currentBearing: Double
+        if buffer.format.channelCount >= 2 {
+            currentBearing = self.fftProcessor.calculateTDOA(
+                left: Array(UnsafeBufferPointer(start: channelData[0], count: safeCount)),
+                right: Array(UnsafeBufferPointer(start: channelData[1], count: safeCount)),
+                sampleRate: localSampleRate,
+                micDistance: exactMicDistance
+            ) ?? 0.0
+        } else {
+            currentBearing = 0.0
         }
         
         activeThreats.removeAll { now.timeIntervalSince($0.lastSeen) > 4.0 }
@@ -217,11 +235,25 @@ actor AcousticProcessingPipeline {
             
             // THREAT MATCHING
             for (index, threat) in activeThreats.enumerated() {
-                // THE FIX: Give music a massive 8000Hz threshold so note-changes don't spawn new dots!
-                let threshold = isVehicle ? 500.0 : (isMusic ? 8000.0 : 40.0)
-                if abs(threat.lastFrequency - currentFreq) < threshold {
-                    matchIndex = index
-                    break
+                guard threat.category.rawValue == currentCategory.rawValue else { continue }
+                
+                if isVehicle {
+                    // THE FIX: Separate cars by spatial angle instead of frequency
+                    let bearingDiff = abs(threat.lastBearing - currentBearing)
+                    let normalizedDiff = bearingDiff > 180 ? 360 - bearingDiff : bearingDiff
+                    
+                    // If the new car is within 35 degrees of the old car, keep the ID
+                    if normalizedDiff < 35.0 {
+                        matchIndex = index
+                        break
+                    }
+                } else {
+                    // Standard frequency matching for sirens, music, and birds
+                    let threshold = isMusic ? 8000.0 : 40.0
+                    if abs(threat.lastFrequency - currentFreq) < threshold {
+                        matchIndex = index
+                        break
+                    }
                 }
             }
             
@@ -230,9 +262,9 @@ actor AcousticProcessingPipeline {
             
             if let index = matchIndex {
                 activeThreats[index].lastFrequency = currentFreq
+                activeThreats[index].lastBearing = currentBearing // Update bearing
                 activeThreats[index].lastSeen = now
                 
-                // THE FIX: Ignore frequency doppler for music (just like vehicles)
                 if isVehicle || isMusic {
                     dopplerResult = nil
                 } else {
@@ -243,49 +275,43 @@ actor AcousticProcessingPipeline {
                 let newID = UUID()
                 var newTracker = SirenDopplerTracker()
                 dopplerResult = newTracker.update(with: currentFreq, confidence: target.confidence)
-                activeThreats.append(ActiveThreat(sessionID: newID, dopplerTracker: newTracker, lastFrequency: currentFreq, lastSeen: now))
+                
+                activeThreats.append(ActiveThreat(
+                    sessionID: newID,
+                    dopplerTracker: newTracker,
+                    lastFrequency: currentFreq,
+                    lastBearing: currentBearing, // Save bearing
+                    lastSeen: now,
+                    category: currentCategory
+                ))
                 threatSessionID = newID
             }
             
-            let localSampleRate = self.sampleRate
-            
-            // 4. DISTANCE & BEARING MATH
-            Task.detached(priority: .userInitiated) { [weak self, threatSessionID] in
+            // 4. DISTANCE MATH ONLY (Task.detached)
+            Task.detached(priority: .userInitiated) { [weak self, threatSessionID, currentBearing] in
                 guard let self = self else { return }
                 
                 let ambientFloor: Double = isVehicle ? 0.02 : 0.04
-                
                 let safePeak = min(max(Double(peak), ambientFloor), profileCeiling)
                 let linearRatio = (profileCeiling - safePeak) / (profileCeiling - ambientFloor)
                 
                 let adjustedMaxRange = isVehicle ? 400.0 : profileMaxRange
-                // Increased from 2.0 to 2.5 to pull reflected/indoor sounds closer
                 let curvePower = isVehicle ? 2.2 : 2.5
                 let estimatedFeet = max(10.0, pow(linearRatio, curvePower) * adjustedMaxRange)
                 let normalizedUI_Distance = estimatedFeet / 1000.0
-                
-                let exactMicDistance = await HardwareCalibration.micBaseline
-                
-                // Use 'safeCount' here as well for both channels!
-                let rawAngle = self.fftProcessor.calculateTDOA(
-                    left: Array(UnsafeBufferPointer(start: channelData[0], count: safeCount)),
-                    right: Array(UnsafeBufferPointer(start: channelData[1], count: safeCount)),
-                    sampleRate: localSampleRate,
-                    micDistance: exactMicDistance
-                ) ?? 0.0
                 
                 let newEvent = SoundEvent(
                     sessionID: threatSessionID,
                     timestamp: Date(),
                     threatLabel: label,
                     confidence: confidence,
-                    bearing: rawAngle,
+                    bearing: currentBearing, // Use the angle we already calculated
                     distance: normalizedUI_Distance,
                     energy: Float(safePeak),
                     dopplerRate: dopplerResult?.shiftHz != nil ? Float(dopplerResult!.shiftHz) : nil,
                     isApproaching: dopplerResult?.isApproaching ?? false,
-                    latitude: nil,  // <--- FIX: Force the map to use relative projection
-                    longitude: nil  // <--- FIX: Force the map to use relative projection
+                    latitude: nil,
+                    longitude: nil
                 )
                 
                 await MainActor.run { _ = self.continuation.yield(newEvent) }
@@ -375,8 +401,8 @@ final class ThreatResultsObserver: NSObject, @unchecked Sendable, SNResultsObser
                 
                 // --- THE WIND & NOISE FILTER ---
                 // Block the ML from hallucinating these sounds when wind hits the mic
-                let ignoredLabels = ["fire", "thunderstorm", "wind", "breathing", "burp", "snore"]
-                if ignoredLabels.contains(label) { continue }
+                // let ignoredLabels = ["fire", "thunderstorm", "wind", "breathing", "burp", "snore"]
+                // if ignoredLabels.contains(label) { continue }
                 
                 let profile = SoundProfile.classify(label)
                 

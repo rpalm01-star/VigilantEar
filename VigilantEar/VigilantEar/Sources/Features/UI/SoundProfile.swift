@@ -1,7 +1,6 @@
 import SwiftUI
 
-// THE FIX 1: Strict categories so the whole app speaks the same language!
-enum ThreatCategory {
+enum ThreatCategory: String, Sendable {
     case emergency, vehicle, medium, quiet, animal, misc, unknown
 }
 

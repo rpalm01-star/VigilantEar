@@ -9,6 +9,11 @@ import Synchronization
 
 nonisolated struct AppGlobals {
     
+    private static let _appVersion = Mutex<String>(" 1.0.0")
+    public static var appVersion: String {
+        get { _appVersion.withLock { $0 } }
+    }
+
     private static let _dataStoreName = Mutex<String>("threats")
     public static var dataStoreName: String {
         get { _dataStoreName.withLock { $0 } }
