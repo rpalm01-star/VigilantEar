@@ -23,9 +23,9 @@ actor AcousticProcessingPipeline {
         var sessionID: UUID
         var dopplerTracker: SirenDopplerTracker
         var lastFrequency: Double
-        var lastBearing: Double // <-- NEW: Remember the spatial angle
+        var lastBearing: Double
         var lastSeen: Date
-        var category: ThreatCategory
+        var category: String // <--- FIX 1: Change this from ThreatCategory to String
     }
     
     private var activeThreats: [ActiveThreat] = []
@@ -166,13 +166,27 @@ actor AcousticProcessingPipeline {
         guard now.timeIntervalSince(lastProcessTime) > 0.2 else { return }
         lastProcessTime = now
         
-        // FETCH EVERYTHING AT ONCE ON THE MAIN ACTOR
+        // FETCH EVERYTHING AT ONCE (including the raw String category)
         let (isVehicle, profileCeiling, profileMaxRange, currentCategory) = await MainActor.run {
             let p = SoundProfile.classify(label)
-            return (p.isVehicle, p.ceiling, p.maxRange, p.category)
+            return (p.isVehicle, p.ceiling, p.maxRange, p.category.rawValue)
         }
         
-        // 1. ML TRIGGER LOG
+        // --- THE STATIC FILTER & EARLY EXIT ---
+        // Instantly drop the sound if its category is in our hardcoded ignore list
+        if AppGlobals.filteredCategories.contains(currentCategory) {
+            
+            // If we are debugging to the cloud, log the fact that we heard and dropped it
+            if AppGlobals.logToCloud {
+                let msg = "Filtered: \(label) (Conf: \(String(format: "%.2f", confidence)))"
+                await PerformanceLogger.shared.logTelemetry(step: "1_ML_FILTERED", message: msg)
+            }
+            
+            // Abort before any expensive FFT or spatial math runs!
+            return
+        }
+        
+        // 1. ML TRIGGER LOG (For active, non-filtered threats)
         let triggerMsg = "Heard: \(label) (Conf: \(String(format: "%.2f", confidence)))"
         await PerformanceLogger.shared.logTelemetry(step: "1_ML_TRIGGER", message: triggerMsg)
         
@@ -214,7 +228,6 @@ actor AcousticProcessingPipeline {
         let localSampleRate = self.sampleRate
         let exactMicDistance = await HardwareCalibration.micBaseline
         
-        // --- NEW: CALCULATE BEARING BEFORE MATCHING ---
         let currentBearing: Double
         if buffer.format.channelCount >= 2 {
             currentBearing = self.fftProcessor.calculateTDOA(
@@ -224,6 +237,7 @@ actor AcousticProcessingPipeline {
                 micDistance: exactMicDistance
             ) ?? 0.0
         } else {
+            print("⚠️ MONO AUDIO DETECTED: TDOA bypassed, bearing locked to 0.0")
             currentBearing = 0.0
         }
         
@@ -235,8 +249,9 @@ actor AcousticProcessingPipeline {
             
             // THREAT MATCHING
             for (index, threat) in activeThreats.enumerated() {
-                guard threat.category.rawValue == currentCategory.rawValue else { continue }
-                
+                // FIX 2: Just compare the two strings directly!
+                guard threat.category == currentCategory else { continue }
+                    
                 if isVehicle {
                     // THE FIX: Separate cars by spatial angle instead of frequency
                     let bearingDiff = abs(threat.lastBearing - currentBearing)
@@ -401,8 +416,8 @@ final class ThreatResultsObserver: NSObject, @unchecked Sendable, SNResultsObser
                 
                 // --- THE WIND & NOISE FILTER ---
                 // Block the ML from hallucinating these sounds when wind hits the mic
-                // let ignoredLabels = ["fire", "thunderstorm", "wind", "breathing", "burp", "snore"]
-                // if ignoredLabels.contains(label) { continue }
+                let ignoredLabels = ["fire", "thunderstorm", "wind", "breathing", "burp", "snore"]
+                if ignoredLabels.contains(label) { continue }
                 
                 let profile = SoundProfile.classify(label)
                 

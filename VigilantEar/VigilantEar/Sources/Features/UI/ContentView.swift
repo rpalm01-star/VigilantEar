@@ -5,7 +5,7 @@ struct ContentView: View {
     @Environment(AcousticCoordinator.self) private var coordinator
     
     let title = "VIGILANT EAR"
-
+    
     var body: some View {
         GeometryReader { geo in
             let isPortrait = geo.size.height > geo.size.width
@@ -23,7 +23,7 @@ struct ContentView: View {
                     HStack(alignment: .top) {
                         // TOP LEFT: Title & Compact Controls
                         VStack(alignment: .leading, spacing: 12) {
-                                                                                    
+                            
                             Text(title)
                                 .font(.system(.headline, design: .monospaced))
                                 .tracking(3)
@@ -234,9 +234,12 @@ struct DebugHUD: View {
                 isCloudLoggingEnabled.toggle()
                 AppGlobals.logToCloud = isCloudLoggingEnabled
                 
+                // (Deleted the dropIgnoredSounds line here!)
+                
                 let generator = UIImpactFeedbackGenerator(style: .medium)
                 generator.impactOccurred()
             }
         }
     }
 }
+

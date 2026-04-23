@@ -1,7 +1,7 @@
 import SwiftUI
 
 enum ThreatCategory: String, Sendable {
-    case emergency, vehicle, medium, quiet, animal, misc, unknown
+    case emergency, vehicle, medium, quiet, animal, misc, unknown, ignored
 }
 
 // MARK: - Classification Engine
@@ -15,19 +15,22 @@ struct SoundProfile {
     var isEmergency: Bool { return category == .emergency }
     var isVehicle: Bool { return category == .vehicle }
     
-    // 1. THE REGISTRY
+    // 1. THE REGISTRYf
     private static let registry: [(keywords: [String], icon: String, color: Color, ceiling: Double, maxRange: Double, category: ThreatCategory)] = [
         
         // --- EMERGENCY ---
-        (["ambulance", "siren", "alarm", "emergency", "fire", "detecctor"], "light.beacon.max.fill", .red, 0.80, 1000.0, .emergency),
+        (["ambulance", "siren", "alarm", "emergency", "detecctor"], "light.beacon.max.fill", .red, 0.80, 1000.0, .emergency),
         (["tornado"], "tornado", .teal, 0.80, 1000.0, .emergency),
-        (["glass", "shatter", "crash"], "burst.fill", .pink, 0.80, 1000.0, .emergency),
+        (["glass", "shatter", "crash", "clink"], "burst.fill", .teal, 0.80, 1000.0, .emergency),
         
         // --- VEHICLES ---
         (["car", "engine", "traffic"], "car.fill", .blue, 0.15, 300.0, .vehicle),
         (["subway"], "tram.fill.tunnel", .blue, 0.15, 300.0, .vehicle),
-        (["train", "rail"], "lightrail.fill", .blue, 0.15, 300.0, .vehicle),
         (["horn"], "horn", .purple, 0.80, 1000.0, .vehicle),
+        
+        // --- IGNORED (Telemetry Only) ---
+        // These sounds are logged to Firestore but completely bypass spatial math and UI rendering
+        (["train", "rail", "fire", "thunderstorm", "wind", "breeze", "breathing", "snore", "snoring", "burp"], "speaker.slash.fill", .gray, 0.0, 0.0, .ignored),
         
         // --- MEDIUM ACTION ---
         (["speech", "voice", "talk", "person"], "waveform", .cyan, 0.55, 150.0, .medium),
@@ -37,15 +40,14 @@ struct SoundProfile {
         (["knock", "tap", "hammer", "chopping", "tennis"], "hand.tap.fill", .purple, 0.55, 150.0, .medium),
         (["step", "walk", "foot", "bowling"], "figure.walk", .cyan, 0.55, 150.0, .medium),
         (["water", "rain", "splash"], "drop.fill", .teal, 0.55, 150.0, .medium),
-        (["wind", "breeze"], "wind", .teal, 0.55, 150.0, .medium),
         (["baby", "cry"], "stroller.fill", .pink, 0.55, 150.0, .medium),
         
         // --- QUIET / BIOLOGICAL ---
         (["snap", "zipper", "keyboard", "typing"], "hand.point.up.left.fill", .purple, 0.35, 30.0, .quiet),
-        (["breathing", "cough"], "lungs.fill", .cyan, 0.35, 30.0, .quiet),
+        (["cough"], "lungs.fill", .cyan, 0.35, 30.0, .quiet),
         (["sneeze", "nose"], "nose.fill", .cyan, 0.35, 30.0, .quiet),
-        (["snoring", "snore", "sleep"], "zzz", .cyan, 0.35, 30.0, .quiet),
-        (["burp", "hiccup", "swallow"], "mouth.fill", .cyan, 0.35, 30.0, .quiet),
+        (["sleep"], "zzz", .cyan, 0.35, 30.0, .quiet),
+        (["hiccup", "swallow"], "mouth.fill", .cyan, 0.35, 30.0, .quiet),
         (["laugh", "chuckle"], "face.smiling.fill", .cyan, 0.35, 30.0, .quiet),
         
         // --- ANIMALS ---
@@ -54,7 +56,7 @@ struct SoundProfile {
         (["dog", "coyote"], "dog", .green, 0.35, 30.0, .animal),
         (["bark", "animal", "pig"], "pawprint.fill", .green, 0.35, 30.0, .animal),
         (["bird", "chirp", "owl"], "bird.fill", .green, 0.35, 30.0, .animal),
-
+        
         // --- MISC ---
         (["fan"], "fan", .mint, 0.35, 30.0, .misc),
         (["crumpl", "crush", "trash"], "trash.fill", .mint, 0.35, 30.0, .misc),

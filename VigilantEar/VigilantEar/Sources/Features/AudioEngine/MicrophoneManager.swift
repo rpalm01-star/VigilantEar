@@ -23,7 +23,7 @@ class MicrophoneManager: NSObject, CLLocationManagerDelegate {
     private var tapInstalled = false
     private var isRunning = false
     var currentLocation: CLLocation? = nil
-
+    
     init(coordinator: AcousticCoordinator, classificationService: ClassificationService) {
         self.coordinator = coordinator
         self.classificationService = classificationService
@@ -35,7 +35,7 @@ class MicrophoneManager: NSObject, CLLocationManagerDelegate {
         locationManager.delegate = self
         locationManager.desiredAccuracy = kCLLocationAccuracyBest
         
-        // This triggers the popup (now that the Info.plist is fixed)
+        // This triggers the popup
         locationManager.requestWhenInUseAuthorization()
         
         // Start compass
@@ -46,14 +46,18 @@ class MicrophoneManager: NSObject, CLLocationManagerDelegate {
         // Start GPS
         locationManager.startUpdatingLocation()
     }
-        
-    // 1. Leave your location method exactly like this (restored):
+    
     func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
         guard let location = locations.last else { return }
         
         Task {
             if pipeline == nil {
-                print("⚠️ ERROR: GPS received, but Pipeline is NIL!")
+                let msg = "⚠️ ERROR: GPS received, but Pipeline is NIL!"
+                print(msg)
+                if AppGlobals.logToCloud {
+                    // FIX: Awaited because we are already inside a Task here
+                    await PerformanceLogger.shared.logTelemetry(step: "0_MIC_MGR", message: msg)
+                }
             }
             await pipeline?.updateLocation(location.coordinate)
         }
@@ -64,7 +68,6 @@ class MicrophoneManager: NSObject, CLLocationManagerDelegate {
         }
     }
     
-    // 2. ADD THIS AS A BRAND NEW FUNCTION right beneath it:
     func locationManager(_ manager: CLLocationManager, didUpdateHeading newHeading: CLHeading) {
         Task { @MainActor in
             // Prefer True North if the GPS has it, otherwise fallback to Magnetic North
@@ -77,54 +80,82 @@ class MicrophoneManager: NSObject, CLLocationManagerDelegate {
         
         let session = AVAudioSession.sharedInstance()
         do {
-            // 1. Restore the .videoRecording category from yesterday (it's the most stable for stereo)
+            // 1. Set the category first (do NOT activate yet)
             try session.setCategory(.playAndRecord, mode: .videoRecording, options: [.defaultToSpeaker, .mixWithOthers])
             
-            // 2. Activate the session
-            try session.setActive(true, options: .notifyOthersOnDeactivation)
-            
-            // 3. Configure hardware exactly like the version that worked
+            // 2. Configure hardware (MUST happen before activation so iOS respects the 2-channel request)
             configureHardwareForStereo(session: session)
+            
+            // 3. NOW activate the session with the hardware locked in
+            try session.setActive(true, options: .notifyOthersOnDeactivation)
             
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
                 self?.startAudioTap()
             }
-            print("✅ Audio Session Active (Yesterday's Stable Mode)")
+            
+            let msg = "✅ Audio Session Active (Stereo Mode Locked)"
+            print(msg)
+            if AppGlobals.logToCloud {
+                // FIX: Wrapped in a Task so it doesn't block the synchronous audio engine startup
+                Task { await PerformanceLogger.shared.logTelemetry(step: "0_MIC_MGR", message: msg) }
+            }
+            
         } catch {
-            print("❌ Audio Session Critical Failure: \(error)")
+            let msg = "❌ Audio Session Critical Failure: " + error.localizedDescription
+            print(msg)
+            if AppGlobals.logToCloud {
+                Task { await PerformanceLogger.shared.logTelemetry(step: "0_MIC_MGR", message: msg) }
+            }
         }
     }
     
     private func configureHardwareForStereo(session: AVAudioSession) {
-        // --- THE FIX: ALWAYS PREFER USB-C ARRAYS IF CONNECTED ---
-        if let usbInput = session.availableInputs?.first(where: { $0.portType == .usbAudio }) {
-            do {
+        do {
+            // --- THE FIX: ALWAYS PREFER USB-C ARRAYS IF CONNECTED ---
+            if let usbInput = session.availableInputs?.first(where: { $0.portType == .usbAudio }) {
                 try session.setPreferredInput(usbInput)
                 try session.setPreferredInputNumberOfChannels(2)
-                print("🎙️ HARDWARE: External USB-C Stereo Array Connected!")
+                let msg = "🎙️ HARDWARE: External USB-C Stereo Array Connected!"
+                print(msg)
+                if AppGlobals.logToCloud {
+                    Task { await PerformanceLogger.shared.logTelemetry(step: "0_MIC_MGR", message: msg) }
+                }
                 return // Skip the built-in mic configuration entirely!
-            } catch {
-                print("⚠️ USB Mic Config failed: \(error)")
             }
-        }
-        
-        // --- Fallback to Internal Mics ---
-        guard let builtInMic = session.availableInputs?.first(where: { $0.portType == .builtInMic }) else { return }
-        do {
+            
+            // --- Fallback to Internal Mics ---
+            guard let builtInMic = session.availableInputs?.first(where: { $0.portType == .builtInMic }) else { return }
+            
             try session.setPreferredInput(builtInMic)
+            
             if let sources = builtInMic.dataSources {
                 for source in sources {
+                    // Look for a mic array that supports spatial audio
                     if source.supportedPolarPatterns?.contains(.stereo) == true {
                         try builtInMic.setPreferredDataSource(source)
                         try session.setPreferredInputOrientation(.landscapeRight)
                         try source.setPreferredPolarPattern(.stereo)
+                        let msg = "🎙️ HARDWARE: iPhone Internal Mics locked to Landscape Stereo!"
+                        print(msg)
+                        if AppGlobals.logToCloud {
+                            Task { await PerformanceLogger.shared.logTelemetry(step: "0_MIC_MGR", message: msg) }
+                        }
                         break
                     }
                 }
             }
+            
+            // --- THE MISSING LINK ---
+            // Regardless of polar patterns, you MUST explicitly demand 2 channels from the session
+            // Otherwise, AVAudioEngine will silently wrap it in a Mono pipeline!
             try session.setPreferredInputNumberOfChannels(2)
+            
         } catch {
-            print("⚠️ Hardware Stereo Config failed: \(error)")
+            let msg = "⚠️ Hardware Stereo Config failed: " + error.localizedDescription
+            print(msg)
+            if AppGlobals.logToCloud {
+                Task { await PerformanceLogger.shared.logTelemetry(step: "0_MIC_MGR", message: msg) }
+            }
         }
     }
     
@@ -149,12 +180,30 @@ class MicrophoneManager: NSObject, CLLocationManagerDelegate {
             try audioEngine.start()
             
             let format = audioEngine.inputNode.inputFormat(forBus: 0)
+            
+            // Verify that we actually got stereo channels back from the hardware
+            if format.channelCount < 2 {
+                let msg = "⚠️ WARNING: Audio pipeline failed to secure stereo channels. TDOA will be bypassed."
+                print(msg)
+                if AppGlobals.logToCloud {
+                    Task { await PerformanceLogger.shared.logTelemetry(step: "0_MIC_MGR", message: msg) }
+                }
+            }
+            
             Task { try? await self.pipeline?.setupAnalyzer(format: format) }
             
             isRunning = true
-            print("✅ Audio Engine Flowing (Stereo)")
+            let msg = "✅ Audio Engine Flowing (Channels: \(format.channelCount))"
+            print(msg)
+            if AppGlobals.logToCloud {
+                Task { await PerformanceLogger.shared.logTelemetry(step: "0_MIC_MGR", message: msg) }
+            }
         } catch {
-            print("❌ Engine Start Failed: \(error)")
+            let msg = "❌ Engine Start Failed: " + error.localizedDescription
+            print(msg)
+            if AppGlobals.logToCloud {
+                Task { await PerformanceLogger.shared.logTelemetry(step: "0_MIC_MGR", message: msg) }
+            }
         }
     }
     

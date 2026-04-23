@@ -13,7 +13,7 @@ nonisolated struct AppGlobals {
     public static var appVersion: String {
         get { _appVersion.withLock { $0 } }
     }
-
+    
     private static let _dataStoreName = Mutex<String>("threats")
     public static var dataStoreName: String {
         get { _dataStoreName.withLock { $0 } }
@@ -35,10 +35,10 @@ nonisolated struct AppGlobals {
             _logToCloud.withLock { $0 }      // safe read
         }
         set {
-            _logToCloud.withLock { $0 = newValue } // THE FIX: safe write
+            _logToCloud.withLock { $0 = newValue } // safe write
         }
     }
-
+    
     private static let _usbMicropohone = Mutex<Bool>(false)   // initial value
     public static var usbMicropohone: Bool {
         get {
@@ -46,4 +46,9 @@ nonisolated struct AppGlobals {
         }
     }
     
+    // THE FIX: A hardcoded, highly optimized set of categories to instantly drop
+    public static let filteredCategories: Set<String> = [
+        ThreatCategory.ignored.rawValue
+        // You can easily add ThreatCategory.misc.rawValue or .quiet.rawValue here later
+    ]
 }
