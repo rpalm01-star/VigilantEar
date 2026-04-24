@@ -56,6 +56,16 @@ actor AcousticProcessingPipeline {
     private var latestTime: AVAudioTime?
     
     private var lastKnownLocation: CLLocationCoordinate2D? = nil
+    private var lastKnownHeading: Double = 0.0 // <-- NEW: The Compass
+    
+    public func updateLocation(_ coordinate: CLLocationCoordinate2D) {
+        self.lastKnownLocation = coordinate
+    }
+    
+    // NEW: Allow the mic manager to pass the compass data in
+    public func updateHeading(_ heading: Double) {
+        self.lastKnownHeading = heading
+    }
     
     // --- CPU THROTTLE STATE ---
     private var lastProcessTime: Date = .distantPast
@@ -77,10 +87,6 @@ actor AcousticProcessingPipeline {
         self.songContinuation = sCont
         
         self.fftProcessor = FFTProcessor(fftSize: Int(self.bufferSize))
-    }
-    
-    public func updateLocation(_ coordinate: CLLocationCoordinate2D) {
-        self.lastKnownLocation = coordinate
     }
     
     func processAudio(buffer: AVAudioPCMBuffer, time: AVAudioTime) async {
@@ -187,8 +193,8 @@ actor AcousticProcessingPipeline {
         }
         
         // 1. ML TRIGGER LOG (For active, non-filtered threats)
-        let triggerMsg = "Heard: \(label) (Conf: \(String(format: "%.2f", confidence)))"
-        await PerformanceLogger.shared.logTelemetry(step: "1_ML_TRIGGER", message: triggerMsg)
+        //let triggerMsg = "Heard: \(label) (Conf: \(String(format: "%.2f", confidence)))"
+        //await PerformanceLogger.shared.logTelemetry(step: "1_ML_TRIGGER", message: triggerMsg)
         
         // --- NEW: THE MUSIC STATE TRIGGER ---
         let isMusic = label.lowercased() == "music"
@@ -302,8 +308,12 @@ actor AcousticProcessingPipeline {
                 threatSessionID = newID
             }
             
-            // 4. DISTANCE MATH ONLY (Task.detached)
-            Task.detached(priority: .userInitiated) { [weak self, threatSessionID, currentBearing] in
+            // Grab the origin and compass before hopping to the background thread
+            let currentLoc = self.lastKnownLocation
+            let currentHead = self.lastKnownHeading
+            
+            // 4. DISTANCE & GPS MATH ONLY (Task.detached)
+            Task.detached(priority: .userInitiated) { [weak self, threatSessionID, currentBearing, currentLoc, currentHead] in
                 guard let self = self else { return }
                 
                 let ambientFloor: Double = isVehicle ? 0.02 : 0.04
@@ -315,18 +325,41 @@ actor AcousticProcessingPipeline {
                 let estimatedFeet = max(10.0, pow(linearRatio, curvePower) * adjustedMaxRange)
                 let normalizedUI_Distance = estimatedFeet / 1000.0
                 
+                // --- THE GEOGRAPHIC PROJECTION (HAVERSINE) ---
+                var targetLat: Double? = nil
+                var targetLon: Double? = nil
+                
+                if let origin = currentLoc {
+                    let earthRadius = 6378137.0 // Meters
+                    let distanceMeters = estimatedFeet * 0.3048
+                    let angularDist = distanceMeters / earthRadius
+                    
+                    // Combine the phone's compass heading with the acoustic angle
+                    let trueBearing = (currentHead + currentBearing).truncatingRemainder(dividingBy: 360.0)
+                    let bearingRad = trueBearing * .pi / 180.0
+                    
+                    let originLatRad = origin.latitude * .pi / 180.0
+                    let originLonRad = origin.longitude * .pi / 180.0
+                    
+                    let destLatRad = asin(sin(originLatRad) * cos(angularDist) + cos(originLatRad) * sin(angularDist) * cos(bearingRad))
+                    let destLonRad = originLonRad + atan2(sin(bearingRad) * sin(angularDist) * cos(originLatRad), cos(angularDist) - sin(originLatRad) * sin(destLatRad))
+                    
+                    targetLat = destLatRad * 180.0 / .pi
+                    targetLon = destLonRad * 180.0 / .pi
+                }
+                
                 let newEvent = SoundEvent(
                     sessionID: threatSessionID,
                     timestamp: Date(),
                     threatLabel: label,
                     confidence: confidence,
-                    bearing: currentBearing, // Use the angle we already calculated
+                    bearing: currentBearing,
                     distance: normalizedUI_Distance,
                     energy: Float(safePeak),
                     dopplerRate: dopplerResult?.shiftHz != nil ? Float(dopplerResult!.shiftHz) : nil,
                     isApproaching: dopplerResult?.isApproaching ?? false,
-                    latitude: nil,
-                    longitude: nil
+                    latitude: targetLat,  // <--- THE FIX: Real GPS Coordinates!
+                    longitude: targetLon  // <--- THE FIX: Real GPS Coordinates!
                 )
                 
                 await MainActor.run { _ = self.continuation.yield(newEvent) }

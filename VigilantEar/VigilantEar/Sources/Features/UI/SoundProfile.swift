@@ -19,8 +19,7 @@ struct SoundProfile {
     private static let registry: [(keywords: [String], icon: String, color: Color, ceiling: Double, maxRange: Double, category: ThreatCategory)] = [
         
         // --- EMERGENCY ---
-        (["ambulance", "siren", "alarm", "emergency", "detecctor"], "light.beacon.max.fill", .red, 0.80, 1000.0, .emergency),
-        (["tornado"], "tornado", .teal, 0.80, 1000.0, .emergency),
+        (["ambulance", "siren", "alarm", "emergency", "detecctor", "simulated_firetruck"], "light.beacon.max.fill", .red, 0.80, 1000.0, .emergency),        (["tornado"], "tornado", .teal, 0.80, 1000.0, .emergency),
         (["glass", "shatter", "crash", "clink"], "burst.fill", .teal, 0.80, 1000.0, .emergency),
         
         // --- VEHICLES ---
@@ -36,7 +35,8 @@ struct SoundProfile {
         (["speech", "voice", "talk", "person"], "waveform", .cyan, 0.55, 150.0, .medium),
         (["bicycle"], "bicycle", .blue, 0.55, 150.0, .medium),
         (["bell", "chime", "clock", "tick", "beep"], "bell.fill", .purple, 0.55, 150.0, .medium),
-        (["music", "choir", "song", "sing", "whistl", "didgeridoo", "bassoon", "tuning", "theremin", "flute"], "music.note", .purple, 0.55, 125.0, .medium),
+        (["music", "choir", "song", "sing", "whistl", "didgeridoo", "bassoon", "tuning", "theremin", "flute", "plucked"], "music.note", .purple, 0.55, 125.0, .medium),
+        (["whale"], "music.note", .purple, 0.35, 30.0, .animal),
         (["knock", "tap", "hammer", "chopping", "tennis"], "hand.tap.fill", .purple, 0.55, 150.0, .medium),
         (["step", "walk", "foot", "bowling"], "figure.walk", .cyan, 0.55, 150.0, .medium),
         (["water", "rain", "splash"], "drop.fill", .teal, 0.55, 150.0, .medium),
@@ -51,7 +51,6 @@ struct SoundProfile {
         (["laugh", "chuckle"], "face.smiling.fill", .cyan, 0.35, 30.0, .quiet),
         
         // --- ANIMALS ---
-        (["whale"], "fish.fill", .green, 0.35, 30.0, .animal),
         (["cat"], "cat", .green, 0.35, 30.0, .animal),
         (["dog", "coyote"], "dog", .green, 0.35, 30.0, .animal),
         (["bark", "animal", "pig"], "pawprint.fill", .green, 0.35, 30.0, .animal),
