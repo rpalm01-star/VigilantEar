@@ -172,61 +172,58 @@ actor AcousticProcessingPipeline {
         guard now.timeIntervalSince(lastProcessTime) > 0.2 else { return }
         lastProcessTime = now
         
-        // FETCH EVERYTHING AT ONCE (including the raw String category)
+        // --- STEP 1: THE EMERGENCY SKEPTICISM GATE ---
+        // If it's a siren/emergency but confidence isn't rock-solid (>90%),
+        // treat it as a generic vehicle engine to stop the 'ghost' siren perimeters.
+        var effectiveLabel = label
+        var effectiveConfidence = confidence
+        
+        let isLikelySiren = label.contains("siren") || label.contains("emergency")
+        if isLikelySiren && confidence < 0.90 {
+            effectiveLabel = "engine"
+            effectiveConfidence = 0.50
+        }
+        
+        // FETCH PROFILE DATA
+        let staticEffectiveLabel = effectiveLabel
         let (isVehicle, profileCeiling, profileMaxRange, currentCategory) = await MainActor.run {
-            let p = SoundProfile.classify(label)
+            let p = SoundProfile.classify(staticEffectiveLabel)
             return (p.isVehicle, p.ceiling, p.maxRange, p.category.rawValue)
         }
         
-        // --- THE STATIC FILTER & EARLY EXIT ---
-        // Instantly drop the sound if its category is in our hardcoded ignore list
+        // STATIC FILTER CHECK
         if AppGlobals.filteredCategories.contains(currentCategory) {
-            
-            // If we are debugging to the cloud, log the fact that we heard and dropped it
             if AppGlobals.logToCloud {
-                let msg = "Filtered: \(label) (Conf: \(String(format: "%.2f", confidence)))"
-                await PerformanceLogger.shared.logTelemetry(step: "1_ML_FILTERED", message: msg)
+                await PerformanceLogger.shared.logTelemetry(step: "1_ML_FILTERED", message: "Filtered: \(effectiveLabel)")
             }
-            
-            // Abort before any expensive FFT or spatial math runs!
             return
         }
         
-        // 1. ML TRIGGER LOG (For active, non-filtered threats)
-        //let triggerMsg = "Heard: \(label) (Conf: \(String(format: "%.2f", confidence)))"
-        //await PerformanceLogger.shared.logTelemetry(step: "1_ML_TRIGGER", message: triggerMsg)
-        
-        // --- NEW: THE MUSIC STATE TRIGGER ---
-        let isMusic = label.lowercased() == "music"
-        if isMusic {
+        // --- STEP 2: MUSIC TRIGGER ---
+        if effectiveLabel.lowercased() == "music" {
             lastMusicDetectedTime = now
-            
-            // If this is a BRAND NEW music event, wake up the Shazam search!
             if !isMusicCurrentlyPlaying {
                 isMusicCurrentlyPlaying = true
-                hasMatchedCurrentSong = false // Unlock the search
-                self.signatureGenerator = SHSignatureGenerator() // Fresh bucket
+                hasMatchedCurrentSong = false
+                self.signatureGenerator = SHSignatureGenerator()
                 self.accumulatedFrames = 0
-                //print("🎵 Radar detected music. Waking up Shazam...")
             }
         }
         
         guard let buffer = latestBuffer, let channelData = buffer.floatChannelData else { return }
-        
-        // --- THE CRASH FIX: Dynamically size the read buffer to prevent EXC_BAD_ACCESS ---
         let safeCount = min(Int(buffer.frameLength), 4096)
-        
         let peak = Array(UnsafeBufferPointer(start: channelData[0], count: safeCount)).map(abs).max() ?? 0.0
         
-        // 2. VOLUME GATE
-        let minimumPeak: Float = isVehicle ? 0.02 : 0.04
+        // --- STEP 3: RE-CALIBRATED VOLUME GATE ---
+        // Lowering vehicle floor to 0.015 to catch faint engine rumbles further away
+        let minimumPeak: Float = isVehicle ? 0.015 : 0.04
         guard peak > minimumPeak else { return }
         
-        // 3. FFT HANDLING
+        // FFT HANDLING
         var targets = self.fftProcessor.analyzeMultiple(samples: Array(UnsafeBufferPointer(start: channelData[0], count: safeCount)), sampleRate: self.sampleRate, maxPeaks: 3)
         
         if isVehicle {
-            targets = [(frequency: 100.0, confidence: Float(confidence))]
+            targets = [(frequency: 100.0, confidence: Float(effectiveConfidence))]
         } else if targets.isEmpty {
             return
         }
@@ -234,6 +231,7 @@ actor AcousticProcessingPipeline {
         let localSampleRate = self.sampleRate
         let exactMicDistance = await HardwareCalibration.micBaseline
         
+        // TDOA / BEARING
         let currentBearing: Double
         if buffer.format.channelCount >= 2 {
             currentBearing = self.fftProcessor.calculateTDOA(
@@ -243,38 +241,25 @@ actor AcousticProcessingPipeline {
                 micDistance: exactMicDistance
             ) ?? 0.0
         } else {
-            print("⚠️ MONO AUDIO DETECTED: TDOA bypassed, bearing locked to 0.0")
             currentBearing = 0.0
         }
         
         activeThreats.removeAll { now.timeIntervalSince($0.lastSeen) > 4.0 }
         
+        // MULTI-TARGET TRACKING ENGINE
         for target in targets {
             let currentFreq = target.frequency
             var matchIndex: Int? = nil
             
-            // THREAT MATCHING
             for (index, threat) in activeThreats.enumerated() {
-                // FIX 2: Just compare the two strings directly!
                 guard threat.category == currentCategory else { continue }
-                    
                 if isVehicle {
-                    // THE FIX: Separate cars by spatial angle instead of frequency
                     let bearingDiff = abs(threat.lastBearing - currentBearing)
                     let normalizedDiff = bearingDiff > 180 ? 360 - bearingDiff : bearingDiff
-                    
-                    // If the new car is within 35 degrees of the old car, keep the ID
-                    if normalizedDiff < 35.0 {
-                        matchIndex = index
-                        break
-                    }
+                    if normalizedDiff < 35.0 { matchIndex = index; break }
                 } else {
-                    // Standard frequency matching for sirens, music, and birds
-                    let threshold = isMusic ? 8000.0 : 40.0
-                    if abs(threat.lastFrequency - currentFreq) < threshold {
-                        matchIndex = index
-                        break
-                    }
+                    let threshold = (effectiveLabel == "music") ? 8000.0 : 40.0
+                    if abs(threat.lastFrequency - currentFreq) < threshold { matchIndex = index; break }
                 }
             }
             
@@ -283,61 +268,45 @@ actor AcousticProcessingPipeline {
             
             if let index = matchIndex {
                 activeThreats[index].lastFrequency = currentFreq
-                activeThreats[index].lastBearing = currentBearing // Update bearing
+                activeThreats[index].lastBearing = currentBearing
                 activeThreats[index].lastSeen = now
-                
-                if isVehicle || isMusic {
-                    dopplerResult = nil
-                } else {
-                    dopplerResult = activeThreats[index].dopplerTracker.update(with: currentFreq, confidence: target.confidence)
-                }
+                dopplerResult = (isVehicle || effectiveLabel == "music") ? nil : activeThreats[index].dopplerTracker.update(with: currentFreq, confidence: target.confidence)
                 threatSessionID = activeThreats[index].sessionID
             } else {
                 let newID = UUID()
                 var newTracker = SirenDopplerTracker()
                 dopplerResult = newTracker.update(with: currentFreq, confidence: target.confidence)
-                
-                activeThreats.append(ActiveThreat(
-                    sessionID: newID,
-                    dopplerTracker: newTracker,
-                    lastFrequency: currentFreq,
-                    lastBearing: currentBearing, // Save bearing
-                    lastSeen: now,
-                    category: currentCategory
-                ))
+                activeThreats.append(ActiveThreat(sessionID: newID, dopplerTracker: newTracker, lastFrequency: currentFreq, lastBearing: currentBearing, lastSeen: now, category: currentCategory))
                 threatSessionID = newID
             }
             
-            // Grab the origin and compass before hopping to the background thread
             let currentLoc = self.lastKnownLocation
             let currentHead = self.lastKnownHeading
             
-            // 4. DISTANCE & GPS MATH ONLY (Task.detached)
-            Task.detached(priority: .userInitiated) { [weak self, threatSessionID, currentBearing, currentLoc, currentHead] in
+            // --- STEP 4: ENHANCED DISTANCE PROJECTION ---
+            Task.detached(priority: .userInitiated) { [weak self, threatSessionID, currentBearing, currentLoc, currentHead, effectiveLabel, effectiveConfidence] in
                 guard let self = self else { return }
                 
-                let ambientFloor: Double = isVehicle ? 0.02 : 0.04
+                let ambientFloor: Double = isVehicle ? 0.015 : 0.04
                 let safePeak = min(max(Double(peak), ambientFloor), profileCeiling)
                 let linearRatio = (profileCeiling - safePeak) / (profileCeiling - ambientFloor)
                 
-                let adjustedMaxRange = isVehicle ? 400.0 : profileMaxRange
-                let curvePower = isVehicle ? 2.2 : 2.5
+                // Increase vehicle range to 600ft to allow for more visual 'travel' space
+                let adjustedMaxRange = isVehicle ? 600.0 : profileMaxRange
+                let curvePower = isVehicle ? 2.0 : 2.5 // Softer curve for vehicles to keep them from getting 'stuck'
+                
                 let estimatedFeet = max(10.0, pow(linearRatio, curvePower) * adjustedMaxRange)
                 let normalizedUI_Distance = estimatedFeet / 1000.0
                 
-                // --- THE GEOGRAPHIC PROJECTION (HAVERSINE) ---
                 var targetLat: Double? = nil
                 var targetLon: Double? = nil
                 
                 if let origin = currentLoc {
-                    let earthRadius = 6378137.0 // Meters
+                    let earthRadius = 6378137.0
                     let distanceMeters = estimatedFeet * 0.3048
                     let angularDist = distanceMeters / earthRadius
-                    
-                    // Combine the phone's compass heading with the acoustic angle
                     let trueBearing = (currentHead + currentBearing).truncatingRemainder(dividingBy: 360.0)
                     let bearingRad = trueBearing * .pi / 180.0
-                    
                     let originLatRad = origin.latitude * .pi / 180.0
                     let originLonRad = origin.longitude * .pi / 180.0
                     
@@ -351,16 +320,23 @@ actor AcousticProcessingPipeline {
                 let newEvent = SoundEvent(
                     sessionID: threatSessionID,
                     timestamp: Date(),
-                    threatLabel: label,
-                    confidence: confidence,
+                    threatLabel: effectiveLabel,
+                    confidence: effectiveConfidence,
                     bearing: currentBearing,
                     distance: normalizedUI_Distance,
                     energy: Float(safePeak),
                     dopplerRate: dopplerResult?.shiftHz != nil ? Float(dopplerResult!.shiftHz) : nil,
                     isApproaching: dopplerResult?.isApproaching ?? false,
-                    latitude: targetLat,  // <--- THE FIX: Real GPS Coordinates!
-                    longitude: targetLon  // <--- THE FIX: Real GPS Coordinates!
+                    latitude: targetLat,
+                    longitude: targetLon
                 )
+                
+                if AppGlobals.logToCloud {
+                    let latStr = targetLat != nil ? String(format: "%.5f", targetLat!) : "N/A"
+                    let lonStr = targetLon != nil ? String(format: "%.5f", targetLon!) : "N/A"
+                    let msg = "Tracked [\(effectiveLabel)] - Dist: \(Int(estimatedFeet))ft, Brg: \(Int(currentBearing))°, GPS: (\(latStr), \(lonStr))"
+                    await PerformanceLogger.shared.logTelemetry(step: "2_TARGET_TRACKED", message: msg)
+                }
                 
                 await MainActor.run { _ = self.continuation.yield(newEvent) }
             }

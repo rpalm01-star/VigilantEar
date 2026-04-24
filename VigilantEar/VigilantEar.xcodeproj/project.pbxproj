@@ -27,6 +27,8 @@
 		30A396432F908D4800D441A0 /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = 30A396422F908D4800D441A0 /* GoogleService-Info.plist */; };
 		30A396462F908DF700D441A0 /* FirebaseFirestore in Frameworks */ = {isa = PBXBuildFile; productRef = 30A396452F908DF700D441A0 /* FirebaseFirestore */; };
 		30A396482F90900700D441A0 /* CloudLogger.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30A396472F90900700D441A0 /* CloudLogger.swift */; };
+		30BDE8EE2F9B342600074009 /* TrackedTarget.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30BDE8ED2F9B342600074009 /* TrackedTarget.swift */; };
+		30BDE8F02F9B353A00074009 /* RadarMapManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30BDE8EF2F9B353A00074009 /* RadarMapManager.swift */; };
 		30C55CC52F85FB1900D0B984 /* AcousticProcessingPipeline.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30C55CC42F85FB1500D0B984 /* AcousticProcessingPipeline.swift */; };
 		30CD987C2F8DEBA400AE7D0A /* RollingNoiseFloor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30CD987B2F8DEBA400AE7D0A /* RollingNoiseFloor.swift */; };
 		30CD987E2F8DF27100AE7D0A /* SirenDopplerTracker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30CD987D2F8DF27100AE7D0A /* SirenDopplerTracker.swift */; };
@@ -54,6 +56,8 @@
 		308EF3EB2F875A9400885DCB /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		30A396422F908D4800D441A0 /* GoogleService-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "GoogleService-Info.plist"; sourceTree = "<group>"; };
 		30A396472F90900700D441A0 /* CloudLogger.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CloudLogger.swift; sourceTree = "<group>"; };
+		30BDE8ED2F9B342600074009 /* TrackedTarget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrackedTarget.swift; sourceTree = "<group>"; };
+		30BDE8EF2F9B353A00074009 /* RadarMapManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RadarMapManager.swift; sourceTree = "<group>"; };
 		30C55CC42F85FB1500D0B984 /* AcousticProcessingPipeline.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AcousticProcessingPipeline.swift; sourceTree = "<group>"; };
 		30CA44A52F88AB5D0059C1D7 /* Settings.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Settings.xcconfig; sourceTree = "<group>"; };
 		30CD987B2F8DEBA400AE7D0A /* RollingNoiseFloor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RollingNoiseFloor.swift; sourceTree = "<group>"; };
@@ -69,6 +73,11 @@
 		3053A9FC2F900FA2008C5419 /* Simulators */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = Simulators;
+			sourceTree = "<group>";
+		};
+		30BDE8F32F9B459700074009 /* Dying */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = Dying;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -124,6 +133,8 @@
 		3053DC992F83718A00241892 /* AudioEngine */ = {
 			isa = PBXGroup;
 			children = (
+				30BDE8EF2F9B353A00074009 /* RadarMapManager.swift */,
+				30BDE8ED2F9B342600074009 /* TrackedTarget.swift */,
 				30CD987D2F8DF27100AE7D0A /* SirenDopplerTracker.swift */,
 				30CD987B2F8DEBA400AE7D0A /* RollingNoiseFloor.swift */,
 				30C55CC42F85FB1500D0B984 /* AcousticProcessingPipeline.swift */,
@@ -179,6 +190,7 @@
 		3053DCAB2F83718A00241892 /* Sources */ = {
 			isa = PBXGroup;
 			children = (
+				30BDE8F32F9B459700074009 /* Dying */,
 				3053DC8F2F83718A00241892 /* App */,
 				3053DC922F83718A00241892 /* Core */,
 				3053DCA62F83718A00241892 /* Features */,
@@ -216,6 +228,7 @@
 			fileSystemSynchronizedGroups = (
 				3044384A2F837A1D00F57539 /* Logging */,
 				3053A9FC2F900FA2008C5419 /* Simulators */,
+				30BDE8F32F9B459700074009 /* Dying */,
 			);
 			name = VigilantEar;
 			packageProductDependencies = (
@@ -282,6 +295,7 @@
 				308EF3E92F8755BC00885DCB /* StartupVerificationView.swift in Sources */,
 				30774C912F946CE5008C16E9 /* SystemMonitor.swift in Sources */,
 				3053DCAF2F83718A00241892 /* SoundEvent.swift in Sources */,
+				30BDE8F02F9B353A00074009 /* RadarMapManager.swift in Sources */,
 				30A396482F90900700D441A0 /* CloudLogger.swift in Sources */,
 				3053AA002F901777008C5419 /* SoundProfile.swift in Sources */,
 				304F42F62F95E816001C3B6B /* AppGlobals.swift in Sources */,
@@ -290,6 +304,7 @@
 				3053DCB22F83718A00241892 /* ClassificationService.swift in Sources */,
 				3053A9F92F900010008C5419 /* MapView.swift in Sources */,
 				30CD987E2F8DF27100AE7D0A /* SirenDopplerTracker.swift in Sources */,
+				30BDE8EE2F9B342600074009 /* TrackedTarget.swift in Sources */,
 				3053DCB42F83718A00241892 /* FFTProcessor.swift in Sources */,
 				308EF3E72F8755A300885DCB /* StartupVerificationViewModel.swift in Sources */,
 				3053DCB62F83718A00241892 /* PermissionManager.swift in Sources */,

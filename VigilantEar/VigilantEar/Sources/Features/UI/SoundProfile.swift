@@ -19,11 +19,12 @@ struct SoundProfile {
     private static let registry: [(keywords: [String], icon: String, color: Color, ceiling: Double, maxRange: Double, category: ThreatCategory)] = [
         
         // --- EMERGENCY ---
-        (["ambulance", "siren", "alarm", "emergency", "detecctor", "simulated_firetruck"], "light.beacon.max.fill", .red, 0.80, 1000.0, .emergency),        (["tornado"], "tornado", .teal, 0.80, 1000.0, .emergency),
+        // THE FIX: Break the simulator label into individual fragments to guarantee a match
+        (["ambulance", "siren", "alarm", "emergency", "detecctor", "simulated", "simluated", "firetruck"], "light.beacon.max.fill", .red, 0.80, 1000.0, .emergency),
         (["glass", "shatter", "crash", "clink"], "burst.fill", .teal, 0.80, 1000.0, .emergency),
         
         // --- VEHICLES ---
-        (["car", "engine", "traffic"], "car.fill", .blue, 0.15, 300.0, .vehicle),
+        (["car", "engine", "traffic"], "car.fill", .blue, 0.05, 500.0, .vehicle),
         (["subway"], "tram.fill.tunnel", .blue, 0.15, 300.0, .vehicle),
         (["horn"], "horn", .purple, 0.80, 1000.0, .vehicle),
         

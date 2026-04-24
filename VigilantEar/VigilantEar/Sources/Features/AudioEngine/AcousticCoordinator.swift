@@ -7,8 +7,13 @@ import SwiftUI
 @MainActor
 @Observable
 class AcousticCoordinator {
-    // This array holds the live "objects" currently on the radar
+    // This array holds the live "objects" currently on the radar (Used for your HUD)
     var activeEvents: [SoundEvent] = []
+    
+    // --- THE NEW MAP MANAGER ---
+    // This holds the smoothed, physics-based targets (Used for MapKit)
+    var mapManager = RadarMapManager()
+    
     /// The most recent verified threat
     var latestEvent: SoundEvent?
     /// Current listening status
@@ -38,17 +43,15 @@ class AcousticCoordinator {
     
     @MainActor
     private func refreshRadar() {
-        if (activeEvents.isEmpty)
-        {
-        return;
-        }
+        if (activeEvents.isEmpty) { return }
+        
         if (isCleaning) {
             print("❌ Active event cleanup is already running. Bypassing.")
             return
         }
         isCleaning = true
         let now = Date()
-        // Keep the trail on the screen for 15 seconds instead of 2!
+        // Keep the trail on the screen for 5 seconds
         let updated = activeEvents.filter { event in
             now.timeIntervalSince(event.timestamp) < 5.0
         }
@@ -63,18 +66,24 @@ class AcousticCoordinator {
         // Because every 'bell' ring creates a NEW SoundEvent() instance
         // with a NEW UUID, they will overlap and pulse correctly.
         activeEvents.append(event)
+        
+        // Pass manual simulation events to the Map Manager too!
+        mapManager.processNewEvent(event)
     }
     
     func startListeningToPipeline(_ pipeline: AcousticProcessingPipeline) {
         isTracking = true
         streamTask = Task {
             for await event in pipeline.eventStream {
+                // 1. Feed the raw event to the array (for the HUD)
                 activeEvents.append(event)
                 self.latestEvent = event
+                
+                // 2. Feed the raw event to the Map Manager (for smoothed map tracking!)
+                self.mapManager.processNewEvent(event)
             }
         }
         // Listen for Shazam Song Matches
-        // Updated listener in AcousticCoordinator
         Task {
             for await songTitle in pipeline.songStream {
                 await MainActor.run {
@@ -92,5 +101,8 @@ class AcousticCoordinator {
         streamTask = nil
         isTracking = false
         activeEvents.removeAll()
+        
+        // Reset the Map Manager when we stop tracking
+        mapManager = RadarMapManager()
     }
 }
