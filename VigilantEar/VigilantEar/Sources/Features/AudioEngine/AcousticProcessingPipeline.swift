@@ -193,9 +193,7 @@ actor AcousticProcessingPipeline {
         
         // STATIC FILTER CHECK
         if AppGlobals.filteredCategories.contains(currentCategory) {
-            if AppGlobals.logToCloud {
-                await PerformanceLogger.shared.logTelemetry(step: "1_ML_FILTERED", message: "Filtered: \(effectiveLabel)")
-            }
+            await PerformanceLogger.shared.logTelemetry(step: "1_ML_FILTERED", message: "Filtered: \(effectiveLabel)")
             return
         }
         
@@ -330,13 +328,10 @@ actor AcousticProcessingPipeline {
                     latitude: targetLat,
                     longitude: targetLon
                 )
-                
-                if AppGlobals.logToCloud {
-                    let latStr = targetLat != nil ? String(format: "%.5f", targetLat!) : "N/A"
-                    let lonStr = targetLon != nil ? String(format: "%.5f", targetLon!) : "N/A"
-                    let msg = "Tracked [\(effectiveLabel)] - Dist: \(Int(estimatedFeet))ft, Brg: \(Int(currentBearing))°, GPS: (\(latStr), \(lonStr))"
-                    await PerformanceLogger.shared.logTelemetry(step: "2_TARGET_TRACKED", message: msg)
-                }
+                let latStr = targetLat != nil ? String(format: "%.5f", targetLat!) : "N/A"
+                let lonStr = targetLon != nil ? String(format: "%.5f", targetLon!) : "N/A"
+                let msg = "Tracked [\(effectiveLabel)] - Dist: \(Int(estimatedFeet))ft, Brg: \(Int(currentBearing))°, GPS: (\(latStr), \(lonStr))"
+                await PerformanceLogger.shared.logTelemetry(step: "2_TARGET_TRACKED", message: msg)
                 
                 await MainActor.run { _ = self.continuation.yield(newEvent) }
             }

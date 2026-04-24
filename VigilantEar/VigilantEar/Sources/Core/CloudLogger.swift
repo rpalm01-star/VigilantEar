@@ -7,14 +7,13 @@ actor CloudLogger {
     static let shared = CloudLogger()
     
     private let db = Firestore.firestore()
-        
+    
     // Memory bank to cache the most recent frame of an active vehicle
     private var activeSessions: [UUID: (lastEvent: SoundEvent, lastSeen: Date)] = [:]
     private var isCleanupRunning = false
     
     func logEvent(_ event: SoundEvent) async {
         guard AppGlobals.logToCloud else { return }
-        guard await event.isEmergency else { return }
         
         let now = Date()
         let sessionID = event.sessionID

@@ -54,10 +54,7 @@ class MicrophoneManager: NSObject, CLLocationManagerDelegate {
             if pipeline == nil {
                 let msg = "⚠️ ERROR: GPS location update received, but Pipeline is NIL!"
                 print(msg)
-                if AppGlobals.logToCloud {
-                    // FIX: Added 'await' inside the Task
-                    Task { PerformanceLogger.shared.logTelemetry(step: "0_MIC_MGR", message: msg) }
-                }
+                Task { PerformanceLogger.shared.logTelemetry(step: "0_MIC_MGR", message: msg) }
                 // FIX: Removed the early 'return' so UI still updates!
             }
             
@@ -79,11 +76,7 @@ class MicrophoneManager: NSObject, CLLocationManagerDelegate {
             if pipeline == nil {
                 let msg = "⚠️ ERROR: GPS heading update received, but Pipeline is NIL!"
                 print(msg)
-                if AppGlobals.logToCloud {
-                    // FIX: Added 'await' inside the Task
-                    Task { PerformanceLogger.shared.logTelemetry(step: "0_MIC_MGR", message: msg) }
-                }
-                // FIX: Removed the early 'return' so UI still updates!
+                Task { PerformanceLogger.shared.logTelemetry(step: "0_MIC_MGR", message: msg) }
             }
             
             // ALWAYS update the UI compass
@@ -116,17 +109,11 @@ class MicrophoneManager: NSObject, CLLocationManagerDelegate {
             
             let msg = "✅ Audio Session Active (Stereo Mode Locked)"
             print(msg)
-            if AppGlobals.logToCloud {
-                // FIX: Wrapped in a Task so it doesn't block the synchronous audio engine startup
-                Task { PerformanceLogger.shared.logTelemetry(step: "0_MIC_MGR", message: msg) }
-            }
-            
+            Task { PerformanceLogger.shared.logTelemetry(step: "0_MIC_MGR", message: msg) }
         } catch {
             let msg = "❌ Audio Session Critical Failure: " + error.localizedDescription
             print(msg)
-            if AppGlobals.logToCloud {
-                Task { PerformanceLogger.shared.logTelemetry(step: "0_MIC_MGR", message: msg) }
-            }
+            Task { PerformanceLogger.shared.logTelemetry(step: "0_MIC_MGR", message: msg) }
         }
     }
     
@@ -138,9 +125,7 @@ class MicrophoneManager: NSObject, CLLocationManagerDelegate {
                 try session.setPreferredInputNumberOfChannels(2)
                 let msg = "🎙️ HARDWARE: External USB-C Stereo Array Connected!"
                 print(msg)
-                if AppGlobals.logToCloud {
-                    Task { PerformanceLogger.shared.logTelemetry(step: "0_MIC_MGR", message: msg) }
-                }
+                Task { PerformanceLogger.shared.logTelemetry(step: "0_MIC_MGR", message: msg) }
                 return // Skip the built-in mic configuration entirely!
             }
             
@@ -158,9 +143,7 @@ class MicrophoneManager: NSObject, CLLocationManagerDelegate {
                         try source.setPreferredPolarPattern(.stereo)
                         let msg = "🎙️ HARDWARE: iPhone Internal Mics locked to Landscape Stereo!"
                         print(msg)
-                        if AppGlobals.logToCloud {
-                            Task { PerformanceLogger.shared.logTelemetry(step: "0_MIC_MGR", message: msg) }
-                        }
+                        Task { PerformanceLogger.shared.logTelemetry(step: "0_MIC_MGR", message: msg) }
                         break
                     }
                 }
@@ -174,9 +157,7 @@ class MicrophoneManager: NSObject, CLLocationManagerDelegate {
         } catch {
             let msg = "⚠️ Hardware Stereo Config failed: " + error.localizedDescription
             print(msg)
-            if AppGlobals.logToCloud {
-                Task { PerformanceLogger.shared.logTelemetry(step: "0_MIC_MGR", message: msg) }
-            }
+            Task { PerformanceLogger.shared.logTelemetry(step: "0_MIC_MGR", message: msg) }
         }
     }
     
@@ -188,7 +169,6 @@ class MicrophoneManager: NSObject, CLLocationManagerDelegate {
         
         inputNode.installTap(onBus: 0, bufferSize: 4096, format: hardwareFormat) { [weak self] buffer, time in
             guard let self = self else { return }
-            
             Task {
                 await self.pipeline?.processAudio(buffer: buffer, time: time)
             }
@@ -206,9 +186,7 @@ class MicrophoneManager: NSObject, CLLocationManagerDelegate {
             if format.channelCount < 2 {
                 let msg = "⚠️ WARNING: Audio pipeline failed to secure stereo channels. TDOA will be bypassed."
                 print(msg)
-                if AppGlobals.logToCloud {
-                    Task { PerformanceLogger.shared.logTelemetry(step: "0_MIC_MGR", message: msg) }
-                }
+                Task { PerformanceLogger.shared.logTelemetry(step: "0_MIC_MGR", message: msg) }
             }
             
             Task { try? await self.pipeline?.setupAnalyzer(format: format) }
@@ -216,15 +194,11 @@ class MicrophoneManager: NSObject, CLLocationManagerDelegate {
             isRunning = true
             let msg = "✅ Audio Engine Flowing (Channels: \(format.channelCount))"
             print(msg)
-            if AppGlobals.logToCloud {
-                Task { PerformanceLogger.shared.logTelemetry(step: "0_MIC_MGR", message: msg) }
-            }
+            Task { PerformanceLogger.shared.logTelemetry(step: "0_MIC_MGR", message: msg) }
         } catch {
             let msg = "❌ Engine Start Failed: " + error.localizedDescription
             print(msg)
-            if AppGlobals.logToCloud {
-                Task { PerformanceLogger.shared.logTelemetry(step: "0_MIC_MGR", message: msg) }
-            }
+            Task { PerformanceLogger.shared.logTelemetry(step: "0_MIC_MGR", message: msg) }
         }
     }
     
