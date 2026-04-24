@@ -133,6 +133,7 @@
 		3053DC992F83718A00241892 /* AudioEngine */ = {
 			isa = PBXGroup;
 			children = (
+				3053A9FF2F901777008C5419 /* SoundProfile.swift */,
 				30BDE8EF2F9B353A00074009 /* RadarMapManager.swift */,
 				30BDE8ED2F9B342600074009 /* TrackedTarget.swift */,
 				30CD987D2F8DF27100AE7D0A /* SirenDopplerTracker.swift */,
@@ -158,11 +159,9 @@
 		3053DCA52F83718A00241892 /* UI */ = {
 			isa = PBXGroup;
 			children = (
-				3053A9FF2F901777008C5419 /* SoundProfile.swift */,
 				3053A9F82F900010008C5419 /* MapView.swift */,
 				308EF3E82F8755BC00885DCB /* StartupVerificationView.swift */,
 				3053DCA42F83718A00241892 /* ContentView.swift */,
-				308EF3E62F8755A300885DCB /* StartupVerificationViewModel.swift */,
 			);
 			path = UI;
 			sourceTree = "<group>";
@@ -183,6 +182,7 @@
 			isa = PBXGroup;
 			children = (
 				3053DCA92F83718A00241892 /* SoundEvent.swift */,
+				308EF3E62F8755A300885DCB /* StartupVerificationViewModel.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
