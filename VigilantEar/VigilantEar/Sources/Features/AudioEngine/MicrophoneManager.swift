@@ -37,7 +37,14 @@ class MicrophoneManager: NSObject, CLLocationManagerDelegate {
         
         // This triggers the popup
         locationManager.requestWhenInUseAuthorization()
+        locationManager.startUpdatingLocation()
+        locationManager.startUpdatingHeading()
         
+        // --- THE FIX ---
+        // Force the hardware compass to track the back of the camera, not the top of the phone!
+        // (Charging port on the right = .landscapeLeft)
+        locationManager.headingOrientation = .landscapeLeft
+
         // Start compass
         if CLLocationManager.headingAvailable() {
             locationManager.startUpdatingHeading()

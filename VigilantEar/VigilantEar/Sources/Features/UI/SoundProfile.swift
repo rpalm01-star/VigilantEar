@@ -12,39 +12,45 @@ struct SoundProfile {
     let maxRange: Double
     let category: ThreatCategory
     
+    // NEW: The master override label for the Tracker and HUD
+    let canonicalLabel: String
+    
     var isEmergency: Bool { return category == .emergency }
     var isVehicle: Bool { return category == .vehicle }
     
-    // 1. THE REGISTRYf
+    // 1. THE REGISTRY
     private static let registry: [(keywords: [String], icon: String, color: Color, ceiling: Double, maxRange: Double, category: ThreatCategory)] = [
         
         // --- EMERGENCY ---
-        // THE FIX: Break the simulator label into individual fragments to guarantee a match
-        (["ambulance", "siren", "alarm", "emergency", "detecctor", "simulated", "simluated", "firetruck"], "light.beacon.max.fill", .red, 0.80, 1000.0, .emergency),
-        (["glass", "shatter", "crash", "clink"], "burst.fill", .teal, 0.80, 1000.0, .emergency),
+        // "siren" is first, so it becomes the canonical UI label
+        (["siren", "ambulance", "alarm", "emergency", "detector", "simulated", "simluated", "firetruck"], "light.beacon.max.fill", .red, 0.80, 1000.0, .emergency),
         
         // --- VEHICLES ---
-        (["car", "engine", "traffic"], "car.fill", .blue, 0.05, 500.0, .vehicle),
+        (["car", "truck", "engine", "traffic"], "car.fill", .blue, 0.30, 500.0, .vehicle),
         (["subway"], "tram.fill.tunnel", .blue, 0.15, 300.0, .vehicle),
         (["horn"], "horn", .purple, 0.80, 1000.0, .vehicle),
         
         // --- IGNORED (Telemetry Only) ---
-        // These sounds are logged to Firestore but completely bypass spatial math and UI rendering
-        (["train", "rail", "fire", "thunderstorm", "wind", "breeze", "breathing", "snore", "snoring", "burp"], "speaker.slash.fill", .gray, 0.0, 0.0, .ignored),
+        (["ignored_noise", "train", "rail", "fire", "thunderstorm", "wind", "breeze", "breathing", "snore", "snoring", "burp"], "speaker.slash.fill", .gray, 0.0, 0.0, .ignored),
         
         // --- MEDIUM ACTION ---
         (["speech", "voice", "talk", "person"], "waveform", .cyan, 0.55, 150.0, .medium),
         (["bicycle"], "bicycle", .blue, 0.55, 150.0, .medium),
         (["bell", "chime", "clock", "tick", "beep"], "bell.fill", .purple, 0.55, 150.0, .medium),
-        (["music", "choir", "song", "sing", "whistl", "didgeridoo", "bassoon", "tuning", "theremin", "flute", "plucked"], "music.note", .purple, 0.55, 125.0, .medium),
-        (["whale"], "music.note", .purple, 0.35, 30.0, .animal),
-        (["knock", "tap", "hammer", "chopping", "tennis"], "hand.tap.fill", .purple, 0.55, 150.0, .medium),
-        (["step", "walk", "foot", "bowling"], "figure.walk", .cyan, 0.55, 150.0, .medium),
+        
+        // THE FIX: All instruments and anomalous harmonics funnel into "music"
+        (["music", "choir", "bugle", "song", "sing", "whistl", "didgeridoo", "bassoon", "tuning", "theremin", "flute", "plucked", "whale", "piano", "guitar"], "music.note", .purple, 0.55, 125.0, .medium),
+        
+        (["hammer", "hammering"], "hammer.fill", .pink, 0.55, 150.0, .medium),
+        (["chopping"], "scissors", .pink, 0.55, 150.0, .medium),
+        (["knock", "tap"], "hand.tap.fill", .purple, 0.55, 150.0, .medium),
+        (["tennis"], "figure.tennis", .pink, 0.55, 150.0, .medium),
+        (["footsteps", "step", "walk", "foot", "bowling"], "figure.walk", .cyan, 0.55, 150.0, .medium),
         (["water", "rain", "splash"], "drop.fill", .teal, 0.55, 150.0, .medium),
         (["baby", "cry"], "stroller.fill", .pink, 0.55, 150.0, .medium),
         
         // --- QUIET / BIOLOGICAL ---
-        (["snap", "zipper", "keyboard", "typing"], "hand.point.up.left.fill", .purple, 0.35, 30.0, .quiet),
+        (["snap", "zipper", "keyboard", "typing"], "hand.point.up.left.fill", .cyan, 0.35, 30.0, .quiet),
         (["cough"], "lungs.fill", .cyan, 0.35, 30.0, .quiet),
         (["sneeze", "nose"], "nose.fill", .cyan, 0.35, 30.0, .quiet),
         (["sleep"], "zzz", .cyan, 0.35, 30.0, .quiet),
@@ -54,14 +60,15 @@ struct SoundProfile {
         // --- ANIMALS ---
         (["cat"], "cat", .green, 0.35, 30.0, .animal),
         (["dog", "coyote"], "dog", .green, 0.35, 30.0, .animal),
-        (["bark", "animal", "pig"], "pawprint.fill", .green, 0.35, 30.0, .animal),
-        (["bird", "chirp", "owl"], "bird.fill", .green, 0.35, 30.0, .animal),
+        (["animal", "bark", "pig"], "pawprint.fill", .green, 0.35, 30.0, .animal),
+        (["bird", "chirp", "owl hoot"], "bird.fill", .green, 0.35, 30.0, .animal),
         
         // --- MISC ---
         (["fan"], "fan", .mint, 0.35, 30.0, .misc),
-        (["crumpl", "crush", "trash"], "trash.fill", .mint, 0.35, 30.0, .misc),
+        (["crumple", "crumpl", "crush", "trash"], "trash.fill", .mint, 0.35, 30.0, .misc),
         (["toilet", "flush"], "toilet.fill", .mint, 0.35, 30.0, .misc),
         (["door"], "door.right.hand.closed", .mint, 0.35, 30.0, .misc),
+        (["glass", "shatter", "crash", "clink"], "burst.fill", .gray, 0.80, 1000.0, .misc),
     ]
     
     // 2. THE SEARCH ENGINE
@@ -75,13 +82,14 @@ struct SoundProfile {
                     color: entry.color,
                     ceiling: entry.ceiling,
                     maxRange: entry.maxRange,
-                    category: entry.category // NEW
+                    category: entry.category,
+                    canonicalLabel: entry.keywords.first ?? label // <-- The Master Override
                 )
             }
         }
         
         // THE FALLBACK
-        return SoundProfile(icon: "waveform", color: .gray, ceiling: 0.55, maxRange: 150.0, category: .unknown)
+        return SoundProfile(icon: "waveform", color: .gray, ceiling: 0.55, maxRange: 150.0, category: .unknown, canonicalLabel: label)
     }
 }
 
@@ -126,7 +134,7 @@ struct ThreatHUDItemInstance: View {
     var event: SoundEvent
     
     var body: some View {
-        // Fetch the unified profile!
+        // Because of the pipeline override, event.threatLabel is ALREADY the canonical string!
         let profile = SoundProfile.classify(event.threatLabel)
         let displayLabel = event.threatLabel.replacingOccurrences(of: "_", with: " ").capitalized
         

@@ -18,14 +18,14 @@ actor AcousticProcessingPipeline {
     
     private let fftProcessor: FFTProcessor
     
-    // --- THE MULTI-TARGET TRACKER MEMORY ---
     struct ActiveThreat {
         var sessionID: UUID
         var dopplerTracker: SirenDopplerTracker
         var lastFrequency: Double
         var lastBearing: Double
         var lastSeen: Date
-        var category: String // <--- FIX 1: Change this from ThreatCategory to String
+        var category: String
+        var hitCount: Int // NEW: Track how many times we've confirmed this stream
     }
     
     private var activeThreats: [ActiveThreat] = []
@@ -172,40 +172,37 @@ actor AcousticProcessingPipeline {
         guard now.timeIntervalSince(lastProcessTime) > 0.2 else { return }
         lastProcessTime = now
         
-        // --- STEP 1: THE EMERGENCY SKEPTICISM GATE ---
-        // If it's a siren/emergency but confidence isn't rock-solid (>90%),
-        // treat it as a generic vehicle engine to stop the 'ghost' siren perimeters.
-        var effectiveLabel = label
-        var effectiveConfidence = confidence
-        
-        let isLikelySiren = label.contains("siren") || label.contains("emergency")
-        if isLikelySiren && confidence < 0.90 {
-            effectiveLabel = "engine"
-            effectiveConfidence = 0.50
+        // --- THE CLEAN TAXONOMY FETCH & SKEPTICISM GATE ---
+        let (isVehicle, profileCeiling, profileMaxRange, currentCategory, canonicalLabel, finalConfidence) = await MainActor.run {
+            
+            // 1. Get the initial classification
+            var profile = SoundProfile.classify(label)
+            var adjustedConf = confidence
+            
+            // 2. THE EMERGENCY GATE: Demote weak sirens to engines
+            // (Because we rely on `.isEmergency`, this safely catches firetrucks and ambulances too!)
+            if profile.isEmergency && confidence < 0.90 {
+                profile = SoundProfile.classify("engine") // Automatically pulls the 'car' canonical profile
+                adjustedConf = 0.50
+            }
+            
+            // 3. THE MUSIC GATE: Give music a tiny bump so it survives the noise floor
+            if profile.canonicalLabel == "music" {
+                adjustedConf = max(0.50, adjustedConf)
+            }
+            
+            return (profile.isVehicle, profile.ceiling, profile.maxRange, profile.category.rawValue, profile.canonicalLabel, adjustedConf)
         }
         
-        // FETCH PROFILE DATA
-        let staticEffectiveLabel = effectiveLabel
-        let (isVehicle, profileCeiling, profileMaxRange, currentCategory) = await MainActor.run {
-            let p = SoundProfile.classify(staticEffectiveLabel)
-            return (p.isVehicle, p.ceiling, p.maxRange, p.category.rawValue)
-        }
+        let effectiveLabel = canonicalLabel
+        let effectiveConfidence = finalConfidence
         
         // STATIC FILTER CHECK
         if AppGlobals.filteredCategories.contains(currentCategory) {
-            await PerformanceLogger.shared.logTelemetry(step: "1_ML_FILTERED", message: "Filtered: \(effectiveLabel)")
-            return
-        }
-        
-        // --- STEP 2: MUSIC TRIGGER ---
-        if effectiveLabel.lowercased() == "music" {
-            lastMusicDetectedTime = now
-            if !isMusicCurrentlyPlaying {
-                isMusicCurrentlyPlaying = true
-                hasMatchedCurrentSong = false
-                self.signatureGenerator = SHSignatureGenerator()
-                self.accumulatedFrames = 0
+            if AppGlobals.logToCloud {
+                await PerformanceLogger.shared.logTelemetry(step: "1_ML_FILTERED", message: "Filtered: \(effectiveLabel)")
             }
+            return
         }
         
         guard let buffer = latestBuffer, let channelData = buffer.floatChannelData else { return }
@@ -251,12 +248,22 @@ actor AcousticProcessingPipeline {
             
             for (index, threat) in activeThreats.enumerated() {
                 guard threat.category == currentCategory else { continue }
-                if isVehicle {
+                
+                // --- THE SPATIAL BUCKET FIX FOR HUMAN SOUNDS ---
+                if currentCategory == "medium" || currentCategory == "quiet" {
                     let bearingDiff = abs(threat.lastBearing - currentBearing)
                     let normalizedDiff = bearingDiff > 180 ? 360 - bearingDiff : bearingDiff
-                    if normalizedDiff < 35.0 { matchIndex = index; break }
-                } else {
-                    let threshold = (effectiveLabel == "music") ? 8000.0 : 40.0
+                    // 45-degree wide net for non-linear sounds like music and speech
+                    if normalizedDiff < 45.0 { matchIndex = index; break }
+                }
+                else if isVehicle {
+                    let bearingDiff = abs(threat.lastBearing - currentBearing)
+                    let normalizedDiff = bearingDiff > 180 ? 360 - bearingDiff : bearingDiff
+                    if normalizedDiff < 10.0 { matchIndex = index; break }
+                }
+                else {
+                    // Standard frequency matching for linear tonal sounds (sirens, alarms)
+                    let threshold = 40.0
                     if abs(threat.lastFrequency - currentFreq) < threshold { matchIndex = index; break }
                 }
             }
@@ -268,13 +275,25 @@ actor AcousticProcessingPipeline {
                 activeThreats[index].lastFrequency = currentFreq
                 activeThreats[index].lastBearing = currentBearing
                 activeThreats[index].lastSeen = now
+                activeThreats[index].hitCount += 1 // Increment the persistence buffer
+                
                 dopplerResult = (isVehicle || effectiveLabel == "music") ? nil : activeThreats[index].dopplerTracker.update(with: currentFreq, confidence: target.confidence)
                 threatSessionID = activeThreats[index].sessionID
             } else {
                 let newID = UUID()
                 var newTracker = SirenDopplerTracker()
                 dopplerResult = newTracker.update(with: currentFreq, confidence: target.confidence)
-                activeThreats.append(ActiveThreat(sessionID: newID, dopplerTracker: newTracker, lastFrequency: currentFreq, lastBearing: currentBearing, lastSeen: now, category: currentCategory))
+                
+                // Initialize a brand new track with a hitCount of 1
+                activeThreats.append(ActiveThreat(
+                    sessionID: newID,
+                    dopplerTracker: newTracker,
+                    lastFrequency: currentFreq,
+                    lastBearing: currentBearing,
+                    lastSeen: now,
+                    category: currentCategory,
+                    hitCount: 1
+                ))
                 threatSessionID = newID
             }
             
@@ -303,8 +322,14 @@ actor AcousticProcessingPipeline {
                     let earthRadius = 6378137.0
                     let distanceMeters = estimatedFeet * 0.3048
                     let angularDist = distanceMeters / earthRadius
+                    
+                    // REMOVED: let compassCalibrationOffset = 90.0
+                    
+                    // THE CLEAN VERSION:
+                    // currentHead is now accurate thanks to .headingOrientation = .landscapeLeft
                     let trueBearing = (currentHead + currentBearing).truncatingRemainder(dividingBy: 360.0)
                     let bearingRad = trueBearing * .pi / 180.0
+                    
                     let originLatRad = origin.latitude * .pi / 180.0
                     let originLonRad = origin.longitude * .pi / 180.0
                     
@@ -328,6 +353,7 @@ actor AcousticProcessingPipeline {
                     latitude: targetLat,
                     longitude: targetLon
                 )
+                
                 let latStr = targetLat != nil ? String(format: "%.5f", targetLat!) : "N/A"
                 let lonStr = targetLon != nil ? String(format: "%.5f", targetLon!) : "N/A"
                 let msg = "Tracked [\(effectiveLabel)] - Dist: \(Int(estimatedFeet))ft, Brg: \(Int(currentBearing))°, GPS: (\(latStr), \(lonStr))"

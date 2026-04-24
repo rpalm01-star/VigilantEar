@@ -1,6 +1,7 @@
 import Foundation
 import CoreLocation
 import Observation
+import SwiftUI
 
 // A smoothed, persistent vehicle traveling on the map
 @Observable
@@ -21,6 +22,19 @@ class TrackedTarget: Identifiable {
     // The complementary filter factor (0.0 to 1.0)
     // Higher = heavily favors smooth predicting, Lower = favors raw jumpy GPS
     private let smoothingFactor = 0.85
+
+    // Put this right below your smoothingFactor variable
+    private var glideTimer: Timer?
+    
+    // Add this function anywhere inside the class
+    @MainActor
+    private func startDeadReckoning() {
+        glideTimer = Timer.scheduledTimer(withTimeInterval: 0.03, repeats: true) { [weak self] _ in
+            guard let self = self, self.estimatedSpeedMPS > 0 else { return }
+            let coastedCoordinate = self.projectCoordinate(from: self.smoothedCoordinate, heading: self.estimatedHeading, distanceMeters: self.estimatedSpeedMPS * 0.03)
+            self.smoothedCoordinate = coastedCoordinate
+        }
+    }
     
     init(initialEvent: SoundEvent) {
         // Matches the struct perfectly now
@@ -31,6 +45,9 @@ class TrackedTarget: Identifiable {
             longitude: initialEvent.longitude ?? 0.0
         )
         self.lastUpdateTime = initialEvent.timestamp
+        
+        // Add this to your init(initialEvent:)
+        startDeadReckoning()
     }
     
     func update(with rawEvent: SoundEvent) {
@@ -64,7 +81,9 @@ class TrackedTarget: Identifiable {
         let distanceMoved = calculateDistance(from: smoothedCoordinate, to: newSmoothedCoordinate)
         self.estimatedSpeedMPS = min(distanceMoved / deltaTime, 35.0)
         
+        // Assign it directly! (The background glideTimer is handling the animation now)
         self.smoothedCoordinate = newSmoothedCoordinate
+        
         self.currentLabel = rawEvent.threatLabel // Allow the label to update if the ML gets a better read
         self.lastUpdateTime = now
     }

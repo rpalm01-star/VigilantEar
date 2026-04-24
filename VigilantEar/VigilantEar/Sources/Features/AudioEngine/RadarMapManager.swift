@@ -5,7 +5,6 @@
 //  Created by Robert Palmer on 4/23/26.
 //
 
-
 import Foundation
 import Observation
 
@@ -22,26 +21,25 @@ class RadarMapManager {
     
     @MainActor
     func processNewEvent(_ event: SoundEvent) {
-        // Skip events with no GPS coordinates (environmental noise, UI clicks, etc.)
-        guard event.latitude != nil, event.longitude != nil else { return }
-        
         if let existingTarget = activeTargets[event.sessionID] {
-            // The car is already on the map! Feed it the new data so it glides forward
             existingTarget.update(with: event)
         } else {
-            // A completely new vehicle just appeared on the radar
+            // Only spawn a visible target if the sound is persistent (e.g., more than just a transient click)
+            // For now, let's keep the spawn but increase the 'Stale' timer
             let newTarget = TrackedTarget(initialEvent: event)
             activeTargets[event.sessionID] = newTarget
         }
         
-        // Clean up ghosts: Remove any target that hasn't made a sound in 4 seconds
         cleanupStaleTargets()
     }
     
     private func cleanupStaleTargets() {
         let now = Date()
+        // INCREASE THIS: Wait 2.5 seconds before deleting an icon.
+        // This bridges the gaps in speech and music beats.
         activeTargets = activeTargets.filter { _, target in
-            now.timeIntervalSince(target.lastUpdateTime) < 4.0
+            now.timeIntervalSince(target.lastUpdateTime) < 2.5
         }
     }
+
 }
