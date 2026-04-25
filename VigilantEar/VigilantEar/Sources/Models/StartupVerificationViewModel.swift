@@ -25,7 +25,6 @@ enum VerificationType: String {
     case orientation = "Landscape Orientation"
     case locationAccess = "GPS Tactical Mapping"
     case neuralEngine = "Neural Engine (CoreML)"
-    case criticalAlerts = "Critical Alert Support"
     case storage = "Storage Access"
 }
 
@@ -52,7 +51,6 @@ final class StartupVerificationViewModel {
             VerificationTask(type: .orientation),
             VerificationTask(type: .locationAccess),
             VerificationTask(type: .neuralEngine),
-            VerificationTask(type: .criticalAlerts),
             VerificationTask(type: .storage)
         ]
         isFinished = false
@@ -68,10 +66,9 @@ final class StartupVerificationViewModel {
         let orientationResult = checkOrientation()
         async let locationResult = checkLocation()
         async let neuralResult = checkNeuralEngine()
-        async let alertsResult = checkEntitlements()
         async let storageResult = checkStorage()
         
-        let results = await [stereoResult, routingResult, orientationResult, locationResult, neuralResult, alertsResult, storageResult]
+        let results = await [stereoResult, routingResult, orientationResult, locationResult, neuralResult, storageResult]
         
         for (index, result) in results.enumerated() {
             steps[index].status = result.status
@@ -172,24 +169,6 @@ final class StartupVerificationViewModel {
     private func checkNeuralEngine() async -> (status: VerificationStatus, reason: String?) {
         let hasANE = MLComputeDevice.allComputeDevices.contains { if case .neuralEngine = $0 { return true }; return false }
         return hasANE ? (.passed, nil) : (.failed, "Neural Engine missing")
-    }
-    
-    private func checkEntitlements() async -> (status: VerificationStatus, reason: String?) {
-#if DEBUG
-        return (.passed, nil)
-#else
-        let center = UNUserNotificationCenter.current()
-        let settings = await center.notificationSettings()
-        if settings.criticalAlertSetting == .enabled { return (.passed, nil) }
-        
-        do {
-            if try await center.requestAuthorization(options: [.alert, .sound, .badge, .criticalAlert]) {
-                let newSettings = await center.notificationSettings()
-                return newSettings.criticalAlertSetting == .enabled ? (.passed, nil) : (.failed, "Critical alerts disabled")
-            }
-        } catch {}
-        return (.failed, "Alert authorization failed")
-#endif
     }
     
     private func checkStorage() async -> (status: VerificationStatus, reason: String?) {

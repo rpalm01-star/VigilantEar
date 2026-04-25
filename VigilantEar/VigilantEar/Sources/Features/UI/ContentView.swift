@@ -33,7 +33,7 @@ struct ContentView: View {
                                     Text(title)
                                         .font(.system(.headline, design: .monospaced))
                                         .tracking(3)
-                                        .foregroundStyle(.mint.opacity(0.9))
+                                        .foregroundStyle(AppGlobals.darkGray.opacity(0.9))
                                         .blur(radius: 10)
                                 }
                                 .overlay {
@@ -189,14 +189,50 @@ struct ContentView: View {
     }
 }
 
-// MARK: - Debug HUD Component
 struct DebugHUD: View {
     
-    @Bindable var manager: MicrophoneManager   // or @ObservedObject if using older style
+    @Bindable var manager: MicrophoneManager
     @StateObject private var monitor = SystemMonitor.shared
     @State private var isCloudLoggingEnabled: Bool = AppGlobals.logToCloud
     
     let telemetryTitle = "⚙️ Telemetry" + AppGlobals.appVersion
+    
+    // Computed thermal state
+    private var thermalState: ProcessInfo.ThermalState {
+        ProcessInfo.processInfo.thermalState
+    }
+    
+    // Smart CPU color thresholds
+    private var cpuColor: Color {
+        let usage = monitor.cpuUsage
+        if usage > 300 {
+            return .red
+        } else if usage > 150 {
+            return .orange
+        } else {
+            return .green
+        }
+    }
+    
+    private var thermalIcon: String {
+        switch thermalState {
+        case .nominal:   return "thermometer.low"
+        case .fair:      return "thermometer.medium"
+        case .serious:   return "thermometer.high"
+        case .critical:  return "flame.fill"
+        @unknown default: return "thermometer"
+        }
+    }
+    
+    private var thermalColor: Color {
+        switch thermalState {
+        case .nominal:   return .green
+        case .fair:      return .yellow
+        case .serious:   return .orange
+        case .critical:  return .red
+        @unknown default: return .gray
+        }
+    }
     
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
@@ -205,43 +241,52 @@ struct DebugHUD: View {
                 .foregroundColor(isCloudLoggingEnabled ? .cyan : .gray)
                 .padding(.bottom, 2)
             
-            HStack {
+            // === CPU with Thermal Indicator ===
+            // === CPU with Smart Thresholds ===
+            HStack() {
                 Text("CPU:")
                     .font(.system(size: 12, weight: .medium, design: .monospaced))
+                
                 Text("\(String(format: "%.1f", monitor.cpuUsage))%")
                     .font(.system(size: 11, weight: .bold, design: .monospaced))
-                    .foregroundColor(monitor.cpuUsage > 80.0 ? .red : .green)
+                    .foregroundColor(cpuColor)
+                
+                Image(systemName: thermalIcon)
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundColor(thermalColor)
             }
             
             HStack {
                 Text("RAM:")
-                    .font(.system(size: 12, weight: .medium, design: .monospaced))
+                    .font(.system(size: 11, weight: .medium, design: .monospaced))
                 Text("\(String(format: "%.1f", monitor.memoryUsageMB)) MB")
                     .font(.system(size: 11, weight: .bold, design: .monospaced))
                     .foregroundColor(.cyan)
             }
             
-            HStack() {
+            HStack {
                 Text("BAT:")
-                    .font(.system(size: 12, weight: .medium, design: .monospaced))
+                    .font(.system(size: 11, weight: .medium, design: .monospaced))
                 
                 Text("\(monitor.batteryLevel)%")
-                    .font(.system(size: 12, weight: .bold, design: .monospaced))
+                    .font(.system(size: 11, weight: .bold, design: .monospaced))
                     .foregroundColor(monitor.batteryLevel > 20 ? .green : .red)
-                
+                Image(systemName: thermalIcon)
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundColor(thermalColor)
                 if monitor.isCharging {
                     Image(systemName: "bolt.fill")
                         .foregroundColor(.yellow)
-                        .font(.system(size: 10))
+                        .font(.system(size: 11))
                 }
             }
             
-            HStack() {
+            HStack {
                 Text("MIC:")
-                    .font(.system(size: 12, weight: .medium, design: .monospaced))
+                    .font(.system(size: 11, weight: .medium, design: .monospaced))
                 
                 Text("\(manager.activeMicCount)" + (manager.activeMicCount >= 2 ? " stereo" : " mono"))
-                    .font(.system(size: 12, weight: .bold, design: .monospaced))
+                    .font(.system(size: 11, weight: .bold, design: .monospaced))
                     .foregroundStyle(manager.activeMicCount > 0 ? .green : .red)
                     .contentTransition(.numericText())
             }
@@ -265,8 +310,6 @@ struct DebugHUD: View {
             withAnimation(.easeInOut(duration: 0.2)) {
                 isCloudLoggingEnabled.toggle()
                 AppGlobals.logToCloud = isCloudLoggingEnabled
-                
-                // (Deleted the dropIgnoredSounds line here!)
                 
                 let generator = UIImpactFeedbackGenerator(style: .medium)
                 generator.impactOccurred()

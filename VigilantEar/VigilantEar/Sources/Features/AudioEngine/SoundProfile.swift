@@ -166,7 +166,7 @@ struct ThreatHUDItemInstance: View {
                 .font(.system(size: 14, weight: .bold, design: .monospaced))
                 .foregroundStyle(color.opacity(1))
                 .lineLimit(1)
-                .frame(width: 80)
+                .frame(width: 50)
         }
     }
 }

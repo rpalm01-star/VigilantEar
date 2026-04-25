@@ -46,7 +46,6 @@ class AcousticCoordinator {
         if (activeEvents.isEmpty) { return }
         
         if (isCleaning) {
-            print("❌ Active event cleanup is already running. Bypassing.")
             return
         }
         isCleaning = true
