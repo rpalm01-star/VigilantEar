@@ -6,9 +6,30 @@
 //
 
 import Synchronization
+import SwiftUI
 
 nonisolated struct AppGlobals {
     
+    private static let _lightGray = Mutex<Color>(Color(white: 0.62))
+    public static var lightGray: Color {
+        get { _lightGray.withLock { $0 } }
+    }
+    
+    private static let _darkGray = Mutex<Color>(Color(white: 0.35))
+    public static var darkGray: Color {
+        get { _darkGray.withLock { $0 } }
+    }
+
+    private static let _darkerGray = Mutex<Color>(Color(white: 0.25))
+    public static var darkerGray: Color {
+        get { _darkerGray.withLock { $0 } }
+    }
+    
+    private static let _darkerGrayWithOpacity = Mutex<Color>(Color(white: 0.25, opacity: 0.9))
+    public static var darkerGrayWithOpacity: Color {
+        get { _darkerGrayWithOpacity.withLock { $0 } }
+    }
+
     private static let _appVersion = Mutex<String>(" 1.0.0")
     public static var appVersion: String {
         get { _appVersion.withLock { $0 } }

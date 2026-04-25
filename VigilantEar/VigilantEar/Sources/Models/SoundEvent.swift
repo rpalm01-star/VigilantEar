@@ -26,7 +26,7 @@ struct SoundEvent: Identifiable {
     public var dotColor: Color {
         if (SoundProfile.classify(threatLabel).isEmergency) {return Color.red} else {return Color.cyan}
     }
-
+    
     // MARK: - Spatial Data
     public let bearing: Double
     public let distance: Double
@@ -35,6 +35,9 @@ struct SoundEvent: Identifiable {
     public let isApproaching: Bool
     public let latitude: Double?
     public let longitude: Double?
+    
+    // NEW: Song label attached from Shazam
+    public let songLabel: String?
     
     public nonisolated init(
         id: UUID = UUID(),
@@ -49,6 +52,7 @@ struct SoundEvent: Identifiable {
         isApproaching: Bool = false,
         latitude: Double? = nil,
         longitude: Double? = nil,
+        songLabel: String? = nil          // ← NEW
     ) {
         self.id = id
         self.sessionID = sessionID
@@ -62,29 +66,25 @@ struct SoundEvent: Identifiable {
         self.isApproaching = isApproaching
         self.latitude = latitude
         self.longitude = longitude
+        self.songLabel = songLabel          // ← NEW
     }
 }
 
 // MARK: - UI & MapKit Extensions
 extension SoundEvent {
-
+    
     var age: TimeInterval { Date().timeIntervalSince(timestamp) }
     
     // Dynamic Lifespan based on ML certainty
     var dynamicLifespan: TimeInterval {
-        // A perfectly confident dot lives 6 seconds.
-        // A highly uncertain (30%) dot vanishes in 1.8 seconds.
-        return max(0.1, 6.0 * confidence) // The max() prevents any divide-by-zero math crashes!
+        return max(0.1, 6.0 * confidence)
     }
     
     var opacity: Double {
-        // Fade out perfectly based on its custom lifespan
         return max(0, 1.0 - (age / dynamicLifespan))
     }
     
-    // Base visual scale
     var visualScale: Double {
-        // A 50% confident dot will be drawn physically half the size
         return confidence
     }
     
@@ -98,8 +98,6 @@ extension SoundEvent {
     var formattedDoppler: String {
         guard let rate = dopplerRate, abs(rate) > 0.1 else { return "Stationary" }
         let direction = isApproaching ? "Approaching" : "Receding"
-        
-        // Formatted to show meters per second
         return "\(direction) (\(String(format: "%.1f", abs(rate))) m/s)"
     }
     

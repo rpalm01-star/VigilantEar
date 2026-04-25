@@ -140,13 +140,33 @@ struct ContentView: View {
                 if isPortrait {
                     Color.black.opacity(0.85).ignoresSafeArea()
                     VStack(spacing: 20) {
+                        Text(title)
+                            .font(.system(.headline, design: .monospaced))
+                            .tracking(3)
+                            .foregroundStyle(.black)
+                            .background {
+                                // Soft mint background glow (behind everything)
+                                Text(title)
+                                    .font(.system(.headline, design: .monospaced))
+                                    .tracking(3)
+                                    .foregroundStyle(.mint.opacity(0.9))
+                                    .blur(radius: 10)
+                            }
+                            .overlay {
+                                Text(title)
+                                    .font(.system(.headline, design: .monospaced))
+                                    .tracking(3)
+                                    .foregroundStyle(.green)
+                                    .blur(radius: 0.9)                   // ← tweak this for outline thickness
+                            }
                         Image(systemName: "iphone.landscape").font(.system(size: 80)).foregroundStyle(.red)
                         Text("SPATIAL ARRAY MISALIGNED").font(.title2.monospaced().bold()).foregroundStyle(.red)
+                        Text("(Turn to landscape mode)").font(.title2.monospaced().bold()).foregroundStyle(.white)
                     }.zIndex(100)
                 }
             }
             .overlay(alignment: .bottomTrailing) {
-                DebugHUD()
+                DebugHUD(manager: microphoneManager)
                     .padding(.bottom, 12)
                     .padding(.trailing, 12)
             }
@@ -171,6 +191,8 @@ struct ContentView: View {
 
 // MARK: - Debug HUD Component
 struct DebugHUD: View {
+    
+    @Bindable var manager: MicrophoneManager   // or @ObservedObject if using older style
     @StateObject private var monitor = SystemMonitor.shared
     @State private var isCloudLoggingEnabled: Bool = AppGlobals.logToCloud
     
@@ -187,7 +209,7 @@ struct DebugHUD: View {
                 Text("CPU:")
                     .font(.system(size: 12, weight: .medium, design: .monospaced))
                 Text("\(String(format: "%.1f", monitor.cpuUsage))%")
-                    .font(.system(size: 12, weight: .bold, design: .monospaced))
+                    .font(.system(size: 11, weight: .bold, design: .monospaced))
                     .foregroundColor(monitor.cpuUsage > 80.0 ? .red : .green)
             }
             
@@ -195,12 +217,12 @@ struct DebugHUD: View {
                 Text("RAM:")
                     .font(.system(size: 12, weight: .medium, design: .monospaced))
                 Text("\(String(format: "%.1f", monitor.memoryUsageMB)) MB")
-                    .font(.system(size: 12, weight: .bold, design: .monospaced))
+                    .font(.system(size: 11, weight: .bold, design: .monospaced))
                     .foregroundColor(.cyan)
             }
             
-            HStack(spacing: 4) {
-                Text("PWR:")
+            HStack() {
+                Text("BAT:")
                     .font(.system(size: 12, weight: .medium, design: .monospaced))
                 
                 Text("\(monitor.batteryLevel)%")
@@ -213,9 +235,19 @@ struct DebugHUD: View {
                         .font(.system(size: 10))
                 }
             }
+            
+            HStack() {
+                Text("MIC:")
+                    .font(.system(size: 12, weight: .medium, design: .monospaced))
+                
+                Text("\(manager.activeMicCount)" + (manager.activeMicCount >= 2 ? " stereo" : " mono"))
+                    .font(.system(size: 12, weight: .bold, design: .monospaced))
+                    .foregroundStyle(manager.activeMicCount > 0 ? .green : .red)
+                    .contentTransition(.numericText())
+            }
         }
-        .padding(6)
-        .frame(width: 115, alignment: .leading)
+        .padding(4)
+        .frame(width: 112, alignment: .leading)
         .background(
             ZStack {
                 Rectangle().fill(.ultraThinMaterial)
@@ -242,4 +274,3 @@ struct DebugHUD: View {
         }
     }
 }
-

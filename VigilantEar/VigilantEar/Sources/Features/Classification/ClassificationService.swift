@@ -54,9 +54,14 @@ final class ClassificationService {
             try newAnalyzer.add(request, withObserver: resultsObserver)
             self.analyzer = newAnalyzer
             self.isPipelineReady = true
-            print("🚀 ANE Pipeline Primed and Ready")
+            PerformanceLogger.shared.start(task: "ANE Pipeline")
+            let msg = "🚀 ANE Pipeline Primed and Ready"
+            print(msg)
+            Task { PerformanceLogger.shared.logTelemetry(step: "AV_AUDIO", message: msg) }
         } catch {
-            print("Failed to prime ANE: \(error)")
+            let msg = "🚀 ANE Pipeline failed: " + error.localizedDescription
+            print(msg)
+            Task { PerformanceLogger.shared.logTelemetry(step: "AV_AUDIO", message: msg) }
         }
     }
 }
@@ -71,6 +76,8 @@ class ClassificationResultsObserver: NSObject, SNResultsObserving {
     }
     
     func request(_ request: SNRequest, didFailWithError error: Error) {
-        print("Analysis request failed: \(error)")
+        let msg = "⚠️ ClassificationResultsObserver analysis failed: " + error.localizedDescription
+        print(msg)
+        Task { PerformanceLogger.shared.logTelemetry(step: "AV_CLASSIFICATION", message: msg) }
     }
 }

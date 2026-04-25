@@ -11,8 +11,6 @@ struct SoundProfile {
     let ceiling: Double
     let maxRange: Double
     let category: ThreatCategory
-    
-    // NEW: The master override label for the Tracker and HUD
     let canonicalLabel: String
     
     var isEmergency: Bool { return category == .emergency }
@@ -34,15 +32,15 @@ struct SoundProfile {
         (["ignored_noise", "train", "rail", "fire", "thunderstorm", "wind", "breeze", "breathing", "snore", "snoring", "burp"], "speaker.slash.fill", .gray, 0.0, 0.0, .ignored),
         
         // --- MEDIUM ACTION ---
-        (["speech", "voice", "talk", "person"], "waveform", .cyan, 0.55, 150.0, .medium),
+        (["speech", "voice", "talk", "person", "squeak"], "waveform", .cyan, 0.55, 150.0, .medium),
         (["bicycle"], "bicycle", .blue, 0.55, 150.0, .medium),
         (["bell", "chime", "clock", "tick", "beep"], "bell.fill", .purple, 0.55, 150.0, .medium),
         
         // THE FIX: All instruments and anomalous harmonics funnel into "music"
-        (["music", "choir", "bugle", "song", "sing", "whistl", "didgeridoo", "bassoon", "tuning", "theremin", "flute", "plucked", "whale", "piano", "guitar"], "music.note", .purple, 0.55, 125.0, .medium),
+        (["music", "choir", "bugle", "song", "sing", "whistl", "didgeridoo", "bassoon", "tuning", "theremin", "flute", "plucked", "whale", "piano", "guitar"], "music.quarternote.3", .purple, 0.55, 125.0, .medium),
         
         (["hammer", "hammering"], "hammer.fill", .pink, 0.55, 150.0, .medium),
-        (["chopping"], "scissors", .pink, 0.55, 150.0, .medium),
+        (["chopping", "cutlery"], "scissors", .pink, 0.55, 150.0, .medium),
         (["knock", "tap"], "hand.tap.fill", .purple, 0.55, 150.0, .medium),
         (["tennis"], "figure.tennis", .pink, 0.55, 150.0, .medium),
         (["footsteps", "step", "walk", "foot", "bowling"], "figure.walk", .cyan, 0.55, 150.0, .medium),
@@ -54,21 +52,26 @@ struct SoundProfile {
         (["cough"], "lungs.fill", .cyan, 0.35, 30.0, .quiet),
         (["sneeze", "nose"], "nose.fill", .cyan, 0.35, 30.0, .quiet),
         (["sleep"], "zzz", .cyan, 0.35, 30.0, .quiet),
-        (["hiccup", "swallow"], "mouth.fill", .cyan, 0.35, 30.0, .quiet),
+        (["hiccup", "swallow", "humming"], "mouth.fill", .cyan, 0.35, 30.0, .quiet),
         (["laugh", "chuckle"], "face.smiling.fill", .cyan, 0.35, 30.0, .quiet),
         
         // --- ANIMALS ---
-        (["cat"], "cat", .green, 0.35, 30.0, .animal),
-        (["dog", "coyote"], "dog", .green, 0.35, 30.0, .animal),
-        (["animal", "bark", "pig"], "pawprint.fill", .green, 0.35, 30.0, .animal),
-        (["bird", "chirp", "owl hoot"], "bird.fill", .green, 0.35, 30.0, .animal),
+        (["cat"], "cat", .brown, 0.35, 30.0, .animal),
+        (["dog", "coyote"], "dog", .brown, 0.35, 30.0, .animal),
+        (["animal", "bark", "pig", "horse"], "pawprint.fill", .brown, 0.35, 30.0, .animal),
+        (["bird", "chirp", "hoot", "owl"], "bird.fill", .brown, 0.35, 30.0, .animal),
         
         // --- MISC ---
+        (["drawer", "cabinet"], "cabinet", .mint, 0.35, 30.0, .misc),
+        (["camera"], "camera", .mint, 0.35, 30.0, .misc),
+        (["dishwasher"], "dishwasher", .mint, 0.35, 30.0, .misc),
+        (["typewriter", "keyboard"], "keyboard", .mint, 0.35, 30.0, .misc),
+        (["microwave"], "microwave", .mint, 0.35, 30.0, .misc),
         (["fan"], "fan", .mint, 0.35, 30.0, .misc),
         (["crumple", "crumpl", "crush", "trash"], "trash.fill", .mint, 0.35, 30.0, .misc),
         (["toilet", "flush"], "toilet.fill", .mint, 0.35, 30.0, .misc),
         (["door"], "door.right.hand.closed", .mint, 0.35, 30.0, .misc),
-        (["glass", "shatter", "crash", "clink"], "burst.fill", .gray, 0.80, 1000.0, .misc),
+        (["glass", "shatter", "crash", "clink"], "burst.fill", .orange, 0.80, 1000.0, .misc),
     ]
     
     // 2. THE SEARCH ENGINE
@@ -89,7 +92,7 @@ struct SoundProfile {
         }
         
         // THE FALLBACK
-        return SoundProfile(icon: "waveform", color: .gray, ceiling: 0.55, maxRange: 150.0, category: .unknown, canonicalLabel: label)
+        return SoundProfile(icon: "waveform", color: AppGlobals.lightGray, ceiling: 0.55, maxRange: 150.0, category: .unknown, canonicalLabel: label)
     }
 }
 
@@ -129,16 +132,15 @@ struct ThreatHUD: View {
     }
 }
 
-// MARK: - The Individual Instrument UI
 struct ThreatHUDItemInstance: View {
     var event: SoundEvent
     
     var body: some View {
-        // Because of the pipeline override, event.threatLabel is ALREADY the canonical string!
         let profile = SoundProfile.classify(event.threatLabel)
         let displayLabel = event.threatLabel.replacingOccurrences(of: "_", with: " ").capitalized
+        let color = profile.color
         
-        VStack(spacing: 5) {
+        VStack(spacing: 4) {
             ZStack {
                 Circle()
                     .fill(.regularMaterial)
@@ -150,7 +152,7 @@ struct ThreatHUDItemInstance: View {
                 
                 Image(systemName: profile.icon)
                     .font(.system(size: 22, weight: .semibold))
-                    .foregroundStyle(profile.color)
+                    .foregroundStyle(color)
                     .symbolEffect(.bounce, value: event.energy)
                 
                 Circle()
@@ -161,10 +163,10 @@ struct ThreatHUDItemInstance: View {
             }
             
             Text(displayLabel)
-                .font(.system(size: 10, weight: .bold, design: .monospaced))
-                .foregroundStyle(.white.opacity(1))
+                .font(.system(size: 14, weight: .bold, design: .monospaced))
+                .foregroundStyle(color.opacity(1))
                 .lineLimit(1)
-                .frame(width: 60)
+                .frame(width: 80)
         }
     }
 }

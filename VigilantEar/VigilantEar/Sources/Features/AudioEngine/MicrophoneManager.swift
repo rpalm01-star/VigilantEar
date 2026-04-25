@@ -11,7 +11,11 @@ class MicrophoneManager: NSObject, CLLocationManagerDelegate {
     var micWarning: String? = nil
     var latestDetection: String? = nil
     
-    /// Public status for UI (green listening dot)
+    // === LIVE ACTIVE MIC COUNTER ===
+    var activeMicCount: Int = 0
+    private let activityThresholdDB: Float = -48.0   // Tune this: -45 to -52 works well
+    private var lastReportedCount: Int = 0
+
     public var isListening: Bool { isRunning }
     public var pipeline: AcousticProcessingPipeline?
     
@@ -176,6 +180,18 @@ class MicrophoneManager: NSObject, CLLocationManagerDelegate {
         
         inputNode.installTap(onBus: 0, bufferSize: 4096, format: hardwareFormat) { [weak self] buffer, time in
             guard let self = self else { return }
+            
+            // === LIVE ACTIVE MIC COUNTER (runs every buffer) ===
+            let currentCount = self.calculateActiveMicCount(from: buffer)
+            
+            if currentCount != self.lastReportedCount {
+                self.lastReportedCount = currentCount
+                Task { @MainActor in
+                    self.activeMicCount = currentCount
+                }
+            }
+            
+            // Original pipeline call
             Task {
                 await self.pipeline?.processAudio(buffer: buffer, time: time)
             }
@@ -220,5 +236,31 @@ class MicrophoneManager: NSObject, CLLocationManagerDelegate {
     }
     
     deinit { stopCapturing() }
+    
+    private func calculateActiveMicCount(from buffer: AVAudioPCMBuffer) -> Int {
+        guard let channelData = buffer.floatChannelData else { return 0 }
+        
+        let channelCount = Int(buffer.format.channelCount)
+        let frameCount = Int(buffer.frameLength)
+        var activeChannels = 0
+        
+        for ch in 0..<channelCount {
+            let samples = channelData[ch]
+            
+            // RMS calculation
+            var sum: Float = 0.0
+            for i in 0..<frameCount {
+                sum += samples[i] * samples[i]
+            }
+            
+            let rms = sqrt(sum / Float(frameCount))
+            let dbFS = 20 * log10(max(rms, 1e-10))
+            
+            if dbFS > activityThresholdDB {
+                activeChannels += 1
+            }
+        }
+        
+        return activeChannels
+    }
 }
-
