@@ -3,7 +3,7 @@ import SwiftUI
 struct ContentView: View {
     @Environment(MicrophoneManager.self) private var microphoneManager
     @Environment(AcousticCoordinator.self) private var coordinator
-    
+
     let title = "VIGILANT EAR"
     
     var body: some View {
@@ -166,9 +166,15 @@ struct ContentView: View {
                 }
             }
             .overlay(alignment: .bottomTrailing) {
-                DebugHUD(manager: microphoneManager)
+                DebugHUD(manager: microphoneManager, roadManager: microphoneManager.roadManager)
                     .padding(.bottom, 12)
                     .padding(.trailing, 12)
+            }
+            // Bridge the GPS from the Mic Manager to the Road Manager
+            .onChange(of: microphoneManager.currentLocation) { _, newLocation in
+                if let location = newLocation {
+                    microphoneManager.roadManager.processLocationUpdate(location)
+                }
             }
             .onChange(of: isPortrait) { _, newValue in
                 if newValue {
@@ -192,6 +198,8 @@ struct ContentView: View {
 struct DebugHUD: View {
     
     @Bindable var manager: MicrophoneManager
+    var roadManager: RoadManager // <-- NEW: Injected to track background map loading
+    
     @StateObject private var monitor = SystemMonitor.shared
     @State private var isCloudLoggingEnabled: Bool = AppGlobals.logToCloud
     
@@ -290,9 +298,33 @@ struct DebugHUD: View {
                     .foregroundStyle(manager.activeMicCount > 0 ? .green : .red)
                     .contentTransition(.numericText())
             }
+            
+            // === THE NEW OSM TELEMETRY ROW ===
+            HStack {
+                Text("OSM:")
+                    .font(.system(size: 11, weight: .medium, design: .monospaced))
+                
+                if roadManager.isFetching {
+                    Text("FETCHING")
+                        .font(.system(size: 11, weight: .bold, design: .monospaced))
+                        .foregroundColor(.orange)
+                    Image(systemName: "arrow.down.circle.fill")
+                        .font(.system(size: 10))
+                        .foregroundColor(.orange)
+                } else if roadManager.cachedRoadSegments.isEmpty {
+                    Text("NO DATA")
+                        .font(.system(size: 11, weight: .bold, design: .monospaced))
+                        .foregroundColor(.red)
+                } else {
+                    Text("\(roadManager.cachedRoadSegments.count) rds")
+                        .font(.system(size: 11, weight: .bold, design: .monospaced))
+                        .foregroundColor(.green)
+                        .contentTransition(.numericText())
+                }
+            }
         }
         .padding(4)
-        .frame(width: 112, alignment: .leading)
+        .frame(width: 120, alignment: .leading) // <-- NEW: Bumped to 120 so "FETCHING" fits
         .background(
             ZStack {
                 Rectangle().fill(.ultraThinMaterial)

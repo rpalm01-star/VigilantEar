@@ -10,27 +10,29 @@ class MicrophoneManager: NSObject, CLLocationManagerDelegate {
     var currentHeading: Double = 0.0
     var micWarning: String? = nil
     var latestDetection: String? = nil
-    
-    // === LIVE ACTIVE MIC COUNTER ===
+    var currentLocation: CLLocation? = nil
     var activeMicCount: Int = 0
-    private let activityThresholdDB: Float = -48.0   // Tune this: -45 to -52 works well
-    private var lastReportedCount: Int = 0
-
-    public var isListening: Bool { isRunning }
-    public var pipeline: AcousticProcessingPipeline?
     
-    private let coordinator: AcousticCoordinator
-    private let classificationService: ClassificationService
-    private let locationManager = CLLocationManager()
-    private let audioEngine = AVAudioEngine()
+    public var isListening: Bool { isRunning }
     
     private var tapInstalled = false
     private var isRunning = false
-    var currentLocation: CLLocation? = nil
     
-    init(coordinator: AcousticCoordinator, classificationService: ClassificationService) {
-        self.coordinator = coordinator
+    private let activityThresholdDB: Float = -48.0   // Tune this: -45 to -52 works well
+    private var lastReportedCount: Int = 0
+    private let locationManager = CLLocationManager()
+    private let audioEngine = AVAudioEngine()
+    
+    private let acousticPipeline: AcousticProcessingPipeline
+    private let acousticCoordinator: AcousticCoordinator
+    private let classificationService: ClassificationService
+    public let roadManager: RoadManager
+    
+    init(acousticCoordinator: AcousticCoordinator, classificationService: ClassificationService, roadManager: RoadManager, acousticPipeline: AcousticProcessingPipeline) {
+        self.acousticCoordinator = acousticCoordinator
         self.classificationService = classificationService
+        self.roadManager = roadManager
+        self.acousticPipeline = acousticPipeline
         super.init()
         setupHeading()
     }
@@ -48,7 +50,7 @@ class MicrophoneManager: NSObject, CLLocationManagerDelegate {
         // Force the hardware compass to track the back of the camera, not the top of the phone!
         // (Charging port on the right = .landscapeLeft)
         locationManager.headingOrientation = .landscapeLeft
-
+        
         // Start compass
         if CLLocationManager.headingAvailable() {
             locationManager.startUpdatingHeading()
@@ -61,21 +63,18 @@ class MicrophoneManager: NSObject, CLLocationManagerDelegate {
     func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
         guard let location = locations.last else { return }
         
+        // --- THE BRIDGE ---
+        // Feed the raw hardware location straight to the network manager
+        roadManager.processLocationUpdate(location)
+        
         Task {
-            if pipeline == nil {
-                let msg = "⚠️ ERROR: GPS location update received, but Pipeline is NIL!"
-                print(msg)
-                Task { PerformanceLogger.shared.logTelemetry(step: "0_MIC_MGR", message: msg) }
-                // FIX: Removed the early 'return' so UI still updates!
-            }
-            
             // ALWAYS update the UI so the blue dot moves
             await MainActor.run {
                 self.currentLocation = location
             }
             
             // Safely optional-chain the pipeline update
-            await pipeline?.updateLocation(location.coordinate)
+            await acousticPipeline.updateLocation(location.coordinate)
         }
     }
     
@@ -84,19 +83,13 @@ class MicrophoneManager: NSObject, CLLocationManagerDelegate {
         let heading = newHeading.trueHeading > 0 ? newHeading.trueHeading : newHeading.magneticHeading
         
         Task {
-            if pipeline == nil {
-                let msg = "⚠️ ERROR: GPS heading update received, but Pipeline is NIL!"
-                print(msg)
-                Task { PerformanceLogger.shared.logTelemetry(step: "0_MIC_MGR", message: msg) }
-            }
-            
             // ALWAYS update the UI compass
             await MainActor.run {
                 self.currentHeading = heading
             }
             
             // Safely optional-chain the pipeline update
-            await pipeline?.updateHeading(heading)
+            await acousticPipeline.updateHeading(heading)
         }
     }
     
@@ -193,7 +186,7 @@ class MicrophoneManager: NSObject, CLLocationManagerDelegate {
             
             // Original pipeline call
             Task {
-                await self.pipeline?.processAudio(buffer: buffer, time: time)
+                await self.acousticPipeline.processAudio(buffer: buffer, time: time)
             }
         }
         
@@ -212,7 +205,7 @@ class MicrophoneManager: NSObject, CLLocationManagerDelegate {
                 Task { PerformanceLogger.shared.logTelemetry(step: "0_MIC_MGR", message: msg) }
             }
             
-            Task { try? await self.pipeline?.setupAnalyzer(format: format) }
+            Task { try? await self.acousticPipeline.setupAnalyzer(format: format) }
             
             isRunning = true
             let msg = "✅ Audio Engine Flowing (Channels: \(format.channelCount))"

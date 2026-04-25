@@ -28,7 +28,6 @@ final class SystemMonitor: ObservableObject {
         timer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
             Task.detached(priority: .background) {
                 let metrics = SystemMonitor.fetchMetrics()
-                
                 await self?.updateUI(cpu: metrics.cpu, mem: metrics.mem)
             }
         }

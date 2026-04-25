@@ -1,4 +1,3 @@
-//
 //  AppGlobals.swift
 //  VigilantEar
 //
@@ -10,6 +9,7 @@ import SwiftUI
 
 nonisolated struct AppGlobals {
     
+    // MARK: - Theming & Config (your existing code)
     private static let _lightGray = Mutex<Color>(Color(white: 0.62))
     public static var lightGray: Color {
         get { _lightGray.withLock { $0 } }
@@ -19,7 +19,7 @@ nonisolated struct AppGlobals {
     public static var darkGray: Color {
         get { _darkGray.withLock { $0 } }
     }
-
+    
     private static let _darkerGray = Mutex<Color>(Color(white: 0.25))
     public static var darkerGray: Color {
         get { _darkerGray.withLock { $0 } }
@@ -29,7 +29,7 @@ nonisolated struct AppGlobals {
     public static var darkerGrayWithOpacity: Color {
         get { _darkerGrayWithOpacity.withLock { $0 } }
     }
-
+    
     private static let _appVersion = Mutex<String>(" 1.0.0")
     public static var appVersion: String {
         get { _appVersion.withLock { $0 } }
@@ -50,26 +50,27 @@ nonisolated struct AppGlobals {
         get { _logDataStoreName.withLock { $0 } }
     }
     
-    private static let _logToCloud = Mutex<Bool>(false)   // initial value
+    private static let _logToCloud = Mutex<Bool>(false)
     public static var logToCloud: Bool {
-        get {
-            _logToCloud.withLock { $0 }      // safe read
-        }
-        set {
-            _logToCloud.withLock { $0 = newValue } // safe write
-        }
+        get { _logToCloud.withLock { $0 } }
+        set { _logToCloud.withLock { $0 = newValue } }
     }
     
-    private static let _usbMicropohone = Mutex<Bool>(false)   // initial value
+    private static let _usbMicropohone = Mutex<Bool>(false)
     public static var usbMicropohone: Bool {
-        get {
-            _usbMicropohone.withLock { $0 }      // safe read
-        }
+        get { _usbMicropohone.withLock { $0 } }
     }
     
-    // THE FIX: A hardcoded, highly optimized set of categories to instantly drop
     public static let filteredCategories: Set<String> = [
         ThreatCategory.ignored.rawValue
-        // You can easily add ThreatCategory.misc.rawValue or .quiet.rawValue here later
     ]
+    
+    // MARK: - Global Logging (new)
+    /// Fire-and-forget log that can be called from **any** context safely.
+    nonisolated static func doLog(message: String, step: String = "APP") {
+        Task.detached(priority: .background) {
+            print(message)
+            await PerformanceLogger.shared.logTelemetry(step: step, message: message)
+        }
+    }
 }

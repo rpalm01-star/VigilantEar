@@ -31,11 +31,11 @@ struct MapView: View {
                 MapCircle(center: center, radius: 152.4).foregroundStyle(.yellow.opacity(0.10)).stroke(.yellow.opacity(0.5), lineWidth: 1.5)
                 MapCircle(center: center, radius: 9.144).foregroundStyle(.green.opacity(0.15)).stroke(.green.opacity(0.8), lineWidth: 2.5)
                 
-                // 1. Draw the "noisy" dots first at low opacity
+                // 1. Draw the "noisy" dots first at higher opacity (0.40) so the trail is visible
                 ForEach(events) { event in
                     Annotation("", coordinate: getProjectedCoordinate(for: event, center: center)) {
                         Circle()
-                            .fill(SoundProfile.classify(event.threatLabel).color.opacity(0.15))
+                            .fill(SoundProfile.classify(event.threatLabel).color.opacity(0.40))
                             .frame(width: 6, height: 6)
                     }
                 }
@@ -45,7 +45,11 @@ struct MapView: View {
                     Annotation("", coordinate: target.smoothedCoordinate) {
                         let profile = SoundProfile.classify(target.currentLabel)
                         
+                        // Grab the latest raw event for this target to read the live doppler
+                        let activeEvent = events.last(where: { $0.sessionID == target.id })
+                        
                         ZStack {
+                            // The Main Icon
                             if profile.isEmergency {
                                 Image(systemName: profile.icon)
                                     .font(.system(size: 24, weight: .bold))
@@ -60,10 +64,23 @@ struct MapView: View {
                                     .clipShape(Circle())
                                     .shadow(radius: 3)
                             }
+                            
+                            // --- THE ORBITAL DOPPLER CARET ---
+                            if let event = activeEvent, let rate = event.dopplerRate, abs(rate) > 0.1 {
+                                // If approaching, point AT the user (bearing + 180). If receding, point AWAY (bearing).
+                                let pointingAngle = event.isApproaching ? (event.bearing + 180) : event.bearing
+                                
+                                // THE FIX: Swapped triangle.fill for the sleek chevron.up caret
+                                Image(systemName: "chevron.up")
+                                    .font(.system(size: 14, weight: .black)) // Bumped size from 10 to 14 for readability
+                                    .foregroundColor(event.isApproaching ? .red : .green)
+                                    .shadow(color: .black.opacity(0.8), radius: 2)
+                                    .offset(y: profile.isEmergency ? -36 : -32)
+                                    .rotationEffect(.degrees(pointingAngle))
+                            }
                         }
                     }
                 }
-        
             }
         }
         .mapStyle(.standard(elevation: .flat, pointsOfInterest: .excludingAll))
@@ -93,7 +110,6 @@ struct MapView: View {
         if let lat = event.latitude, let lon = event.longitude {
             return CLLocationCoordinate2D(latitude: lat, longitude: lon)
         } else {
-            // Fallback for simulation or manual bells
             let distanceInMeters = Double(event.distance) * 304.8
             let geographicBearing = (userHeading + Double(event.bearing)).truncatingRemainder(dividingBy: 360.0)
             return center.projected(by: distanceInMeters, bearingDegrees: geographicBearing)
