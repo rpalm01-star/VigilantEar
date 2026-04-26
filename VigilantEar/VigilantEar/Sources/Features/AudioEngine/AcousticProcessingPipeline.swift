@@ -17,6 +17,9 @@ actor AcousticProcessingPipeline {
     
     private let fftProcessor: FFTProcessor
     
+    // --- THE INJECTED ROAD MANAGER ---
+    private let roadManager: RoadManager
+    
     struct ActiveThreat {
         var sessionID: UUID
         var dopplerTracker: SirenDopplerTracker
@@ -57,8 +60,10 @@ actor AcousticProcessingPipeline {
     private var lastKnownHeading: Double = 0.0
     
     private var lastProcessTime: Date = .distantPast
+    private var lastConfidence: Double = 0.0
     
-    init() {
+    // --- THE UPDATED INIT ---
+    init(roadManager: RoadManager) {
         let (stream, cont) = AsyncStream.makeStream(of: SoundEvent.self)
         self.eventStream = stream
         self.continuation = cont
@@ -68,6 +73,7 @@ actor AcousticProcessingPipeline {
         self.songContinuation = sCont
         
         self.fftProcessor = FFTProcessor(fftSize: Int(self.bufferSize))
+        self.roadManager = roadManager
     }
     
     public func updateLocation(_ coordinate: CLLocationCoordinate2D) {
@@ -145,7 +151,7 @@ actor AcousticProcessingPipeline {
         hasMatchedCurrentSong = true
         isAccumulatingForShazam = false
         
-        await PerformanceLogger.shared.logTelemetry(step: "SHAZAM", message: "Identified: \(customLabel)")
+        AppGlobals.doLog(message: "Identified: \(customLabel)", step: "SHAZAM")
         _ = songContinuation.yield(customLabel)
     }
     
@@ -154,13 +160,17 @@ actor AcousticProcessingPipeline {
         guard now.timeIntervalSince(lastProcessTime) > 0.2 else { return }
         lastProcessTime = now
         
+        // 1. Classify the profile immediately to get our snapping flag
+        let profile = await MainActor.run { SoundProfile.classify(label) }
+        
+        // ADJUSTED LOGIC: If it's a siren but confidence is mid-range,
+        // still treat it as Emergency, just maybe not a "Confirmed" one.
         let (isVehicle, profileCeiling, profileMaxRange, currentCategory, canonicalLabel, finalConfidence) = await MainActor.run {
-            var profile = SoundProfile.classify(label)
             var adjustedConf = confidence
             
-            if profile.isEmergency && confidence < 0.90 {
-                profile = SoundProfile.classify("engine")
-                adjustedConf = 0.50
+            if profile.isEmergency && confidence < 0.70 {
+                let engineProfile = SoundProfile.classify("car")
+                return (engineProfile.isVehicle, engineProfile.ceiling, engineProfile.maxRange, engineProfile.category.rawValue, engineProfile.canonicalLabel, 0.50)
             }
             
             if profile.canonicalLabel == "music" {
@@ -174,9 +184,8 @@ actor AcousticProcessingPipeline {
         let effectiveConfidence = finalConfidence
         
         if AppGlobals.filteredCategories.contains(currentCategory) {
-            if AppGlobals.logToCloud {
-                await PerformanceLogger.shared.logTelemetry(step: "1_ML_FILTERED", message: "Filtered: \(effectiveLabel)")
-            }
+            let msg = "Filtered: \(effectiveLabel)"
+            AppGlobals.doLog(message: msg, step: "1_ML_FILTERED")
             return
         }
         
@@ -267,7 +276,7 @@ actor AcousticProcessingPipeline {
             let currentHead = self.lastKnownHeading
             let songToAttach = self.currentSongLabel
             
-            Task.detached(priority: .userInitiated) { [weak self, threatSessionID, currentBearing, currentLoc, currentHead, effectiveLabel, effectiveConfidence, songToAttach] in
+            Task.detached(priority: .userInitiated) { [weak self, threatSessionID, currentBearing, currentLoc, currentHead, effectiveLabel, effectiveConfidence, songToAttach, profile] in
                 guard let self = self else { return }
                 
                 let ambientFloor: Double = isVehicle ? 0.015 : 0.04
@@ -297,8 +306,19 @@ actor AcousticProcessingPipeline {
                     let destLatRad = asin(sin(originLatRad) * cos(angularDist) + cos(originLatRad) * sin(angularDist) * cos(bearingRad))
                     let destLonRad = originLonRad + atan2(sin(bearingRad) * sin(angularDist) * cos(originLatRad), cos(originLatRad) * sin(destLatRad))
                     
-                    targetLat = destLatRad * 180.0 / .pi
-                    targetLon = destLonRad * 180.0 / .pi
+                    let rawTargetLat = destLatRad * 180.0 / .pi
+                    let rawTargetLon = destLonRad * 180.0 / .pi
+                    
+                    // --- SELECTIVE SNAPPING ---
+                    if profile.shouldSnapToRoad {
+                        let rawCoord = CLLocationCoordinate2D(latitude: rawTargetLat, longitude: rawTargetLon)
+                        let snappedCoord = await self.roadManager.snapToNearestRoad(rawCoordinate: rawCoord)
+                        targetLat = snappedCoord.latitude
+                        targetLon = snappedCoord.longitude
+                    } else {
+                        targetLat = rawTargetLat
+                        targetLon = rawTargetLon
+                    }
                 }
                 
                 let attachedSong = (effectiveLabel == "music" || effectiveLabel.contains("music")) ? songToAttach : nil
@@ -320,10 +340,17 @@ actor AcousticProcessingPipeline {
                 
                 let latStr = targetLat != nil ? String(format: "%.5f", targetLat!) : "N/A"
                 let lonStr = targetLon != nil ? String(format: "%.5f", targetLon!) : "N/A"
-                let msg = "Tracked [\(effectiveLabel)] - Dist: \(Int(estimatedFeet))ft, Brg: \(Int(currentBearing))°, GPS: (\(latStr), \(lonStr))"
-                await PerformanceLogger.shared.logTelemetry(step: "2_TARGET_TRACKED", message: msg)
-                
-                await MainActor.run { _ = self.continuation.yield(newEvent) }
+                let confStr = String(format: "%.3f", effectiveConfidence)
+
+                let msg = "Tracked [\(effectiveLabel)] - Dist: \(Int(estimatedFeet))ft, Brg: \(Int(currentBearing))°, GPS: (\(latStr), \(lonStr)), SNP: [\(profile.shouldSnapToRoad)], Conf: \(confStr), HAP: \(profile.hapticCount)"
+                AppGlobals.doLog(message: msg, step: "2_TARGET_TRACKED")
+
+                await MainActor.run {
+                    if (profile.hapticCount > 0) {
+                        HapticManager.shared.trigger(count: profile.hapticCount, sessionID: threatSessionID)
+                    }
+                    _ = self.continuation.yield(newEvent)
+                }
             }
         }
     }
@@ -336,7 +363,8 @@ actor AcousticProcessingPipeline {
         let request = try SNClassifySoundRequest(classifierIdentifier: .version1)
         request.windowDuration = CMTime(seconds: 0.5, preferredTimescale: 1000)
         request.overlapFactor = 0.9
-        
+        AppGlobals.doLog(message: "ML Engine Labels: \(request.knownClassifications.joined(separator: ", "))", step: "ACOUSTIC_PIPLINE_SETUP")
+
         let observer = ThreatResultsObserver(pipeline: self)
         self.resultsObserver = observer
         try streamAnalyzer?.add(request, withObserver: observer)

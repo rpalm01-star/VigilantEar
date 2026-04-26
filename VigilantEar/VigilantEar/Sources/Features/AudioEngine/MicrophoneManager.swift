@@ -1,4 +1,5 @@
 import Combine
+import UIKit
 import Foundation
 import AVFoundation
 import CoreLocation
@@ -28,6 +29,12 @@ class MicrophoneManager: NSObject, CLLocationManagerDelegate {
     private let classificationService: ClassificationService
     public let roadManager: RoadManager
     
+    deinit {
+        UIDevice.current.endGeneratingDeviceOrientationNotifications()
+        NotificationCenter.default.removeObserver(self)
+        stopCapturing()
+    }
+    
     init(acousticCoordinator: AcousticCoordinator, classificationService: ClassificationService, roadManager: RoadManager, acousticPipeline: AcousticProcessingPipeline) {
         self.acousticCoordinator = acousticCoordinator
         self.classificationService = classificationService
@@ -35,6 +42,15 @@ class MicrophoneManager: NSObject, CLLocationManagerDelegate {
         self.acousticPipeline = acousticPipeline
         super.init()
         setupHeading()
+        
+        // --- THE NEW ROTATION TRACKER ---
+        UIDevice.current.beginGeneratingDeviceOrientationNotifications()
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleOrientationChange),
+            name: UIDevice.orientationDidChangeNotification,
+            object: nil
+        )
     }
     
     private func setupHeading() {
@@ -45,11 +61,6 @@ class MicrophoneManager: NSObject, CLLocationManagerDelegate {
         locationManager.requestWhenInUseAuthorization()
         locationManager.startUpdatingLocation()
         locationManager.startUpdatingHeading()
-        
-        // --- THE FIX ---
-        // Force the hardware compass to track the back of the camera, not the top of the phone!
-        // (Charging port on the right = .landscapeLeft)
-        locationManager.headingOrientation = .landscapeLeft
         
         // Start compass
         if CLLocationManager.headingAvailable() {
@@ -112,12 +123,10 @@ class MicrophoneManager: NSObject, CLLocationManagerDelegate {
             }
             
             let msg = "✅ Audio Session Active (Stereo Mode Locked)"
-            print(msg)
-            Task { PerformanceLogger.shared.logTelemetry(step: "0_MIC_MGR", message: msg) }
+            AppGlobals.doLog(message: msg, step: "MICMGR")
         } catch {
             let msg = "❌ Audio Session Critical Failure: " + error.localizedDescription
-            print(msg)
-            Task { PerformanceLogger.shared.logTelemetry(step: "0_MIC_MGR", message: msg) }
+            AppGlobals.doLog(message: msg, step: "MICMGR")
         }
     }
     
@@ -128,8 +137,7 @@ class MicrophoneManager: NSObject, CLLocationManagerDelegate {
                 try session.setPreferredInput(usbInput)
                 try session.setPreferredInputNumberOfChannels(2)
                 let msg = "🎙️ HARDWARE: External USB-C Stereo Array Connected!"
-                print(msg)
-                Task { PerformanceLogger.shared.logTelemetry(step: "0_MIC_MGR", message: msg) }
+                AppGlobals.doLog(message: msg, step: "MICMGR")
                 return // Skip the built-in mic configuration entirely!
             }
             
@@ -143,11 +151,8 @@ class MicrophoneManager: NSObject, CLLocationManagerDelegate {
                     // Look for a mic array that supports spatial audio
                     if source.supportedPolarPatterns?.contains(.stereo) == true {
                         try builtInMic.setPreferredDataSource(source)
-                        try session.setPreferredInputOrientation(.landscapeRight)
                         try source.setPreferredPolarPattern(.stereo)
-                        let msg = "🎙️ HARDWARE: iPhone Internal Mics locked to Landscape Stereo!"
-                        print(msg)
-                        Task { PerformanceLogger.shared.logTelemetry(step: "0_MIC_MGR", message: msg) }
+                        AppGlobals.doLog(message: "🎙️ HARDWARE: iPhone Internal Mics locked to Stereo Pattern!", step: "MICMGR")
                         break
                     }
                 }
@@ -159,9 +164,7 @@ class MicrophoneManager: NSObject, CLLocationManagerDelegate {
             try session.setPreferredInputNumberOfChannels(2)
             
         } catch {
-            let msg = "⚠️ Hardware Stereo Config failed: " + error.localizedDescription
-            print(msg)
-            Task { PerformanceLogger.shared.logTelemetry(step: "0_MIC_MGR", message: msg) }
+            AppGlobals.doLog(message: "⚠️ Hardware Stereo Config failed: " + error.localizedDescription, step: "MICMGR")
         }
     }
     
@@ -200,21 +203,18 @@ class MicrophoneManager: NSObject, CLLocationManagerDelegate {
             
             // Verify that we actually got stereo channels back from the hardware
             if format.channelCount < 2 {
-                let msg = "⚠️ WARNING: Audio pipeline failed to secure stereo channels. TDOA will be bypassed."
-                print(msg)
-                Task { PerformanceLogger.shared.logTelemetry(step: "0_MIC_MGR", message: msg) }
+                AppGlobals.doLog(message: "⚠️ WARNING: Audio pipeline failed to secure stereo channels. TDOA will be bypassed.", step: "MICMGR")
             }
             
             Task { try? await self.acousticPipeline.setupAnalyzer(format: format) }
             
             isRunning = true
+            
             let msg = "✅ Audio Engine Flowing (Channels: \(format.channelCount))"
-            print(msg)
-            Task { PerformanceLogger.shared.logTelemetry(step: "0_MIC_MGR", message: msg) }
+            AppGlobals.doLog(message: msg, step: "MICMGR")
         } catch {
             let msg = "❌ Engine Start Failed: " + error.localizedDescription
-            print(msg)
-            Task { PerformanceLogger.shared.logTelemetry(step: "0_MIC_MGR", message: msg) }
+            AppGlobals.doLog(message: msg, step: "MICMGR")
         }
     }
     
@@ -227,8 +227,6 @@ class MicrophoneManager: NSObject, CLLocationManagerDelegate {
         }
         isRunning = false
     }
-    
-    deinit { stopCapturing() }
     
     private func calculateActiveMicCount(from buffer: AVAudioPCMBuffer) -> Int {
         guard let channelData = buffer.floatChannelData else { return 0 }
@@ -255,5 +253,48 @@ class MicrophoneManager: NSObject, CLLocationManagerDelegate {
         }
         
         return activeChannels
+    }
+    
+    @objc private func handleOrientationChange() {
+        let deviceOrientation = UIDevice.current.orientation
+        
+        // We need to map the physical device orientation to the specific ENUMs
+        // required by the Audio Session and the Location Manager.
+        let audioOrientation: AVAudioSession.StereoOrientation
+        let gpsOrientation: CLDeviceOrientation
+        
+        switch deviceOrientation {
+        case .landscapeLeft: // Notch on the LEFT
+            audioOrientation = .landscapeLeft
+            gpsOrientation = .landscapeLeft
+        case .landscapeRight: // Notch on the RIGHT
+            audioOrientation = .landscapeRight
+            gpsOrientation = .landscapeRight
+        case .portrait:
+            audioOrientation = .portrait
+            gpsOrientation = .portrait
+        case .portraitUpsideDown:
+            audioOrientation = .portraitUpsideDown
+            gpsOrientation = .portraitUpsideDown
+        default:
+            // Ignore "Face Up", "Face Down", or "Unknown" states
+            return
+        }
+        
+        // 1. Re-align the Map/Radar Compass
+        locationManager.headingOrientation = gpsOrientation
+        
+        // 2. Re-align the Acoustic DSP Array
+        let session = AVAudioSession.sharedInstance()
+        do {
+            try session.setPreferredInputOrientation(audioOrientation)
+            
+            let msg = "🔄 Hardware Array & GPS re-aligned to: \(deviceOrientation.isLandscape ? "Landscape" : "Portrait")"
+            AppGlobals.doLog(message: msg, step: "MICMGR")
+            
+        } catch {
+            let msg = "⚠️ Failed to re-align audio orientation: \(error.localizedDescription)"
+            AppGlobals.doLog(message: msg, step: "MICMGR")
+        }
     }
 }

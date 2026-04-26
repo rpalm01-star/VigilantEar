@@ -6,6 +6,9 @@ class AppDelegate: NSObject, UIApplicationDelegate {
     func application(_ application: UIApplication,
                      didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey : Any]? = nil) -> Bool {
         FirebaseApp.configure()
+        Task {
+            await CloudLogger.shared.purgeOldLogs()
+        }
         return true
     }
 }
@@ -24,6 +27,7 @@ struct VigilantEarApp: App {
     
     var body: some Scene {
         WindowGroup {
+            // Wrap the whole routing logic in a single Group
             Group {
                 if isVerified {
                     ContentView()

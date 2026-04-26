@@ -12,90 +12,121 @@ struct SoundProfile {
     let maxRange: Double
     let category: ThreatCategory
     let canonicalLabel: String
+    let shouldSnapToRoad: Bool
+    let hapticCount: Int // THE NEW HAPTIC FLAG
     
+    // Computed Properties for Logic Gates
     var isEmergency: Bool { return category == .emergency }
     var isVehicle: Bool { return category == .vehicle }
     
-    // 1. THE REGISTRY
-    private static let registry: [(keywords: [String], icon: String, color: Color, ceiling: Double, maxRange: Double, category: ThreatCategory)] = [
+    // --- THE THREAD-SAFE CONCURRENT CACHE ---
+    private static var lookupTable: [String: SoundProfile] = [:]
+    private static let queue = DispatchQueue(label: "com.VigilantEar.profileCache", attributes: .concurrent)
+    
+    // 1. THE RAW REGISTRY
+    // Tuple: (Keywords, Icon, Color, Ceiling, MaxRange, Category, Snaps, Haptics)
+    private static let rawRegistry: [(keywords: [String], icon: String, color: Color, ceiling: Double, maxRange: Double, category: ThreatCategory, snaps: Bool, haptics: Int)] = [
         
-        // --- EMERGENCY ---
-        // "siren" is first, so it becomes the canonical UI label
-        (["siren", "ambulance", "alarm", "emergency", "detector", "simulated", "simluated", "firetruck"], "light.beacon.max.fill", .red, 0.80, 1000.0, .emergency),
+        // --- 🚨 EMERGENCY / SIRENS (High Priority) ---
+        (["siren", "ambulance", "police", "firetruck", "civil_defense", "foghorn", "simulated_fire_truck"], "light.beacon.max.fill", .red, 0.80, 1000.0, .emergency, true, 3),
         
-        // --- VEHICLES ---
-        (["car", "truck", "engine", "traffic"], "car.fill", .blue, 0.30, 500.0, .vehicle),
-        (["subway"], "tram.fill.tunnel", .blue, 0.15, 300.0, .vehicle),
-        (["horn"], "horn", .purple, 0.80, 1000.0, .vehicle),
+        // --- ⚠️ THREATS / DANGER (High Priority) ---
+        (["gunshot", "artillery", "fireworks", "firecracker", "explosion", "boom", "eruption"], "shriker.fill", .red, 0.90, 1000.0, .emergency, false, 2),
         
-        // --- IGNORED (Telemetry Only) ---
-        (["ignored_noise", "train", "rail", "fire", "thunderstorm", "wind", "breeze", "breathing", "snore", "snoring", "burp"], "speaker.slash.fill", .gray, 0.0, 0.0, .ignored),
+        // --- 👣 PERSONAL SAFETY / APPROACH (High Priority for Safety) ---
+        (["footsteps", "walking", "running", "shuffling", "knock", "door_slam", "door_sliding"], "figure.walk.arrival", .red, 0.45, 60.0, .emergency, false, 2),
         
-        // --- MEDIUM ACTION ---
-        (["speech", "voice", "talk", "person", "squeak"], "waveform", .cyan, 0.55, 150.0, .medium),
-        (["bicycle"], "bicycle", .blue, 0.55, 150.0, .medium),
-        (["bell", "chime", "clock", "tick", "beep"], "bell.fill", .purple, 0.55, 150.0, .medium),
+        // --- 🔔 CRITICAL ALERTS ---
+        (["smoke_detector", "alarm", "telephone_bell", "ringtone", "door_bell", "reverse_beeps"], "exclamationmark.triangle.fill", .red, 0.60, 100.0, .emergency, false, 2),
         
-        // THE FIX: All instruments and anomalous harmonics funnel into "music"
-        (["music", "choir", "bugle", "song", "sing", "whistl", "didgeridoo", "bassoon", "tuning", "theremin", "flute", "plucked", "whale", "piano", "guitar"], "music.quarternote.3", .purple, 0.55, 125.0, .medium),
+        // --- 🚗 VEHICLES (Important but standard) ---
+        (["car_horn", "air_horn", "train_horn"], "horn.fill", .purple, 0.80, 1000.0, .vehicle, true, 1),
         
-        (["hammer", "hammering"], "hammer.fill", .pink, 0.55, 150.0, .medium),
-        (["chopping", "cutlery"], "scissors", .pink, 0.55, 150.0, .medium),
-        (["knock", "tap"], "hand.tap.fill", .purple, 0.55, 150.0, .medium),
-        (["tennis"], "figure.tennis", .pink, 0.55, 150.0, .medium),
-        (["footsteps", "step", "walk", "foot", "bowling"], "figure.walk", .cyan, 0.55, 150.0, .medium),
-        (["water", "rain", "splash"], "drop.fill", .teal, 0.55, 150.0, .medium),
-        (["baby", "cry"], "stroller.fill", .pink, 0.55, 150.0, .medium),
+        (["car", "truck", "bus", "motorcycle", "traffic", "vehicle"], "car.fill", .blue, 0.30, 500.0, .vehicle, true, 0),
+        (["subway", "metro", "train", "railroad", "rail_transport"], "tram.fill.tunnel", .blue, 0.15, 600.0, .vehicle, false, 0),
+        (["engine_accelerating", "revving"], "engine.combustion.fill", .blue, 0.50, 400.0, .vehicle, true, 0),
         
-        // --- QUIET / BIOLOGICAL ---
-        (["snap", "zipper", "keyboard", "typing"], "hand.point.up.left.fill", .cyan, 0.35, 30.0, .quiet),
-        (["cough"], "lungs.fill", .cyan, 0.35, 30.0, .quiet),
-        (["sneeze", "nose"], "nose.fill", .cyan, 0.35, 30.0, .quiet),
-        (["sleep"], "zzz", .cyan, 0.35, 30.0, .quiet),
-        (["hiccup", "swallow", "humming"], "mouth.fill", .cyan, 0.35, 30.0, .quiet),
-        (["laugh", "chuckle"], "face.smiling.fill", .cyan, 0.35, 30.0, .quiet),
+        // --- 🛠️ WORK / TOOLS ---
+        (["hammer", "saw", "drill", "power_tool", "trimmer", "chopping_wood"], "hammer.fill", .orange, 0.60, 100.0, .medium, false, 0),
         
-        // --- ANIMALS ---
-        (["cat"], "cat", .brown, 0.35, 30.0, .animal),
-        (["dog", "coyote"], "dog", .brown, 0.35, 30.0, .animal),
-        (["animal", "bark", "pig", "horse"], "pawprint.fill", .brown, 0.35, 30.0, .animal),
-        (["bird", "chirp", "hoot", "owl"], "bird.fill", .brown, 0.35, 30.0, .animal),
+        // --- 🎵 THE MUSIC FUNNEL (Informational) ---
+        (["music", "horn", "singing", "choir", "yodeling", "rapping", "humming", "whistling", "instrument", "guitar", "piano", "organ", "keyboard_musical", "synthesizer", "drum", "percussion", "orchestra", "brass", "trumpet", "trombone", "violin", "fiddle", "cello", "flute", "saxophone", "clarinet", "oboe", "bassoon", "harp", "harmonica", "accordion", "bagpipes", "didgeridoo", "theremin"], "music.quarternote.3", .purple, 0.55, 150.0, .medium, false, 0),
         
-        // --- MISC ---
-        (["drawer", "cabinet"], "cabinet", .mint, 0.35, 30.0, .misc),
-        (["camera"], "camera", .mint, 0.35, 30.0, .misc),
-        (["dishwasher"], "dishwasher", .mint, 0.35, 30.0, .misc),
-        (["typewriter", "keyboard"], "keyboard", .mint, 0.35, 30.0, .misc),
-        (["microwave"], "microwave", .mint, 0.35, 30.0, .misc),
-        (["fan"], "fan", .mint, 0.35, 30.0, .misc),
-        (["crumple", "crumpl", "crush", "trash"], "trash.fill", .mint, 0.35, 30.0, .misc),
-        (["toilet", "flush"], "toilet.fill", .mint, 0.35, 30.0, .misc),
-        (["door"], "door.right.hand.closed", .mint, 0.35, 30.0, .misc),
-        (["glass", "shatter", "crash", "clink"], "burst.fill", .orange, 0.80, 1000.0, .misc),
+        // --- 🗣️ HUMAN VOICE & INTERACTION ---
+        (["speech", "shout", "yell", "cry", "scream", "whisper", "laughter", "giggling", "chuckle", "babble", "chatter", "crowd"], "person.wave.2.fill", .cyan, 0.55, 120.0, .medium, false, 0),
+        (["clapping", "applause", "cheering", "finger_snapping"], "hands.clap.fill", .cyan, 0.50, 80.0, .medium, false, 0),
+        
+        // --- 🐶 ANIMALS ---
+        (["dog", "bark", "howl", "growl", "coyote"], "dog.fill", .brown, 0.40, 150.0, .animal, false, 0),
+        (["cat", "meow", "purr"], "cat.fill", .brown, 0.35, 40.0, .animal, false, 0),
+        (["bird", "chirp", "tweet", "owl", "crow", "pigeon", "duck", "goose", "turkey", "rooster"], "bird.fill", .brown, 0.35, 60.0, .animal, false, 0),
+        (["horse", "cow", "pig", "sheep", "lion", "elk", "whale", "frog", "snake", "insect", "cricket", "bee"], "pawprint.fill", .brown, 0.40, 100.0, .animal, false, 0),
+        
+        // --- 💧 NATURE & ELEMENTS ---
+        (["wind", "thunder", "storm", "rain", "water", "stream", "waterfall", "ocean", "waves", "fire_crackle"], "leaf.arrow.triangle.circlepath", .teal, 0.30, 300.0, .medium, false, 0),
+        
+        // --- 🏠 DOMESTIC / INTERIOR ---
+        (["dishes", "cutlery", "frying", "microwave", "blender", "sink", "bathtub", "toilet", "dishwasher", "vacuum", "hair_dryer"], "house.fill", .mint, 0.40, 40.0, .misc, false, 0),
+        (["typing", "keyboard", "typewriter", "writing", "camera", "printer", "clock", "tick"], "keyboard", .mint, 0.35, 40.0, .misc, false, 0),
+        (["drawer", "sliding_door", "squeak", "zipper", "keys", "coin"], "door.left.hand.closed", .mint, 0.35, 30.0, .misc, false, 0),
+        (["glass_clink", "glass_breaking", "shatter"], "tear", .orange, 0.70, 100.0, .misc, false, 1),
+        
+        // --- 💤 BIOLOGICAL / IGNORED ---
+        (["breathing", "snoring", "cough", "sneeze", "gasp", "chewing", "biting", "gargling", "burp", "hiccup", "slurp"], "lungs.fill", .gray, 0.20, 20.0, .ignored, false, 0),
+        (["ignored_noise", "silence"], "speaker.slash.fill", .gray, 0.0, 0.0, .ignored, false, 0)
     ]
     
-    // 2. THE SEARCH ENGINE
+    // Helper to keep the main function clean
+    private static func createAndCache(profile entry: (keywords: [String], icon: String, color: Color, ceiling: Double, maxRange: Double, category: ThreatCategory, snaps: Bool, haptics: Int), for label: String) -> SoundProfile {
+        let p = SoundProfile(
+            icon: entry.icon,
+            color: entry.color,
+            ceiling: entry.ceiling,
+            maxRange: entry.maxRange,
+            category: entry.category,
+            canonicalLabel: entry.keywords.first ?? label,
+            shouldSnapToRoad: entry.snaps,
+            hapticCount: entry.haptics
+        )
+        queue.async(flags: .barrier) { lookupTable[label] = p }
+        return p
+    }
+    
     static func classify(_ label: String) -> SoundProfile {
         let lowerLabel = label.lowercased()
         
-        for entry in registry {
-            if entry.keywords.contains(where: { lowerLabel.contains($0) }) {
-                return SoundProfile(
-                    icon: entry.icon,
-                    color: entry.color,
-                    ceiling: entry.ceiling,
-                    maxRange: entry.maxRange,
-                    category: entry.category,
-                    canonicalLabel: entry.keywords.first ?? label // <-- The Master Override
-                )
+        // 1. Check Hash Map First
+        var cachedResult: SoundProfile?
+        queue.sync { cachedResult = lookupTable[lowerLabel] }
+        if let cached = cachedResult { return cached }
+        
+        // 2. SEARCH REGISTRY
+        // PRIORITY 1: Exact matches (prevents "engine_siren" being caught by "engine")
+        for entry in rawRegistry {
+            if entry.keywords.contains(where: { lowerLabel == $0 }) {
+                return createAndCache(profile: entry, for: lowerLabel)
             }
         }
         
-        // THE FALLBACK
-        return SoundProfile(icon: "waveform", color: AppGlobals.lightGray, ceiling: 0.55, maxRange: 150.0, category: .unknown, canonicalLabel: label)
+        // PRIORITY 2: Partial matches (the "Contains" logic)
+        for entry in rawRegistry {
+            if entry.keywords.contains(where: { lowerLabel.contains($0) }) {
+                return createAndCache(profile: entry, for: lowerLabel)
+            }
+        }
+        
+        // Fallback (Quiet notification for unknown sounds)
+        let fallback = SoundProfile(icon: "waveform", color: .gray, ceiling: 0.55, maxRange: 150.0, category: .unknown, canonicalLabel: label, shouldSnapToRoad: false, hapticCount: 1)
+        
+        queue.async(flags: .barrier) {
+            lookupTable[lowerLabel] = fallback
+        }
+        
+        return fallback
     }
 }
 
+// ... Rest of the HUD View code remains the same ...
 // MARK: - The HUD View
 struct ThreatHUD: View {
     var events: [SoundEvent]
@@ -119,54 +150,63 @@ struct ThreatHUD: View {
         let recent = events.filter { now.timeIntervalSince($0.timestamp) < 3.0 }
         
         var dictionary: [String: SoundEvent] = [:]
+        
         for event in recent {
-            if let existing = dictionary[event.threatLabel] {
+            // Normalize the label for music so "🎵 Song A" and "🎵 Song B"
+            // or raw "music" all compete for the same slot.
+            let isMusic = event.threatLabel.lowercased().contains("music")
+            let key = isMusic ? "music_king" : event.threatLabel
+            
+            if let existing = dictionary[key] {
+                // Keep the one with the highest energy (the loudest/best signal)
                 if event.energy > existing.energy {
-                    dictionary[event.threatLabel] = event
+                    dictionary[key] = event
                 }
             } else {
-                dictionary[event.threatLabel] = event
+                dictionary[key] = event
             }
         }
+        
+        // Return the values using your original sorting logic
         return dictionary.values.sorted(by: { $0.timestamp > $1.timestamp })
     }
-}
-
-struct ThreatHUDItemInstance: View {
-    var event: SoundEvent
     
-    var body: some View {
-        let profile = SoundProfile.classify(event.threatLabel)
-        let displayLabel = event.threatLabel.replacingOccurrences(of: "_", with: " ").capitalized
-        let color = profile.color
+    struct ThreatHUDItemInstance: View {
+        var event: SoundEvent
         
-        VStack(spacing: 4) {
-            ZStack {
-                Circle()
-                    .fill(.regularMaterial)
-                    .frame(width: 50, height: 50)
-                
-                Circle()
-                    .stroke(profile.color.opacity(Double(event.energy)), lineWidth: 3)
-                    .frame(width: 54, height: 54)
-                
-                Image(systemName: profile.icon)
-                    .font(.system(size: 22, weight: .semibold))
-                    .foregroundStyle(color)
-                    .symbolEffect(.bounce, value: event.energy)
-                
-                Circle()
-                    .trim(from: 0.0, to: 0.05)
-                    .stroke(profile.color, style: StrokeStyle(lineWidth: 4, lineCap: .round))
-                    .frame(width: 62, height: 62)
-                    .rotationEffect(.degrees(Double(event.bearing) - 90))
-            }
+        var body: some View {
+            let profile = SoundProfile.classify(event.threatLabel)
+            let displayLabel = event.threatLabel.replacingOccurrences(of: "_", with: " ").capitalized
+            let color = profile.color
             
-            Text(displayLabel)
-                .font(.system(size: 14, weight: .bold, design: .monospaced))
-                .foregroundStyle(color.opacity(1))
-                .lineLimit(1)
-                .frame(width: 50)
+            VStack(spacing: 4) {
+                ZStack {
+                    Circle()
+                        .fill(.regularMaterial)
+                        .frame(width: 50, height: 50)
+                    
+                    Circle()
+                        .stroke(profile.color.opacity(Double(event.energy)), lineWidth: 3)
+                        .frame(width: 54, height: 54)
+                    
+                    Image(systemName: profile.icon)
+                        .font(.system(size: 22, weight: .semibold))
+                        .foregroundStyle(color)
+                        .symbolEffect(.bounce, value: event.energy)
+                    
+                    Circle()
+                        .trim(from: 0.0, to: 0.05)
+                        .stroke(profile.color, style: StrokeStyle(lineWidth: 4, lineCap: .round))
+                        .frame(width: 62, height: 62)
+                        .rotationEffect(.degrees(Double(event.bearing) - 90))
+                }
+                
+                Text(displayLabel)
+                    .font(.system(size: 14, weight: .bold, design: .monospaced))
+                    .foregroundStyle(color.opacity(1))
+                    .lineLimit(1)
+                    .frame(width: 50)
+            }
         }
     }
 }

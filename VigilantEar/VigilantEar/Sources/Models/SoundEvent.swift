@@ -7,10 +7,11 @@ struct SoundEvent: Identifiable {
     let id: UUID
     
     // 2. For the Cloud: The shared ID that groups this entire drive-by together.
-    var sessionID: UUID
+    let sessionID: UUID
     
-    let timestamp: Date
-    let threatLabel: String
+    var timestamp: Date
+    var threatLabel: String
+    var hitCount: Int = 1
     
     // ML Certainty (0.0 to 1.0)
     public let confidence: Double
@@ -30,13 +31,11 @@ struct SoundEvent: Identifiable {
     // MARK: - Spatial Data
     public let bearing: Double
     public let distance: Double
-    public let energy: Float
+    public var energy: Float
     public let dopplerRate: Float?
     public let isApproaching: Bool
     public let latitude: Double?
     public let longitude: Double?
-    
-    // NEW: Song label attached from Shazam
     public let songLabel: String?
     
     public nonisolated init(
@@ -66,7 +65,7 @@ struct SoundEvent: Identifiable {
         self.isApproaching = isApproaching
         self.latitude = latitude
         self.longitude = longitude
-        self.songLabel = songLabel          // ← NEW
+        self.songLabel = songLabel
     }
 }
 
@@ -92,13 +91,6 @@ extension SoundEvent {
     var coordinate: CLLocationCoordinate2D? {
         guard let lat = latitude, let lon = longitude else { return nil }
         return CLLocationCoordinate2D(latitude: lat, longitude: lon)
-    }
-    
-    /// Formats the Doppler velocity for the UI
-    var formattedDoppler: String {
-        guard let rate = dopplerRate, abs(rate) > 0.1 else { return "Stationary" }
-        let direction = isApproaching ? "Approaching" : "Receding"
-        return "\(direction) (\(String(format: "%.1f", abs(rate))) m/s)"
     }
     
 }

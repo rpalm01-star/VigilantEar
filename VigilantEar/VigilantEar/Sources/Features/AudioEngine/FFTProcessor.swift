@@ -107,7 +107,6 @@ final class FFTProcessor: @unchecked Sendable {
     
     // MARK: - TDOA
     nonisolated func calculateTDOA(left: [Float], right: [Float], sampleRate: Double, micDistance: Double = 0.15) -> Double? {
-        // --- THE CRASH FIX ---
         // Ensure we never process more than the internal FFT setup can handle
         let safeLeft = Array(left.prefix(fftSize))
         let safeRight = Array(right.prefix(fftSize))
@@ -127,7 +126,18 @@ final class FFTProcessor: @unchecked Sendable {
         var crossReal = [Float](repeating: 0, count: halfSize)
         var crossImag = [Float](repeating: 0, count: halfSize)
         
+        // --- THE ALIASING FIX: Frequency Domain Low-Pass Filter ---
+        let cutoffFrequency: Double = 1200.0
+        let maxBin = Int((cutoffFrequency / sampleRate) * Double(fftSize))
+        
         for i in 0..<halfSize {
+            // THE MISSING FIX: Actually use the maxBin to zero out the high frequencies!
+            if i > maxBin {
+                crossReal[i] = 0.0
+                crossImag[i] = 0.0
+                continue
+            }
+            
             let a = leftReal[i], b = leftImag[i]
             let c = rightReal[i], d = rightImag[i]
             let r = (a * c) + (b * d)
@@ -150,30 +160,36 @@ final class FFTProcessor: @unchecked Sendable {
         let virtualMicDistance = micDistance * 1.2
         let maxSampleDelay = Int(ceil((virtualMicDistance / speedOfSound) * sampleRate))
         
+        // --- THE NEW TDOA INTERPOLATION MATH ---
         var maxVal: Float = -1.0
-        var peakIdx = 0
+        var absolutePeakIndex = 0
+        var logicalLagIndex = 0
         
+        // Find highest peak within the physical constraints
         for i in 0...maxSampleDelay {
-            if crossCorr[i] > maxVal { maxVal = crossCorr[i]; peakIdx = i }
+            if crossCorr[i] > maxVal {
+                maxVal = crossCorr[i]
+                absolutePeakIndex = i
+                logicalLagIndex = i
+            }
         }
         for i in (fftSize - maxSampleDelay)..<fftSize {
             if crossCorr[i] > maxVal {
                 maxVal = crossCorr[i]
-                peakIdx = i - fftSize
+                absolutePeakIndex = i
+                logicalLagIndex = i - fftSize
             }
         }
         
-        var refinedLag = Double(peakIdx)
-        let p = peakIdx >= 0 ? peakIdx : fftSize + peakIdx
+        // 1. Interpolate using your existing quadratic helper
+        let fractionalPeak = quadraticInterpolate(magnitudes: crossCorr, peakIndex: absolutePeakIndex)
         
-        // Safety check for TDOA interpolation
-        if p > 0 && p < fftSize - 1 {
-            let y1 = crossCorr[p-1], y2 = crossCorr[p], y3 = crossCorr[p+1]
-            let denom = y1 - 2 * y2 + y3
-            if abs(denom) > 1e-8 {
-                refinedLag += Double(0.5 * (y1 - y3) / denom)
-            }
-        }
+        // 2. Determine the sub-sample offset (-0.5 to +0.5) from the integer peak
+        let offset = Double(fractionalPeak) - Double(absolutePeakIndex)
+        
+        // 3. Apply the fractional offset to the physical lag
+        let refinedLag = Double(logicalLagIndex) + offset
+        // ---------------------------------------
         
         let deltaT = refinedLag / sampleRate
         let ratio = (deltaT * speedOfSound) / micDistance

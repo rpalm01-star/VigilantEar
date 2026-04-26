@@ -17,7 +17,7 @@ final class DependencyContainer {
         self.acousticCoordinator = AcousticCoordinator()
         self.classificationService = ClassificationService()
         self.roadManager = RoadManager()
-        self.acousticPipeline = AcousticProcessingPipeline()
+        self.acousticPipeline = AcousticProcessingPipeline(roadManager: self.roadManager)
         
         // 3. Pass it into the Mic Manager
         self.microphoneManager = MicrophoneManager(

@@ -28,12 +28,10 @@ final class ThreatResultsObserver: NSObject, @unchecked Sendable, SNResultsObser
             var pendingVehicleConf: Double = 0.0
             
             for (label, conf) in topCandidates {
-                let ignoredLabels = ["fire", "thunderstorm", "wind", "breathing", "burp", "snore"]
-                if ignoredLabels.contains(label) { continue }
                 
                 let profile = SoundProfile.classify(label)
                 
-                if profile.isEmergency && conf > 0.25 {
+                if profile.isEmergency && conf > 0.50 {
                     finalLabel = label
                     finalConfidence = conf
                     break
@@ -57,12 +55,15 @@ final class ThreatResultsObserver: NSObject, @unchecked Sendable, SNResultsObser
             
             if let detectedLabel = finalLabel {
                 Task {
-                    await self.pipeline?.confirmThreatAndTrack(label: detectedLabel, confidence: finalConfidence)
-                    
                     let profile = SoundProfile.classify(detectedLabel)
-                    if profile.canonicalLabel == "music" && finalConfidence > 0.65 {
-                        await self.pipeline?.startShazamAccumulation()
+                    if (profile.canonicalLabel == "music") {
+                        if (finalConfidence > 0.65) {
+                            await self.pipeline?.startShazamAccumulation()
+                        } else {
+                            return
+                        }
                     }
+                    await self.pipeline?.confirmThreatAndTrack(label: detectedLabel, confidence: finalConfidence)
                 }
             }
         }

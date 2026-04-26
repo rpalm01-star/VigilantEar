@@ -35,6 +35,7 @@
 		30D9FE1B2F9C234A006CCAAA /* ShazamResultsObserver.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30D9FE1A2F9C234A006CCAAA /* ShazamResultsObserver.swift */; };
 		30D9FE1D2F9C2356006CCAAA /* ThreatResultsObserver.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30D9FE1C2F9C2356006CCAAA /* ThreatResultsObserver.swift */; };
 		30FEA0162F9D3FC500FFEE25 /* RoadManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30FEA0152F9D3FC500FFEE25 /* RoadManager.swift */; };
+		30FEA0182F9DD7F100FFEE25 /* HapticManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30FEA0172F9DD7F100FFEE25 /* HapticManager.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -68,6 +69,7 @@
 		30D9FE1A2F9C234A006CCAAA /* ShazamResultsObserver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShazamResultsObserver.swift; sourceTree = "<group>"; };
 		30D9FE1C2F9C2356006CCAAA /* ThreatResultsObserver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThreatResultsObserver.swift; sourceTree = "<group>"; };
 		30FEA0152F9D3FC500FFEE25 /* RoadManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RoadManager.swift; sourceTree = "<group>"; };
+		30FEA0172F9DD7F100FFEE25 /* HapticManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HapticManager.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -139,6 +141,7 @@
 		3053DC992F83718A00241892 /* AudioEngine */ = {
 			isa = PBXGroup;
 			children = (
+				30FEA0172F9DD7F100FFEE25 /* HapticManager.swift */,
 				30FEA0152F9D3FC500FFEE25 /* RoadManager.swift */,
 				30D9FE1C2F9C2356006CCAAA /* ThreatResultsObserver.swift */,
 				30D9FE1A2F9C234A006CCAAA /* ShazamResultsObserver.swift */,
@@ -323,6 +326,7 @@
 				3053DCBA2F83718A00241892 /* MicrophoneManager.swift in Sources */,
 				3053DCBB2F83718A00241892 /* ContentView.swift in Sources */,
 				30D9FE1B2F9C234A006CCAAA /* ShazamResultsObserver.swift in Sources */,
+				30FEA0182F9DD7F100FFEE25 /* HapticManager.swift in Sources */,
 				30CD987C2F8DEBA400AE7D0A /* RollingNoiseFloor.swift in Sources */,
 				30FEA0162F9D3FC500FFEE25 /* RoadManager.swift in Sources */,
 				3053DCBC2F83718A00241892 /* DependencyContainer.swift in Sources */,

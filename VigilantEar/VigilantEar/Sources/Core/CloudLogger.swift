@@ -32,6 +32,47 @@ actor CloudLogger {
         }
     }
     
+    // --- THE NEW AUTOPURGE FUNCTION ---
+    /// Fetches and deletes every document in the target collection.
+    /// WARNING: Use for development/debugging only.
+    func purgeOldLogs() async {
+        
+        if (!AppGlobals.purgeCloudLogsOnStartup) {
+            let msg = "✨ Firestore '\(AppGlobals.logDataStoreName)' purge is disabled because AppGlobals.purgeCloudLogsOnStartup is true."
+            AppGlobals.doLog(message: msg, step: "CLOUDLOGGER")
+            return
+        }
+        
+        let logsCollection = db.collection(AppGlobals.logDataStoreName)
+        
+        do {
+            // 1. Fetch all existing log documents
+            let snapshot = try await logsCollection.getDocuments()
+            
+            guard !snapshot.documents.isEmpty else {
+                let msg = "✨ Firestore '\(AppGlobals.logDataStoreName)' collection is already empty."
+                AppGlobals.doLog(message: msg, step: "CLOUDLOGGER")
+                return
+            }
+            
+            // 2. Create a batch to delete them all at once
+            let batch = db.batch()
+            for document in snapshot.documents {
+                batch.deleteDocument(document.reference)
+            }
+            
+            // 3. Commit the batch
+            try await batch.commit()
+            
+            let msg = "🗑️ Successfully purged \(snapshot.documents.count) old logs from Firestore."
+            AppGlobals.doLog(message: msg, step: "CLOUDLOGGER")
+            
+        } catch {
+            let msg = "⚠️ Failed to purge old logs: \(error.localizedDescription)"
+            AppGlobals.doLog(message: msg, step: "CLOUDLOGGER")
+        }
+    }
+    
     // A self-managing background loop that watches for faded sirens
     private func startCleanupLoop() {
         isCleanupRunning = true
@@ -84,7 +125,8 @@ actor CloudLogger {
         do {
             try await db.collection(AppGlobals.dataStoreName).document(event.id.uuidString).setData(eventData)
         } catch {
-            print("⚠️ Cloud write queued (Offline): \(error.localizedDescription)")
+            let msg = "⚠️ Cloud write queued (Offline): \(error.localizedDescription)"
+            AppGlobals.doLog(message: msg, step: "CLOUDLOGGER")
         }
     }
 }

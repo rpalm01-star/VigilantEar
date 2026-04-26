@@ -50,10 +50,16 @@ nonisolated struct AppGlobals {
         get { _logDataStoreName.withLock { $0 } }
     }
     
-    private static let _logToCloud = Mutex<Bool>(false)
+    private static let _logToCloud = Mutex<Bool>(true)
     public static var logToCloud: Bool {
         get { _logToCloud.withLock { $0 } }
         set { _logToCloud.withLock { $0 = newValue } }
+    }
+
+    private static let _purgeCloudLogsOnStartup = Mutex<Bool>(true)
+    public static var purgeCloudLogsOnStartup: Bool {
+        get { _purgeCloudLogsOnStartup.withLock { $0 } }
+        set { _purgeCloudLogsOnStartup.withLock { $0 = newValue } }
     }
     
     private static let _usbMicropohone = Mutex<Bool>(false)
