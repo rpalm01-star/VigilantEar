@@ -1,20 +1,12 @@
-//
-//  ThreatResultsObserver.swift
-//  VigilantEar
-//
-//  Created by Robert Palmer on 4/24/26.
-//
-
 import SoundAnalysis
 
+// 🛑 Make absolutely sure there is NO @MainActor above this line
 final class ThreatResultsObserver: NSObject, @unchecked Sendable, SNResultsObserving {
     
     private weak var pipeline: AcousticProcessingPipeline?
+    private var debounceMap: [String: Date] = [:]
     
-    // === DEBOUNCE STATE ===
-    private var lastForwardedLabel: String = ""
-    private var lastForwardedTime: Date = .distantPast
-    
+    // ✅ THE FIX: Explicitly nonisolated so your Actor can call it instantly
     nonisolated init(pipeline: AcousticProcessingPipeline) {
         self.pipeline = pipeline
         super.init()
@@ -23,70 +15,58 @@ final class ThreatResultsObserver: NSObject, @unchecked Sendable, SNResultsObser
     nonisolated func request(_ request: SNRequest, didProduce result: SNResult) {
         guard let classificationResult = result as? SNClassificationResult else { return }
         
-        let topCandidates = classificationResult.classifications.prefix(5).map { ($0.identifier.lowercased(), $0.confidence) }
+        let validHits = classificationResult.classifications.filter { $0.confidence > 0.20 }
+        if validHits.isEmpty { return }
         
+        // Bounce to the Main thread only for the actual processing
         Task { @MainActor in
-            var finalLabel: String?
-            var finalConfidence: Double = 0.0
-            var pendingVehicleLabel: String?
-            var pendingVehicleConf: Double = 0.0
+            self.processClassifications(validHits)
+        }
+    }
+    
+    @MainActor
+    private func processClassifications(_ classifications: [SNClassification]) {
+        // === STEP 1: CANONICAL COLLAPSE ===
+        var collapsedHits: [String: (profile: SoundProfile, confidence: Double)] = [:]
+        
+        for classification in classifications {
+            let profile = SoundProfile.classify(classification.identifier)
+            if profile.category == .ignored { continue }
             
-            for (label, conf) in topCandidates {
-                let profile = SoundProfile.classify(label)
-                
-                if profile.isEmergency && conf > 0.50 {
-                    finalLabel = label
-                    finalConfidence = conf
-                    break
+            let canonLabel = profile.canonicalLabel
+            let conf = classification.confidence
+            
+            if let existing = collapsedHits[canonLabel] {
+                if conf > existing.confidence {
+                    collapsedHits[canonLabel] = (profile, conf)
                 }
-                else if profile.isVehicle && conf > 0.20 && pendingVehicleLabel == nil {
-                    pendingVehicleLabel = label
-                    pendingVehicleConf = conf
-                }
+            } else {
+                collapsedHits[canonLabel] = (profile, conf)
+            }
+        }
+        
+        let now = Date()
+        
+        // === STEP 2: THRESHOLD & DEBOUNCE EVALUATION ===
+        for (canonLabel, data) in collapsedHits {
+            let profile = data.profile
+            let conf = data.confidence
+            
+            if profile.isEmergency && conf < 0.50 { continue }
+            if profile.category == .animal && conf < 0.50 { continue }
+            
+            if canonLabel == "music" && conf > 0.65 {
+                Task { await pipeline?.startShazamAccumulation() }
             }
             
-            if finalLabel == nil {
-                if let vLabel = pendingVehicleLabel {
-                    finalLabel = vLabel
-                    finalConfidence = pendingVehicleConf
-                }
-                else if let top = topCandidates.first, top.1 > 0.50 {
-                    finalLabel = top.0
-                    finalConfidence = top.1
-                }
-            }
+            let timeSinceLast = now.timeIntervalSince(debounceMap[canonLabel] ?? .distantPast)
             
-            guard let detectedLabel = finalLabel else { return }
-            
-            // === NEW: Category-Aware Debounce ===
-            let now = Date()
-            let timeSinceLast = now.timeIntervalSince(self.lastForwardedTime)
-            
-            let profile = SoundProfile.classify(detectedLabel)
-            
-            let cooldown = profile.cooldown
-            let shouldForward = detectedLabel != self.lastForwardedLabel || timeSinceLast > cooldown
-            guard shouldForward else { return }
-            
-            self.lastForwardedLabel = detectedLabel
-            self.lastForwardedTime = now
-            
-            Task {
-                let profile = SoundProfile.classify(detectedLabel)
+            if timeSinceLast > profile.cooldown {
+                debounceMap[canonLabel] = now
                 
-                if profile.isEmergency && finalConfidence < 0.50 {
-                    return
+                Task {
+                    await pipeline?.confirmThreatAndTrack(label: canonLabel, confidence: conf)
                 }
-                
-                if profile.canonicalLabel == "animal" && finalConfidence < 0.50 {
-                    return;
-                }
-                
-                if profile.canonicalLabel == "music" && finalConfidence > 0.65 {
-                    await self.pipeline?.startShazamAccumulation()
-                }
-                
-                await self.pipeline?.confirmThreatAndTrack(label: detectedLabel, confidence: finalConfidence)
             }
         }
     }

@@ -19,7 +19,10 @@ actor AcousticProcessingPipeline {
     
     // --- THE INJECTED ROAD MANAGER ---
     private let roadManager: RoadManager
-    
+
+    // Add this to your class properties
+    private var isAnalyzerSetup = false
+
     struct ActiveThreat {
         var sessionID: UUID
         var dopplerTracker: SirenDopplerTracker
@@ -159,18 +162,11 @@ actor AcousticProcessingPipeline {
     func confirmThreatAndTrack(label: String, confidence: Double) async {
         let now = Date()
         
-        // Debug logging - REMOVE AFTER TESTING
-        //let stack = Thread.callStackSymbols.prefix(8).joined(separator: "\n")
-        //print("=== confirmThreatAndTrack called ===")
-        //print("Label: \(label) | Confidence: \(confidence)")
-        //print("Time since last: \(now.timeIntervalSince(lastProcessTime))s")
-        //print("Call stack:\n\(stack)")
-        //print("====================================")
+        // === STRONGER DEBOUNCE ===
+        guard now.timeIntervalSince(lastProcessTime) > AppGlobals.Timing.pipelineDebounce else { return }
         
-        // === STRONGER DEBOUNCE (fixes the 3x duplicate issue) ===
-        guard now.timeIntervalSince(lastProcessTime) > 0.85 else { return }
-        
-        if label == lastProcessedLabel && now.timeIntervalSince(lastProcessTime) < 1.8 {
+        // Anti-spam guard (If it's the exact same sound back-to-back, give it a slightly longer cooldown)
+        if label == lastProcessedLabel && now.timeIntervalSince(lastProcessTime) < (AppGlobals.Timing.pipelineDebounce * 2) {
             return
         }
         
@@ -180,17 +176,17 @@ actor AcousticProcessingPipeline {
         // 1. Classify the profile immediately
         let profile = await MainActor.run { SoundProfile.classify(label) }
         
-        // ADJUSTED LOGIC for mid-confidence sirens
+        // ADJUSTED LOGIC for mid-confidence sirens & music floor
         let (isVehicle, profileCeiling, profileMaxRange, currentCategory, canonicalLabel, finalConfidence) = await MainActor.run {
             var adjustedConf = confidence
             
-            if profile.isEmergency && confidence < 0.70 {
+            if profile.isEmergency && confidence < AppGlobals.ML.emergencyDowngradeThreshold {
                 let engineProfile = SoundProfile.classify("car")
                 return (engineProfile.isVehicle, engineProfile.ceiling, engineProfile.maxRange, engineProfile.category.rawValue, engineProfile.canonicalLabel, 0.50)
             }
             
             if profile.canonicalLabel == "music" {
-                adjustedConf = max(0.50, adjustedConf)
+                adjustedConf = max(AppGlobals.ML.musicConfidenceFloor, adjustedConf)
             }
             
             return (profile.isVehicle, profile.ceiling, profile.maxRange, profile.category.rawValue, profile.canonicalLabel, adjustedConf)
@@ -200,8 +196,6 @@ actor AcousticProcessingPipeline {
         let effectiveConfidence = finalConfidence
         
         if AppGlobals.filteredCategories.contains(currentCategory) {
-            let msg = "Filtered: \(effectiveLabel)"
-            AppGlobals.doLog(message: msg, step: "1_ML_FILTERED")
             return
         }
         
@@ -209,10 +203,11 @@ actor AcousticProcessingPipeline {
         let safeCount = min(Int(buffer.frameLength), 4096)
         let peak = Array(UnsafeBufferPointer(start: channelData[0], count: safeCount)).map(abs).max() ?? 0.0
         
-        let minimumPeak: Float = isVehicle ? 0.015 : 0.04
+        // PHYSICS FLOOR
+        let minimumPeak: Float = isVehicle ? AppGlobals.Physics.minimumVehiclePeak : AppGlobals.Physics.minimumAmbientPeak
         guard peak > minimumPeak else { return }
         
-        var targets = self.fftProcessor.analyzeMultiple(samples: Array(UnsafeBufferPointer(start: channelData[0], count: safeCount)), sampleRate: self.sampleRate, maxPeaks: 3)
+        var targets = self.fftProcessor.analyzeMultiple(samples: Array(UnsafeBufferPointer(start: channelData[0], count: safeCount)), sampleRate: self.sampleRate, maxPeaks: 1)
         
         if isVehicle {
             targets = [(frequency: 100.0, confidence: Float(effectiveConfidence))]
@@ -235,7 +230,8 @@ actor AcousticProcessingPipeline {
             currentBearing = 0.0
         }
         
-        activeThreats.removeAll { now.timeIntervalSince($0.lastSeen) > 4.0 }
+        // MEMORY PURGE
+        activeThreats.removeAll { now.timeIntervalSince($0.lastSeen) > AppGlobals.Timing.threatMemoryLifespan }
         
         for target in targets {
             let currentFreq = target.frequency
@@ -247,18 +243,20 @@ actor AcousticProcessingPipeline {
                 if currentCategory == "medium" || currentCategory == "quiet" {
                     let bearingDiff = abs(threat.lastBearing - currentBearing)
                     let normalizedDiff = bearingDiff > 180 ? 360 - bearingDiff : bearingDiff
-                    if normalizedDiff < 45.0 { matchIndex = index; break }
+                    if normalizedDiff < AppGlobals.Physics.ambientBearingTolerance { matchIndex = index; break }
                 }
                 else if isVehicle {
                     let bearingDiff = abs(threat.lastBearing - currentBearing)
                     let normalizedDiff = bearingDiff > 180 ? 360 - bearingDiff : bearingDiff
-                    if normalizedDiff < 10.0 { matchIndex = index; break }
+                    if normalizedDiff < AppGlobals.Physics.vehicleBearingTolerance { matchIndex = index; break }
                 }
                 else {
-                    let threshold = 40.0
+                    let threshold = 40.0 // You could move this frequency tolerance to AppGlobals too!
                     if abs(threat.lastFrequency - currentFreq) < threshold { matchIndex = index; break }
                 }
             }
+            
+            // ... (Rest of the session ID / Doppler tracking and GPS math remains exactly the same) ...
             
             let threatSessionID: UUID
             let dopplerResult: (isApproaching: Bool, shiftHz: Double)?
@@ -372,6 +370,13 @@ actor AcousticProcessingPipeline {
     }
     
     func setupAnalyzer(format: AVAudioFormat) throws {
+        // THE CLONE KILLER
+        guard !isAnalyzerSetup else {
+            AppGlobals.doLog(message: "Analyzer already setup. Ignoring redundant call.", step: "ACOUSTIC_PIPLINE_SETUP")
+            return
+        }
+        isAnalyzerSetup = true
+        
         self.sampleRate = format.sampleRate
         
         streamAnalyzer = SNAudioStreamAnalyzer(format: format)

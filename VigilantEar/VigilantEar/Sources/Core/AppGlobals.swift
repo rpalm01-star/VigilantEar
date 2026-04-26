@@ -55,7 +55,7 @@ nonisolated struct AppGlobals {
         get { _logToCloud.withLock { $0 } }
         set { _logToCloud.withLock { $0 = newValue } }
     }
-
+    
     private static let _purgeCloudLogsOnStartup = Mutex<Bool>(true)
     public static var purgeCloudLogsOnStartup: Bool {
         get { _purgeCloudLogsOnStartup.withLock { $0 } }
@@ -78,5 +78,48 @@ nonisolated struct AppGlobals {
             print(message)
             await PerformanceLogger.shared.logTelemetry(step: step, message: message)
         }
+    }
+    
+    // MARK: - Machine Learning Thresholds
+    enum ML {
+        /// Absolute floor for the observer to even bother looking at a result
+        static let absoluteMinimumConfidence: Double = 0.20
+        
+        /// The confidence required to trigger a background Shazam match
+        static let shazamTriggerThreshold: Double = 0.65
+        
+        /// The pipeline floor for music to prevent it from dropping off during quiet parts
+        static let musicConfidenceFloor: Double = 0.50
+        
+        /// Confidence needed to treat a muffled emergency sound as a standard vehicle
+        static let emergencyDowngradeThreshold: Double = 0.70
+    }
+    
+    // MARK: - Acoustic Physics & Radar
+    enum Physics {
+        /// The minimum volume peak required to track a standard sound
+        static let minimumAmbientPeak: Float = 0.04
+        
+        /// The minimum volume peak required to track a vehicle (lower because of low frequencies)
+        static let minimumVehiclePeak: Float = 0.015
+        
+        /// How many degrees of bearing difference before we consider it a separate physical object
+        static let ambientBearingTolerance: Double = 45.0
+        static let vehicleBearingTolerance: Double = 10.0
+    }
+    
+    // MARK: - Timing & Debounce (Seconds)
+    enum Timing {
+        /// How long an old threat stays in the pipeline memory before being purged
+        static let threatMemoryLifespan: TimeInterval = 4.0
+        
+        /// How long an event is allowed to live on the SwiftUI HUD
+        static let hudEventLifespan: TimeInterval = 10.0
+        
+        /// The strict pipeline debounce to prevent sub-second FFT cloning
+        static let pipelineDebounce: TimeInterval = 0.85
+        
+        /// How long to pause Shazam accumulation after a successful match
+        static let shazamCooldown: TimeInterval = 180.0
     }
 }

@@ -1,28 +1,51 @@
-import UIKit
+import Foundation
+import CoreHaptics
 
 @MainActor
 class HapticManager {
     static let shared = HapticManager()
     
+    // The Core Haptics engine that bypasses UIKit restrictions
+    private var engine: CHHapticEngine?
+    
     private var isFiring = false
-    
-    // We use Impact generators for more "physical" feel that ignores the silent switch
-    private let heavyImpact = UIImpactFeedbackGenerator(style: .heavy)
-    private let lightImpact = UIImpactFeedbackGenerator(style: .light)
-    
     private var sessionCooldowns: [UUID: Date] = [:]
     private let minimumObjectInterval: TimeInterval = 6.0
     
+    init() {
+        setupHapticEngine()
+    }
+    
+    private func setupHapticEngine() {
+        guard CHHapticEngine.capabilitiesForHardware().supportsHaptics else { return }
+        
+        do {
+            engine = try CHHapticEngine()
+            
+            // These handlers reboot the engine if the system kills it (e.g., an incoming phone call)
+            engine?.stoppedHandler = { reason in
+                AppGlobals.doLog(message: "Haptic Engine stopped: \(reason)", step: "HAPTIC_MANAGER")
+            }
+            engine?.resetHandler = { [weak self] in
+                AppGlobals.doLog(message: "Restarting Haptic Engine...", step: "HAPTIC_MANAGER")
+                do { try self?.engine?.start() } catch { }
+            }
+            
+            try engine?.start()
+        } catch {
+            AppGlobals.doLog(message: "Failed to create Haptic Engine: \(error)", step: "HAPTIC_MANAGER")
+        }
+    }
+    
     func trigger(count: Int, sessionID: UUID) {
+        guard CHHapticEngine.capabilitiesForHardware().supportsHaptics else { return }
+        
         let now = Date()
         
         // 1. THE OBJECT COOLDOWN
         if let lastVibrated = sessionCooldowns[sessionID],
            now.timeIntervalSince(lastVibrated) < minimumObjectInterval {
-            AppGlobals.doLog(
-                message: "⚠️ Haptic manager is cooling down. Request ignored.",
-                step: "HAPTIC_MANAGER"
-            )
+            // AppGlobals.doLog(message: "⚠️ Haptic manager is cooling down. Request ignored.", step: "HAPTIC_MANAGER")
             return
         }
         
@@ -32,31 +55,59 @@ class HapticManager {
         isFiring = true
         sessionCooldowns[sessionID] = now
         
-        // 3. PREPARE THE HARDWARE (Crucial for zero-latency)
-        if count >= 3 { heavyImpact.prepare() } else { lightImpact.prepare() }
-        
-        Task {
+        // 3. BUILD AND PLAY THE PATTERN
+        do {
+            // Wake the engine if it went to sleep
+            try engine?.start()
+            
+            var events: [CHHapticEvent] = []
+            
             if count >= 3 {
-                // Triple heavy impact for emergencies (Fire/Sirens/Footsteps)
-                for _ in 0..<3 {
-                    heavyImpact.impactOccurred()
-                    AppGlobals.doLog(
-                        message: "✅ Heavy impact requested from haptic manager",
-                        step: "HAPTIC_MANAGER"
+                // --- 🚨 EMERGENCY: 3 Heavy Pulses ---
+                AppGlobals.doLog(message: "✅ Heavy impact requested from haptic manager", step: "HAPTIC_MANAGER")
+                
+                // Maximum intensity and sharpness
+                let intensity = CHHapticEventParameter(parameterID: .hapticIntensity, value: 1.0)
+                let sharpness = CHHapticEventParameter(parameterID: .hapticSharpness, value: 1.0)
+                
+                // Schedule 3 precise hits, 0.15 seconds apart
+                for i in 0..<3 {
+                    let event = CHHapticEvent(
+                        eventType: .hapticTransient,
+                        parameters: [intensity, sharpness],
+                        relativeTime: Double(i) * 0.15 // Automatically spaces them out!
                     )
-                    // 0.1s is the "sweet spot" for human perception of distinct pulses
-                    try? await Task.sleep(nanoseconds: 100_000_000)
+                    events.append(event)
                 }
             } else {
-                // Single light pulse for cars/ambient
-                lightImpact.impactOccurred()
-                AppGlobals.doLog(
-                    message: "✅ Light impact requested from haptic manager",
-                    step: "HAPTIC_MANAGER"
+                // --- 🚗 STANDARD: 1 Light Pulse ---
+                AppGlobals.doLog(message: "✅ Light impact requested from haptic manager", step: "HAPTIC_MANAGER")
+                
+                // Lower intensity and softer sharpness for a "tap" feel
+                let intensity = CHHapticEventParameter(parameterID: .hapticIntensity, value: 0.6)
+                let sharpness = CHHapticEventParameter(parameterID: .hapticSharpness, value: 0.4)
+                
+                let event = CHHapticEvent(
+                    eventType: .hapticTransient,
+                    parameters: [intensity, sharpness],
+                    relativeTime: 0
                 )
-                // Small lockout to prevent "buzzing" from rapid overlapping events
-                try? await Task.sleep(nanoseconds: 200_000_000)
+                events.append(event)
             }
+            
+            // Hand the track to the Taptic Engine
+            let pattern = try CHHapticPattern(events: events, parameters: [])
+            let player = try engine?.makePlayer(with: pattern)
+            try player?.start(atTime: CHHapticTimeImmediate)
+            
+        } catch {
+            AppGlobals.doLog(message: "Failed to play haptic pattern: \(error)", step: "HAPTIC_MANAGER")
+        }
+        
+        // Cleanup memory and reset the firing gate
+        Task {
+            let delay = count >= 3 ? 450_000_000 : 200_000_000
+            try? await Task.sleep(nanoseconds: UInt64(delay))
             
             isFiring = false
             sessionCooldowns = sessionCooldowns.filter { now.timeIntervalSince($0.value) < 60 }

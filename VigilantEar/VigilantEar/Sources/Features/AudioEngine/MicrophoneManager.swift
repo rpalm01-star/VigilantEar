@@ -109,8 +109,13 @@ class MicrophoneManager: NSObject, CLLocationManagerDelegate {
         
         let session = AVAudioSession.sharedInstance()
         do {
+            
             // 1. Set the category first (do NOT activate yet)
             try session.setCategory(.playAndRecord, mode: .videoRecording, options: [.defaultToSpeaker, .mixWithOthers])
+            
+            // 2. 🚨 THE REAL MAGIC KEY 🚨
+            // This explicitly tells iOS not to kill the Taptic Engine while recording
+            try session.setAllowHapticsAndSystemSoundsDuringRecording(true)
             
             // 2. Configure hardware (MUST happen before activation so iOS respects the 2-channel request)
             configureHardwareForStereo(session: session)

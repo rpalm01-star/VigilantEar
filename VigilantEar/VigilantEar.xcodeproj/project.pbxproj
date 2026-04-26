@@ -24,6 +24,7 @@
 		30774C912F946CE5008C16E9 /* SystemMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30774C902F946CE5008C16E9 /* SystemMonitor.swift */; };
 		308EF3E72F8755A300885DCB /* StartupVerificationViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 308EF3E62F8755A300885DCB /* StartupVerificationViewModel.swift */; };
 		308EF3E92F8755BC00885DCB /* StartupVerificationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 308EF3E82F8755BC00885DCB /* StartupVerificationView.swift */; };
+		30A2B5112F9EA32100BF2E15 /* ThreatHUD.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30A2B5102F9EA32100BF2E15 /* ThreatHUD.swift */; };
 		30A396432F908D4800D441A0 /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = 30A396422F908D4800D441A0 /* GoogleService-Info.plist */; };
 		30A396462F908DF700D441A0 /* FirebaseFirestore in Frameworks */ = {isa = PBXBuildFile; productRef = 30A396452F908DF700D441A0 /* FirebaseFirestore */; };
 		30A396482F90900700D441A0 /* CloudLogger.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30A396472F90900700D441A0 /* CloudLogger.swift */; };
@@ -58,6 +59,7 @@
 		308EF3E62F8755A300885DCB /* StartupVerificationViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StartupVerificationViewModel.swift; sourceTree = "<group>"; };
 		308EF3E82F8755BC00885DCB /* StartupVerificationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StartupVerificationView.swift; sourceTree = "<group>"; };
 		308EF3EB2F875A9400885DCB /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		30A2B5102F9EA32100BF2E15 /* ThreatHUD.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThreatHUD.swift; sourceTree = "<group>"; };
 		30A396422F908D4800D441A0 /* GoogleService-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "GoogleService-Info.plist"; sourceTree = "<group>"; };
 		30A396472F90900700D441A0 /* CloudLogger.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CloudLogger.swift; sourceTree = "<group>"; };
 		30BDE8ED2F9B342600074009 /* TrackedTarget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrackedTarget.swift; sourceTree = "<group>"; };
@@ -171,6 +173,7 @@
 		3053DCA52F83718A00241892 /* UI */ = {
 			isa = PBXGroup;
 			children = (
+				30A2B5102F9EA32100BF2E15 /* ThreatHUD.swift */,
 				3053A9F82F900010008C5419 /* MapView.swift */,
 				308EF3E82F8755BC00885DCB /* StartupVerificationView.swift */,
 				3053DCA42F83718A00241892 /* ContentView.swift */,
@@ -304,6 +307,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				30A2B5112F9EA32100BF2E15 /* ThreatHUD.swift in Sources */,
 				308EF3E92F8755BC00885DCB /* StartupVerificationView.swift in Sources */,
 				30774C912F946CE5008C16E9 /* SystemMonitor.swift in Sources */,
 				3053DCAF2F83718A00241892 /* SoundEvent.swift in Sources */,
