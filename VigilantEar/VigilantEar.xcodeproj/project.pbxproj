@@ -83,9 +83,9 @@
 			path = Simulators;
 			sourceTree = "<group>";
 		};
-		30BDE8F32F9B459700074009 /* Dying */ = {
+		30BDE8F32F9B459700074009 /* Deprecated */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			path = Dying;
+			path = Deprecated;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -202,7 +202,7 @@
 		3053DCAB2F83718A00241892 /* Sources */ = {
 			isa = PBXGroup;
 			children = (
-				30BDE8F32F9B459700074009 /* Dying */,
+				30BDE8F32F9B459700074009 /* Deprecated */,
 				3053DC8F2F83718A00241892 /* App */,
 				3053DC922F83718A00241892 /* Core */,
 				3053DCA62F83718A00241892 /* Features */,
@@ -240,7 +240,7 @@
 			fileSystemSynchronizedGroups = (
 				3044384A2F837A1D00F57539 /* Logging */,
 				3053A9FC2F900FA2008C5419 /* Simulators */,
-				30BDE8F32F9B459700074009 /* Dying */,
+				30BDE8F32F9B459700074009 /* Deprecated */,
 			);
 			name = VigilantEar;
 			packageProductDependencies = (
