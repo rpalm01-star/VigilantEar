@@ -61,6 +61,7 @@ actor AcousticProcessingPipeline {
     
     private var lastProcessTime: Date = .distantPast
     private var lastConfidence: Double = 0.0
+    private var lastProcessedLabel: String = ""          // ← NEW
     
     // --- THE UPDATED INIT ---
     init(roadManager: RoadManager) {
@@ -157,14 +158,29 @@ actor AcousticProcessingPipeline {
     
     func confirmThreatAndTrack(label: String, confidence: Double) async {
         let now = Date()
-        guard now.timeIntervalSince(lastProcessTime) > 0.2 else { return }
-        lastProcessTime = now
         
-        // 1. Classify the profile immediately to get our snapping flag
+        // Debug logging - REMOVE AFTER TESTING
+        //let stack = Thread.callStackSymbols.prefix(8).joined(separator: "\n")
+        //print("=== confirmThreatAndTrack called ===")
+        //print("Label: \(label) | Confidence: \(confidence)")
+        //print("Time since last: \(now.timeIntervalSince(lastProcessTime))s")
+        //print("Call stack:\n\(stack)")
+        //print("====================================")
+        
+        // === STRONGER DEBOUNCE (fixes the 3x duplicate issue) ===
+        guard now.timeIntervalSince(lastProcessTime) > 0.85 else { return }
+        
+        if label == lastProcessedLabel && now.timeIntervalSince(lastProcessTime) < 1.8 {
+            return
+        }
+        
+        lastProcessTime = now
+        lastProcessedLabel = label
+        
+        // 1. Classify the profile immediately
         let profile = await MainActor.run { SoundProfile.classify(label) }
         
-        // ADJUSTED LOGIC: If it's a siren but confidence is mid-range,
-        // still treat it as Emergency, just maybe not a "Confirmed" one.
+        // ADJUSTED LOGIC for mid-confidence sirens
         let (isVehicle, profileCeiling, profileMaxRange, currentCategory, canonicalLabel, finalConfidence) = await MainActor.run {
             var adjustedConf = confidence
             
@@ -341,10 +357,10 @@ actor AcousticProcessingPipeline {
                 let latStr = targetLat != nil ? String(format: "%.5f", targetLat!) : "N/A"
                 let lonStr = targetLon != nil ? String(format: "%.5f", targetLon!) : "N/A"
                 let confStr = String(format: "%.3f", effectiveConfidence)
-
+                
                 let msg = "Tracked [\(effectiveLabel)] - Dist: \(Int(estimatedFeet))ft, Brg: \(Int(currentBearing))°, GPS: (\(latStr), \(lonStr)), SNP: [\(profile.shouldSnapToRoad)], Conf: \(confStr), HAP: \(profile.hapticCount)"
                 AppGlobals.doLog(message: msg, step: "2_TARGET_TRACKED")
-
+                
                 await MainActor.run {
                     if (profile.hapticCount > 0) {
                         HapticManager.shared.trigger(count: profile.hapticCount, sessionID: threatSessionID)
@@ -364,7 +380,7 @@ actor AcousticProcessingPipeline {
         request.windowDuration = CMTime(seconds: 0.5, preferredTimescale: 1000)
         request.overlapFactor = 0.9
         AppGlobals.doLog(message: "ML Engine Labels: \(request.knownClassifications.joined(separator: ", "))", step: "ACOUSTIC_PIPLINE_SETUP")
-
+        
         let observer = ThreatResultsObserver(pipeline: self)
         self.resultsObserver = observer
         try streamAnalyzer?.add(request, withObserver: observer)

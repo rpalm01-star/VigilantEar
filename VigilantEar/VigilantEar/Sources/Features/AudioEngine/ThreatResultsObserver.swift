@@ -5,11 +5,15 @@
 //  Created by Robert Palmer on 4/24/26.
 //
 
-
 import SoundAnalysis
 
 final class ThreatResultsObserver: NSObject, @unchecked Sendable, SNResultsObserving {
+    
     private weak var pipeline: AcousticProcessingPipeline?
+    
+    // === DEBOUNCE STATE ===
+    private var lastForwardedLabel: String = ""
+    private var lastForwardedTime: Date = .distantPast
     
     nonisolated init(pipeline: AcousticProcessingPipeline) {
         self.pipeline = pipeline
@@ -28,7 +32,6 @@ final class ThreatResultsObserver: NSObject, @unchecked Sendable, SNResultsObser
             var pendingVehicleConf: Double = 0.0
             
             for (label, conf) in topCandidates {
-                
                 let profile = SoundProfile.classify(label)
                 
                 if profile.isEmergency && conf > 0.50 {
@@ -53,18 +56,37 @@ final class ThreatResultsObserver: NSObject, @unchecked Sendable, SNResultsObser
                 }
             }
             
-            if let detectedLabel = finalLabel {
-                Task {
-                    let profile = SoundProfile.classify(detectedLabel)
-                    if (profile.canonicalLabel == "music") {
-                        if (finalConfidence > 0.65) {
-                            await self.pipeline?.startShazamAccumulation()
-                        } else {
-                            return
-                        }
-                    }
-                    await self.pipeline?.confirmThreatAndTrack(label: detectedLabel, confidence: finalConfidence)
+            guard let detectedLabel = finalLabel else { return }
+            
+            // === NEW: Category-Aware Debounce ===
+            let now = Date()
+            let timeSinceLast = now.timeIntervalSince(self.lastForwardedTime)
+            
+            let profile = SoundProfile.classify(detectedLabel)
+            
+            let cooldown = profile.cooldown
+            let shouldForward = detectedLabel != self.lastForwardedLabel || timeSinceLast > cooldown
+            guard shouldForward else { return }
+            
+            self.lastForwardedLabel = detectedLabel
+            self.lastForwardedTime = now
+            
+            Task {
+                let profile = SoundProfile.classify(detectedLabel)
+                
+                if profile.isEmergency && finalConfidence < 0.50 {
+                    return
                 }
+                
+                if profile.canonicalLabel == "animal" && finalConfidence < 0.50 {
+                    return;
+                }
+                
+                if profile.canonicalLabel == "music" && finalConfidence > 0.65 {
+                    await self.pipeline?.startShazamAccumulation()
+                }
+                
+                await self.pipeline?.confirmThreatAndTrack(label: detectedLabel, confidence: finalConfidence)
             }
         }
     }
