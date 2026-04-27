@@ -35,7 +35,7 @@ struct ThreatSimulator {
             do {
                 let response = try await directions.calculate()
                 guard let route = response.routes.first else {
-                    print("⚠️ Simulator: No routes found.")
+                    AppGlobals.doLog(message: "⚠️ " + AppGlobals.simulatedFireTruck.capitalized + ": No routes found.", step: "FIRESIM")
                     return
                 }
                 
@@ -52,7 +52,7 @@ struct ThreatSimulator {
                 }
                 
                 guard !pathCoordinates.isEmpty else {
-                    print("⚠️ Simulator: Truncation resulted in zero points.")
+                    AppGlobals.doLog(message: "⚠️ " + AppGlobals.simulatedFireTruck.capitalized + ": Range truncation resulted in zero points.", step: "FIRESIM")
                     coordinator.simulatedRoute = nil
                     return
                 }
@@ -87,7 +87,7 @@ struct ThreatSimulator {
                     let newEvent = SoundEvent(
                         sessionID: threatSessionID,
                         timestamp: Date(),
-                        threatLabel: "simulated_fire_truck",
+                        threatLabel: AppGlobals.simulatedFireTruck,
                         confidence: simulatedConfidence,
                         bearing: relativeBearing,
                         distance: normalizedDistance,
@@ -101,6 +101,13 @@ struct ThreatSimulator {
                     // UI Feed
                     Task { @MainActor in
                         coordinator.addEvent(newEvent)
+                        if (step == 0) {
+                            let profile = SoundProfile.classify(AppGlobals.simulatedFireTruck)
+                            if (profile.hapticCount > 0) {
+                                AppGlobals.doLog(message: "🌀 " + AppGlobals.simulatedFireTruck.capitalized + ": Haptic request @start for : \(profile.hapticCount) pulses.", step: "FIRESIM")
+                                HapticManager.shared.trigger(count: profile.hapticCount, sessionID: newEvent.sessionID)
+                            }
+                        }
                     }
                     
                     step += 1
@@ -108,11 +115,16 @@ struct ThreatSimulator {
                         timer.invalidate()
                         Task { @MainActor in
                             coordinator.simulatedRoute = nil
+                            let profile = SoundProfile.classify(AppGlobals.simulatedFireTruck)
+                            if (profile.hapticCount > 0) {
+                                AppGlobals.doLog(message: "🌀 " + AppGlobals.simulatedFireTruck.capitalized + ": Haptic request @end for : \(profile.hapticCount) pulses.", step: "FIRESIM")
+                                HapticManager.shared.trigger(count: profile.hapticCount, sessionID: newEvent.sessionID)
+                            }
                         }
                     }
                 }
             } catch {
-                print("⚠️ Routing failed: \(error.localizedDescription)")
+                AppGlobals.doLog(message: "⚠️ Routing failed: \(error.localizedDescription)", step: "FIRESIM")
                 coordinator.simulatedRoute = nil
             }
         }

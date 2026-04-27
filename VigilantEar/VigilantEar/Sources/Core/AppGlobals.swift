@@ -50,7 +50,12 @@ nonisolated struct AppGlobals {
         get { _logDataStoreName.withLock { $0 } }
     }
     
-    private static let _logToCloud = Mutex<Bool>(true)
+    private static let _simFireLabel = Mutex<String>("simulated_fire_truck")
+    public static var simulatedFireTruck: String {
+        get { _simFireLabel.withLock { $0 } }
+    }
+    
+    private static let _logToCloud = Mutex<Bool>(false)
     public static var logToCloud: Bool {
         get { _logToCloud.withLock { $0 } }
         set { _logToCloud.withLock { $0 = newValue } }
@@ -79,6 +84,38 @@ nonisolated struct AppGlobals {
             await PerformanceLogger.shared.logTelemetry(step: step, message: message)
         }
     }
+    
+    // MARK: - Location & Heading Power Tuning
+    //
+    // These four values control the balance between battery life and how "alive" the app feels.
+    // Tweak them while testing on your iPhone and watch the Energy Impact numbers + turning feel.
+    //
+    // === LOCATION (GPS) ===
+    // locationUpdateThrottle: How often (in seconds) we allow a new GPS position to be sent to the pipeline.
+    //   - Lower value (0.3–0.5) = more responsive map dot, but higher battery drain
+    //   - Higher value (1.0–2.0) = smoother battery, but the blue dot on the map updates less often
+    //   Recommended range: 0.6 – 1.2 seconds
+    static let locationUpdateThrottle: TimeInterval = 0.5
+    
+    // locationDistanceFilter: iOS will only deliver a new location update after you've moved this many meters.
+    //   - Lower value (3–5) = more frequent updates, feels more "live"
+    //   - Higher value (10–15) = fewer updates, saves significant power
+    //   Recommended range: 5 – 12 meters
+    static let locationDistanceFilter: Double = 8.0
+    
+    // === HEADING (COMPASS) ===
+    // headingUpdateThrottle: How often (in seconds) we allow a new heading value to be sent to the pipeline.
+    //   - This is the one that affects "turning the phone" feel the most.
+    //   - Lower value (0.1–0.15) = buttery smooth turning, slightly higher power
+    //   - Higher value (0.25–0.4) = noticeable lag when rotating, better battery
+    //   Recommended range: 0.12 – 0.25 seconds (0.18 feels great for most people)
+    static let headingUpdateThrottle: TimeInterval = 0.20
+    
+    // headingFilterDegrees: iOS will only deliver a new heading update when the device has rotated at least this many degrees.
+    //   - Lower value (1–2) = very sensitive, almost no filtering, can feel jittery
+    //   - Higher value (5–8) = smoother but can feel "steppy" when turning slowly
+    //   Recommended range: 2.5 – 4.5 degrees
+    static let headingFilterDegrees: Double = 3.5
     
     // MARK: - Machine Learning Thresholds
     enum ML {
