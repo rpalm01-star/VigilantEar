@@ -28,6 +28,12 @@ struct SoundEvent: Identifiable {
         if (SoundProfile.classify(threatLabel).isEmergency) {return Color.red} else {return Color.cyan}
     }
     
+    /// Tells the UI whether the inner circle should react (flash, pulse, change color, etc.)
+    /// Currently used for all emergency events (fire trucks, sirens, etc.)
+    public var shouldInnerCircleReact: Bool {
+        return isEmergency
+    }
+    
     // MARK: - Spatial Data
     public let bearing: Double
     public let distance: Double
@@ -51,7 +57,7 @@ struct SoundEvent: Identifiable {
         isApproaching: Bool = false,
         latitude: Double? = nil,
         longitude: Double? = nil,
-        songLabel: String? = nil          // ← NEW
+        songLabel: String? = nil
     ) {
         self.id = id
         self.sessionID = sessionID

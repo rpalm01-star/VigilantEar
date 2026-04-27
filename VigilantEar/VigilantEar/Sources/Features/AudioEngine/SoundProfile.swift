@@ -25,7 +25,7 @@ struct SoundProfile {
         if canonicalLabel == "music" { return 0.45 }
         return 0.60 // Default for animals, misc, etc.
     }
-
+    
     // --- THE THREAD-SAFE CONCURRENT CACHE ---
     private static var lookupTable: [String: SoundProfile] = [:]
     private static let queue = DispatchQueue(label: "com.VigilantEar.profileCache", attributes: .concurrent)
@@ -35,16 +35,16 @@ struct SoundProfile {
     private static let rawRegistry: [(keywords: [String], icon: String, color: Color, ceiling: Double, maxRange: Double, category: ThreatCategory, snaps: Bool, haptics: Int, cooldown: Double)] = [
         
         // --- 🚨 EMERGENCY / SIRENS (High Priority) ---
-        (["siren", "ambulance_siren", "police_siren", "fire_engine_siren", "civil_defense_siren", "foghorn", "emergency_vehicle", "simulated_fire_truck"], "light.beacon.max.fill", .red, 0.80, 1000.0, .emergency, true, 3, 1.1),
+        (["siren", "ambulance_siren", "police_siren", "fire_engine_siren", "civil_defense_siren", "foghorn", "emergency_vehicle", "simulated_fire_truck"], "light.beacon.max.fill", .red, 0.80, 1000.0, .emergency, true, 3, 2.0),
         
         // --- ⚠️ THREATS / DANGER (High Priority) ---
-        (["fireworks", "gunshot_gunfire", "artillery_fire", "firecracker", "eruption", "boom"], "fireworks", .red, 0.90, 1000.0, .emergency, false, 2, 1.2),
+        (["fireworks", "gunshot_gunfire", "artillery_fire", "firecracker", "eruption", "boom"], "fireworks", .red, 0.90, 1000.0, .emergency, false, 2, 2.0),
         
         // --- 👣 PERSONAL SAFETY / APPROACH (High Priority for Safety) ---
-        (["person_running", "person_shuffling", "person_walking", "knock", "door_slam", "door_sliding"], "figure.walk.arrival", .red, 0.45, 60.0, .emergency, false, 2, 1.1),
+        (["person_running", "person_shuffling", "person_walking", "knock", "door_slam", "door_sliding"], "figure.walk.arrival", .red, 0.45, 60.0, .emergency, false, 2, 2.0),
         
         // --- 🔔 CRITICAL ALERTS ---
-        (["smoke_detector", "alarm_clock", "telephone_bell_ringing", "ringtone", "door_bell", "reverse_beeps", "beep"], "exclamationmark.triangle.fill", .red, 0.60, 100.0, .emergency, false, 2, 1.2),
+        (["smoke_detector", "alarm_clock", "telephone_bell_ringing", "ringtone", "door_bell", "reverse_beeps", "beep"], "exclamationmark.triangle.fill", .red, 0.60, 100.0, .emergency, false, 2, 2.0),
         
         // --- 🚗 VEHICLES (Important but standard) ---
         (["air_horn", "train_horn", "train_whistle", "car_horn"], "horn.fill", .purple, 0.80, 1000.0, .emergency, true, 1, 1.2),
@@ -55,7 +55,7 @@ struct SoundProfile {
         (["hammer", "saw", "power_tool", "drill", "hedge_trimmer", "chopping_wood", "wood_cracking", "lawn_mower", "chainsaw"], "hammer.fill", .orange, 0.60, 100.0, .medium, false, 0, 1.6),
         
         // --- 🎵 THE MEGA MUSIC FUNNEL (Informational) ---
-        (["music", "singing", "choir_singing", "yodeling", "rapping", "humming", "whistling", "plucked_string_instrument", "guitar", "electric_guitar", "bass_guitar", "acoustic_guitar", "steel_guitar_slide_guitar", "guitar_tapping", "guitar_strum", "banjo", "sitar", "mandolin", "zither", "ukulele", "keyboard_musical", "piano", "electric_piano", "organ", "electronic_organ", "hammond_organ", "synthesizer", "harpsichord", "percussion", "drum_kit", "drum", "snare_drum", "bass_drum", "timpani", "tabla", "cymbal", "hi_hat", "tambourine", "rattle_instrument", "gong", "mallet_percussion", "marimba_xylophone", "glockenspiel", "vibraphone", "steelpan", "orchestra", "brass_instrument", "french_horn", "trumpet", "trombone", "bowed_string_instrument", "violin_fiddle", "cello", "double_bass", "wind_instrument", "flute", "saxophone", "clarinet", "oboe", "bassoon", "harp", "bell", "church_bell", "bicycle_bell", "cowbell", "tuning_fork", "chime", "wind_chime", "harmonica", "accordion", "bagpipes", "didgeridoo", "shofar", "theremin", "singing_bowl", "disc_scratching"], "music.quarternote.3", .purple, 0.55, 150.0, .medium, false, 0, 1.9),
+        (["music", "singing", "choir_singing", "yodeling", "rapping", "humming", "whistling", "plucked_string_instrument", "guitar", "electric_guitar", "bass_guitar", "acoustic_guitar", "steel_guitar_slide_guitar", "guitar_tapping", "guitar_strum", "banjo", "sitar", "mandolin", "zither", "ukulele", "keyboard_musical", "piano", "electric_piano", "organ", "electronic_organ", "hammond_organ", "synthesizer", "harpsichord", "percussion", "drum_kit", "drum", "snare_drum", "bass_drum", "timpani", "tabla", "cymbal", "hi_hat", "tambourine", "rattle_instrument", "gong", "mallet_percussion", "marimba_xylophone", "glockenspiel", "vibraphone", "steelpan", "orchestra", "brass_instrument", "french_horn", "trumpet", "trombone", "bowed_string_instrument", "violin_fiddle", "cello", "double_bass", "wind_instrument", "flute", "saxophone", "clarinet", "oboe", "bassoon", "harp", "bell", "church_bell", "bicycle_bell", "cowbell", "tuning_fork", "chime", "wind_chime", "harmonica", "accordion", "bagpipes", "didgeridoo", "shofar", "theremin", "singing_bowl", "disc_scratching"], "music.quarternote.3", .purple, 0.55, 150.0, .medium, false, 0, 3.0),
         
         // --- 🗣️ HUMAN VOICE & INTERACTION ---
         (["speech", "shout", "yell", "battle_cry", "children_shouting", "screaming", "whispering", "laughter", "baby_laughter", "giggling", "snicker", "belly_laugh", "chuckle_chortle", "crying_sobbing", "baby_crying", "sigh", "chatter", "crowd", "babble", "clapping", "cheering", "applause", "booing", "finger_snapping"], "person.wave.2.fill", .cyan, 0.55, 120.0, .medium, false, 0, 1.6),
@@ -77,7 +77,7 @@ struct SoundProfile {
         (["sewing_machine", "mechanical_fan", "air_conditioner"], "fanblades.fill", .gray, 0.20, 20.0, .ignored, false, 0, 2.0),
         (["toilet_flush"], "toilet.fill", .white, 0.20, 20.0, .ignored, false, 0, 2.0),
         (["dishes_pot_pans", "sink_filling_washing"], "dishwasher", .white, 0.20, 20.0, .ignored, false, 0, 2.0),
-
+        
         // --- ⚽️ SPORTS & RECREATION ---
         (["bicycle", "skateboard", "basketball_bounce", "slap_smack", "bowling_impact", "playing_badminton", "playing_hockey", "playing_squash", "playing_table_tennis", "playing_tennis", "playing_volleyball", "rope_skipping", "scuba_diving", "skiing"], "figure.run", .mint, 0.40, 80.0, .misc, false, 0, 1.5),
         
@@ -115,13 +115,14 @@ struct SoundProfile {
         for entry in rawRegistry {
             // Using array `.contains` for strict string equality against elements (NOT string substring contains)
             if entry.keywords.contains(lowerLabel) {
-                // AppGlobals.doLog(message: "Found [\(lowerLabel)] in registry. Caching.", step: "SOUNDPROFILE_CLASSIFY")
                 return createAndCache(profile: entry, for: lowerLabel)
             }
         }
         
-        let msg = "No exact profile found for [\(lowerLabel)]. Using default \"waveform\"."
-        AppGlobals.doLog(message: msg, step: "SOUNDPROFILE_CLASSIFY")
+        AppGlobals.doLog(message: "Sound label [\(lowerLabel)] missing from registry. Using default value of \"waveform\".",
+                         step: "SOUNDPROFILE_CLASSIFY",
+                         logName: AppGlobals.exceptionsDataStoreName,
+                         isError: true)
         
         // Fallback
         let fallback = SoundProfile(

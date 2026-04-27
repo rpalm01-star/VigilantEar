@@ -101,7 +101,7 @@ struct ThreatSimulator {
                     // UI Feed
                     Task { @MainActor in
                         coordinator.addEvent(newEvent)
-                        if (step == 0) {
+                        if (step == 1) {
                             let profile = SoundProfile.classify(AppGlobals.simulatedFireTruck)
                             if (profile.hapticCount > 0) {
                                 AppGlobals.doLog(message: "🌀 " + AppGlobals.simulatedFireTruck.capitalized + ": Haptic request @start for : \(profile.hapticCount) pulses.", step: "FIRESIM")

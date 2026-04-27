@@ -1,3 +1,6 @@
+// HapticManager.swift
+// VigilantEar
+
 import Foundation
 import CoreHaptics
 
@@ -5,9 +8,7 @@ import CoreHaptics
 class HapticManager {
     static let shared = HapticManager()
     
-    // The Core Haptics engine that bypasses UIKit restrictions
     private var engine: CHHapticEngine?
-    
     private var isFiring = false
     private var sessionCooldowns: [UUID: Date] = [:]
     private let minimumObjectInterval: TimeInterval = 6.0
@@ -21,16 +22,13 @@ class HapticManager {
         
         do {
             engine = try CHHapticEngine()
-            
-            // These handlers reboot the engine if the system kills it (e.g., an incoming phone call)
             engine?.stoppedHandler = { reason in
                 AppGlobals.doLog(message: "Haptic Engine stopped: \(reason)", step: "HAPTIC_MANAGER")
             }
             engine?.resetHandler = { [weak self] in
                 AppGlobals.doLog(message: "Restarting Haptic Engine...", step: "HAPTIC_MANAGER")
-                do { try self?.engine?.start() } catch { }
+                try? self?.engine?.start()
             }
-            
             try engine?.start()
         } catch {
             AppGlobals.doLog(message: "Failed to create Haptic Engine: \(error)", step: "HAPTIC_MANAGER")
@@ -38,79 +36,84 @@ class HapticManager {
     }
     
     func trigger(count: Int, sessionID: UUID) {
-        guard CHHapticEngine.capabilitiesForHardware().supportsHaptics else { return }
+        guard CHHapticEngine.capabilitiesForHardware().supportsHaptics, count > 0 else { return }
         
         let now = Date()
-        
-        // 1. THE OBJECT COOLDOWN
-        if let lastVibrated = sessionCooldowns[sessionID],
-           now.timeIntervalSince(lastVibrated) < minimumObjectInterval {
-            // AppGlobals.doLog(message: "⚠️ Haptic manager is cooling down. Request ignored.", step: "HAPTIC_MANAGER")
+        if let last = sessionCooldowns[sessionID], now.timeIntervalSince(last) < minimumObjectInterval {
             return
         }
         
-        // 2. THE HARDWARE GATEKEEPER
-        guard !isFiring && count > 0 else { return }
-        
+        guard !isFiring else { return }
         isFiring = true
         sessionCooldowns[sessionID] = now
         
-        // 3. BUILD AND PLAY THE PATTERN
-        do {
-            // Wake the engine if it went to sleep
-            try engine?.start()
-            
-            var events: [CHHapticEvent] = []
-            
-            if count >= 3 {
-                // --- 🚨 EMERGENCY: 3 Heavy Pulses ---
-                AppGlobals.doLog(message: "✅ Heavy impact requested from haptic manager", step: "HAPTIC_MANAGER")
+        Task {
+            do {
+                try await engine?.start()
                 
-                // Maximum intensity and sharpness
-                let intensity = CHHapticEventParameter(parameterID: .hapticIntensity, value: 1.0)
-                let sharpness = CHHapticEventParameter(parameterID: .hapticSharpness, value: 1.0)
+                let pattern = try createHapticPattern(for: count)
+                let player = try engine?.makePlayer(with: pattern)
+                try player?.start(atTime: CHHapticTimeImmediate)
                 
-                // Schedule 3 precise hits, 0.15 seconds apart
-                for i in 0..<3 {
-                    let event = CHHapticEvent(
-                        eventType: .hapticTransient,
-                        parameters: [intensity, sharpness],
-                        relativeTime: Double(i) * 0.15 // Automatically spaces them out!
-                    )
-                    events.append(event)
-                }
-            } else {
-                // --- 🚗 STANDARD: 1 Light Pulse ---
-                AppGlobals.doLog(message: "✅ Light impact requested from haptic manager", step: "HAPTIC_MANAGER")
+                AppGlobals.doLog(message: "🚨 Haptic triggered: \(count) pulses (emergency)", step: "HAPTIC_MANAGER")
                 
-                // Lower intensity and softer sharpness for a "tap" feel
-                let intensity = CHHapticEventParameter(parameterID: .hapticIntensity, value: 0.6)
-                let sharpness = CHHapticEventParameter(parameterID: .hapticSharpness, value: 0.4)
-                
-                let event = CHHapticEvent(
-                    eventType: .hapticTransient,
-                    parameters: [intensity, sharpness],
-                    relativeTime: 0
-                )
-                events.append(event)
+            } catch {
+                AppGlobals.doLog(message: "Haptic play failed: \(error)", step: "HAPTIC_MANAGER")
             }
             
-            // Hand the track to the Taptic Engine
-            let pattern = try CHHapticPattern(events: events, parameters: [])
-            let player = try engine?.makePlayer(with: pattern)
-            try player?.start(atTime: CHHapticTimeImmediate)
+            let delay = count >= 3 ? 1.2 : 0.4
+            try? await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
+            isFiring = false
+        }
+    }
+    
+    // MARK: - Pattern Factory
+    private func createHapticPattern(for count: Int) throws -> CHHapticPattern {
+        var events: [CHHapticEvent] = []
+        
+        switch count {
+        case 3...Int.max:  // 🔥 MAX INTENSITY EMERGENCY (Amber Alert style)
+            AppGlobals.doLog(message: "🚨 MAX EMERGENCY HAPTIC PATTERN", step: "HAPTIC_MANAGER")
             
-        } catch {
-            AppGlobals.doLog(message: "Failed to play haptic pattern: \(error)", step: "HAPTIC_MANAGER")
+            let maxIntensity = CHHapticEventParameter(parameterID: .hapticIntensity, value: 1.0)
+            let maxSharpness = CHHapticEventParameter(parameterID: .hapticSharpness, value: 1.0)
+            
+            // Sharp, urgent triple hit
+            for i in 0..<3 {
+                let hit = CHHapticEvent(
+                    eventType: .hapticTransient,
+                    parameters: [maxIntensity, maxSharpness],
+                    relativeTime: Double(i) * 0.16
+                )
+                events.append(hit)
+            }
+            
+            // Long, powerful rumble at the end
+            let rumble = CHHapticEvent(
+                eventType: .hapticContinuous,
+                parameters: [
+                    CHHapticEventParameter(parameterID: .hapticIntensity, value: 0.95),
+                    CHHapticEventParameter(parameterID: .hapticSharpness, value: 0.6)
+                ],
+                relativeTime: 0.65,
+                duration: 1.1
+            )
+            events.append(rumble)
+            
+        case 2:
+            // Double sharp hit
+            let intensity = CHHapticEventParameter(parameterID: .hapticIntensity, value: 0.9)
+            let sharpness = CHHapticEventParameter(parameterID: .hapticSharpness, value: 0.8)
+            events.append(CHHapticEvent(eventType: .hapticTransient, parameters: [intensity, sharpness], relativeTime: 0))
+            events.append(CHHapticEvent(eventType: .hapticTransient, parameters: [intensity, sharpness], relativeTime: 0.25))
+            
+        default:
+            // Normal single tap
+            let intensity = CHHapticEventParameter(parameterID: .hapticIntensity, value: 0.7)
+            let sharpness = CHHapticEventParameter(parameterID: .hapticSharpness, value: 0.5)
+            events.append(CHHapticEvent(eventType: .hapticTransient, parameters: [intensity, sharpness], relativeTime: 0))
         }
         
-        // Cleanup memory and reset the firing gate
-        Task {
-            let delay = count >= 3 ? 450_000_000 : 200_000_000
-            try? await Task.sleep(nanoseconds: UInt64(delay))
-            
-            isFiring = false
-            sessionCooldowns = sessionCooldowns.filter { now.timeIntervalSince($0.value) < 60 }
-        }
+        return try CHHapticPattern(events: events, parameters: [])
     }
 }

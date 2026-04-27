@@ -27,18 +27,38 @@ struct MapView: View {
                 let center = location.coordinate
                 
                 // Tactical Horizons
-                MapCircle(center: center, radius: 304.8).foregroundStyle(.red.opacity(0.12)).stroke(.red.opacity(0.4), lineWidth: 1)
-                MapCircle(center: center, radius: 152.4).foregroundStyle(.yellow.opacity(0.10)).stroke(.yellow.opacity(0.5), lineWidth: 1.5)
-                MapCircle(center: center, radius: 9.144).foregroundStyle(.green.opacity(0.15)).stroke(.green.opacity(0.8), lineWidth: 2.5)
-                
-                // 1. Draw the "noisy" dots first at higher opacity (0.40) so the trail is visible
-                ForEach(events) { event in
-                    Annotation("", coordinate: getProjectedCoordinate(for: event, center: center)) {
-                        Circle()
-                            .fill(SoundProfile.classify(event.threatLabel).color.opacity(0.40))
-                            .frame(width: 6, height: 6)
-                    }
+                let hasEmergencyInside500ft = events.contains { event in
+                    event.isEmergency && (event.distance * 1000.0) <= 500.0
                 }
+                
+                // 1000ft red circle
+                MapCircle(center: center, radius: 304.8)
+                    .foregroundStyle(.red.opacity(0.06))
+                    .stroke(.red.opacity(0.4), lineWidth: 1)
+                
+                // Base 500ft yellow circle (always visible)
+                MapCircle(center: center, radius: 152.4)
+                    .foregroundStyle(.yellow.opacity(0.08))
+                    .stroke(.yellow, lineWidth: 1.5)
+                
+                // Traveling red ring (expands from center → rim → back)
+                if hasEmergencyInside500ft {
+                    let t = Date().timeIntervalSince1970 * 1.4
+                    let progress = (sin(t) + 1) / 2                    // 0 → 1 → 0
+                    
+                    let ringRadius = 15 + (progress * 137)             // starts small, expands to ~152m
+                    
+                    // Opacity: low near center, higher at edge, then reverses on the way back
+                    let ringOpacity = 0.02 + (progress * 0.12)
+                    
+                    MapCircle(center: center, radius: ringRadius)
+                        .foregroundStyle(.red.opacity(ringOpacity))
+                }
+                
+                // 30ft green circle
+                MapCircle(center: center, radius: 9.144)
+                    .foregroundStyle(.green.opacity(0.15))
+                    .stroke(.green.opacity(0.8), lineWidth: 2.5)
                 
                 // 2. Draw the "Smoothed Targets" LAST so they are always on top
                 ForEach(coordinator.mapManager.visibleTargets) { target in

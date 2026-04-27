@@ -56,12 +56,10 @@ final class ClassificationService {
             self.isPipelineReady = true
             PerformanceLogger.shared.start(task: "ANE Pipeline")
             let msg = "🚀 ANE Pipeline Primed and Ready"
-            print(msg)
-            Task { PerformanceLogger.shared.logTelemetry(step: "AV_AUDIO", message: msg) }
+            AppGlobals.doLog(message: msg, step: "AV_AUDIO");
         } catch {
             let msg = "🚀 ANE Pipeline failed: " + error.localizedDescription
-            print(msg)
-            Task { PerformanceLogger.shared.logTelemetry(step: "AV_AUDIO", message: msg) }
+            AppGlobals.doLog(message: msg, step: "AV_AUDIO");
         }
     }
 }
@@ -77,7 +75,6 @@ class ClassificationResultsObserver: NSObject, SNResultsObserving {
     
     func request(_ request: SNRequest, didFailWithError error: Error) {
         let msg = "⚠️ ClassificationResultsObserver analysis failed: " + error.localizedDescription
-        print(msg)
-        Task { PerformanceLogger.shared.logTelemetry(step: "AV_CLASSIFICATION", message: msg) }
+        AppGlobals.doLog(message: msg, step: "AV_AUDIO");
     }
 }

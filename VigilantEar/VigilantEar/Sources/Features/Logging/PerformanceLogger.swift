@@ -74,13 +74,13 @@ public final class PerformanceLogger: @unchecked Sendable {
     }
     
     // MARK: - Remote Telemetry
-    
-    /// Beams a debug log to Firebase so you can read it after a field test
-    public func logTelemetry(step: String, message: String, isError: Bool = false) {
+    public func logTelemetry(step: String, message: String, logName: String, isError: Bool = false) {
         let icon = isError ? "❌" : "🐞"
         print("\(icon) [\(step)] \(message)")
         
-        guard AppGlobals.logToCloud else { return }
+        if (AppGlobals.exceptionsDataStoreName != logName) {
+            guard AppGlobals.logToCloud else { return }
+        }
         
         // 2. Beam to Firebase
         let logData: [String: Any] = [
@@ -93,9 +93,9 @@ public final class PerformanceLogger: @unchecked Sendable {
         
         Task.detached(priority: .background) {
             do {
-                try await self.db.collection(AppGlobals.logDataStoreName).addDocument(data: logData)
+                try await self.db.collection(logName).addDocument(data: logData)
             } catch {
-                print("⚠️ Telemetry failed to send: \(error.localizedDescription)")
+                print("⚠️ Telemetry failed to send to \(logName): \(error.localizedDescription)")
             }
         }
         

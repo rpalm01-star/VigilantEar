@@ -50,6 +50,11 @@ nonisolated struct AppGlobals {
         get { _logDataStoreName.withLock { $0 } }
     }
     
+    private static let _exceptionDataStoreName = Mutex<String>("exceptions")
+    public static var exceptionsDataStoreName: String {
+        get { _exceptionDataStoreName.withLock { $0 } }
+    }
+
     private static let _simFireLabel = Mutex<String>("simulated_fire_truck")
     public static var simulatedFireTruck: String {
         get { _simFireLabel.withLock { $0 } }
@@ -78,12 +83,14 @@ nonisolated struct AppGlobals {
     
     // MARK: - Global Logging (new)
     /// Fire-and-forget log that can be called from **any** context safely.
-    nonisolated static func doLog(message: String, step: String = "APP") {
+    nonisolated static func doLog(message: String, step: String = "APP", logName: String = AppGlobals.logDataStoreName, isError: Bool = false) {
         Task.detached(priority: .background) {
             print(message)
-            await PerformanceLogger.shared.logTelemetry(step: step, message: message)
+            await PerformanceLogger.shared.logTelemetry(step: step, message: message, logName: logName, isError: isError)
         }
     }
+
+    
     
     // MARK: - Location & Heading Power Tuning
     //
