@@ -88,6 +88,7 @@ struct ThreatSimulator {
                         sessionID: threatSessionID,
                         timestamp: Date(),
                         threatLabel: AppGlobals.simulatedFireTruck,
+                        realThreatLabel: AppGlobals.simulatedFireTruck,
                         confidence: simulatedConfidence,
                         bearing: relativeBearing,
                         distance: normalizedDistance,

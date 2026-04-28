@@ -21,7 +21,7 @@ final class ShazamResultsObserver: NSObject, @unchecked Sendable, SHSessionDeleg
               let title = mediaItem.title,
               let artist = mediaItem.artist else { return }
         
-        print("🎵 Shazam Match Found: \(title)")
+        AppGlobals.doLog(message: "🎵 Shazam Match Found: \(title)", step: "Shazam")
         
         Task {
             await pipeline?.registerSongMatch(title: title, artist: artist)
@@ -30,9 +30,7 @@ final class ShazamResultsObserver: NSObject, @unchecked Sendable, SHSessionDeleg
     
     nonisolated func session(_ session: SHSession, didNotFindMatchFor signature: SHSignature, error: Error?) {
         if let err = error {
-            print("🎵 Shazam Error: \(err.localizedDescription)")
-        } else {
-            print("🎵 Shazam: Listening... no match yet.")
+            AppGlobals.doLog(message: "🎵 Shazam Error: \(err.localizedDescription)", step: "Shazam")
         }
     }
 }

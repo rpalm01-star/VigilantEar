@@ -87,7 +87,7 @@ struct ContentView: View {
                             Circle()
                                 .fill(microphoneManager.isListening ? Color.green : Color.gray)
                                 .frame(width: 8, height: 8)
-                            Text(coordinator.activeEvents.last?.threatLabel.uppercased() ?? (microphoneManager.isListening ? "LISTENING..." : "OFFLINE"))
+                            Text(coordinator.activeEvents.last?.realThreatLabel.uppercased() ?? (microphoneManager.isListening ? "LISTENING..." : "OFFLINE"))
                                 .font(.caption2.monospaced())
                                 .foregroundStyle(.green)
                         }
@@ -111,10 +111,6 @@ struct ContentView: View {
                                coordinator.activeEvents.contains(where: { $0.threatLabel.lowercased() == "music" }) {
                                 
                                 HStack(alignment: .center, spacing: 8) {
-                                    Image(systemName: "waveform")
-                                        .font(.system(size: 14, weight: .bold))
-                                        .foregroundColor(.white)
-                                    
                                     Text(songTitle)
                                         .font(.system(size: 14, weight: .semibold, design: .monospaced))
                                         .foregroundColor(.white)
@@ -129,11 +125,11 @@ struct ContentView: View {
                                 ))
                             }
                         }
-                        .padding(.leading, 20)
+                        .padding(.leading, 10)
                         
                         Spacer()
                     }
-                    .padding(.bottom, 30)
+                    .padding(.bottom, 15)
                 }
                 .animation(.easeInOut, value: coordinator.activeSong)
                 

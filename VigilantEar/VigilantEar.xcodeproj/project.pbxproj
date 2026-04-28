@@ -22,6 +22,7 @@
 		3053DCBC2F83718A00241892 /* DependencyContainer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3053DC912F83718A00241892 /* DependencyContainer.swift */; };
 		3053DCBF2F83718A00241892 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 3053DCAC2F83718A00241892 /* Assets.xcassets */; };
 		30774C912F946CE5008C16E9 /* SystemMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30774C902F946CE5008C16E9 /* SystemMonitor.swift */; };
+		3079CD4F2FA0938B003D6094 /* NotificationManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3079CD4E2FA0938B003D6094 /* NotificationManager.swift */; };
 		308EF3E72F8755A300885DCB /* StartupVerificationViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 308EF3E62F8755A300885DCB /* StartupVerificationViewModel.swift */; };
 		308EF3E92F8755BC00885DCB /* StartupVerificationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 308EF3E82F8755BC00885DCB /* StartupVerificationView.swift */; };
 		30A2B5112F9EA32100BF2E15 /* ThreatHUD.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30A2B5102F9EA32100BF2E15 /* ThreatHUD.swift */; };
@@ -57,6 +58,7 @@
 		3053DCA92F83718A00241892 /* SoundEvent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SoundEvent.swift; sourceTree = "<group>"; };
 		3053DCAC2F83718A00241892 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		30774C902F946CE5008C16E9 /* SystemMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SystemMonitor.swift; sourceTree = "<group>"; };
+		3079CD4E2FA0938B003D6094 /* NotificationManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationManager.swift; sourceTree = "<group>"; };
 		308EF3E62F8755A300885DCB /* StartupVerificationViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StartupVerificationViewModel.swift; sourceTree = "<group>"; };
 		308EF3E82F8755BC00885DCB /* StartupVerificationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StartupVerificationView.swift; sourceTree = "<group>"; };
 		308EF3EB2F875A9400885DCB /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
@@ -134,6 +136,7 @@
 		3053DC922F83718A00241892 /* Core */ = {
 			isa = PBXGroup;
 			children = (
+				3079CD4E2FA0938B003D6094 /* NotificationManager.swift */,
 				304F42F52F95E816001C3B6B /* AppGlobals.swift */,
 				30774C902F946CE5008C16E9 /* SystemMonitor.swift */,
 				30A396472F90900700D441A0 /* CloudLogger.swift */,
@@ -329,6 +332,7 @@
 				3053DCB42F83718A00241892 /* FFTProcessor.swift in Sources */,
 				308EF3E72F8755A300885DCB /* StartupVerificationViewModel.swift in Sources */,
 				3053DCB62F83718A00241892 /* PermissionManager.swift in Sources */,
+				3079CD4F2FA0938B003D6094 /* NotificationManager.swift in Sources */,
 				3053DCB82F83718A00241892 /* AcousticCoordinator.swift in Sources */,
 				3053DCB92F83718A00241892 /* VigilantEarApp.swift in Sources */,
 				3053DCBA2F83718A00241892 /* MicrophoneManager.swift in Sources */,

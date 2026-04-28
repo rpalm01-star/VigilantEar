@@ -81,7 +81,7 @@ struct DebugHUD: View {
         }
         .padding(.horizontal, 8)
         .padding(.vertical, 5)
-        .frame(width: 95, alignment: .leading)
+        .frame(width: 110, alignment: .leading)
         .background(
             .ultraThinMaterial,
             in: RoundedRectangle(cornerRadius: 7)

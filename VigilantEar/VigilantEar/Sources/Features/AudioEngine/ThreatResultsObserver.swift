@@ -1,12 +1,10 @@
 import SoundAnalysis
 
-// 🛑 Make absolutely sure there is NO @MainActor above this line
 final class ThreatResultsObserver: NSObject, @unchecked Sendable, SNResultsObserving {
     
     private weak var pipeline: AcousticProcessingPipeline?
     private var debounceMap: [String: Date] = [:]
     
-    // ✅ THE FIX: Explicitly nonisolated so your Actor can call it instantly
     nonisolated init(pipeline: AcousticProcessingPipeline) {
         self.pipeline = pipeline
         super.init()
@@ -15,10 +13,11 @@ final class ThreatResultsObserver: NSObject, @unchecked Sendable, SNResultsObser
     nonisolated func request(_ request: SNRequest, didProduce result: SNResult) {
         guard let classificationResult = result as? SNClassificationResult else { return }
         
-        let validHits = classificationResult.classifications.filter { $0.confidence > 0.20 }
+        // 🚦 THE GATE: Use our global floor (0.20).
+        // We MUST let low-confidence stuff through so the pipeline can do "Ghost Tracking"!
+        let validHits = classificationResult.classifications.filter { $0.confidence > AppGlobals.ML.absoluteMinimumConfidence }
         if validHits.isEmpty { return }
         
-        // Bounce to the Main thread only for the actual processing
         Task { @MainActor in
             self.processClassifications(validHits)
         }
@@ -26,17 +25,19 @@ final class ThreatResultsObserver: NSObject, @unchecked Sendable, SNResultsObser
     
     @MainActor
     private func processClassifications(_ classifications: [SNClassification]) {
-        // === STEP 1: CANONICAL COLLAPSE ===
         var collapsedHits: [String: (profile: SoundProfile, confidence: Double)] = [:]
         
+        // 1. Collapse the shrapnel into canonical buckets
         for classification in classifications {
             let profile = SoundProfile.classify(classification.identifier)
+            
             if profile.category == .ignored { continue }
             
             let canonLabel = profile.canonicalLabel
             let conf = classification.confidence
             
             if let existing = collapsedHits[canonLabel] {
+                // Keep the highest confidence reading for this specific bucket
                 if conf > existing.confidence {
                     collapsedHits[canonLabel] = (profile, conf)
                 }
@@ -47,27 +48,30 @@ final class ThreatResultsObserver: NSObject, @unchecked Sendable, SNResultsObser
         
         let now = Date()
         
-        // === STEP 2: THRESHOLD & DEBOUNCE EVALUATION ===
+        // 2. Dispatch to the Pipeline
         for (canonLabel, data) in collapsedHits {
             let profile = data.profile
             let conf = data.confidence
             
-            if profile.isEmergency && conf < 0.50 { continue }
-            if profile.category == .animal && conf < 0.50 { continue }
-            
-            if canonLabel == "music" && conf > 0.65 {
+            // 🎵 Shazam Trigger (Using the new global threshold)
+            if profile.isMusic && conf >= AppGlobals.ML.shazamTriggerThreshold {
                 Task { await pipeline?.startShazamAccumulation() }
             }
             
             let timeSinceLast = now.timeIntervalSince(debounceMap[canonLabel] ?? .distantPast)
             
+            // 🛑 BASIC SPAM FILTER
+            // We just ensure we aren't flooding the pipeline faster than the profile's cooldown allows.
+            // The pipeline will handle the complex leadInTime and tailMemory math per-spatial-object!
             if timeSinceLast > profile.cooldown {
                 debounceMap[canonLabel] = now
-                
                 Task {
                     await pipeline?.confirmThreatAndTrack(label: canonLabel, confidence: conf)
                 }
             }
         }
+        
+        // Housekeeping: Clean up the map so it doesn't leak memory if sounds disappear forever
+        debounceMap = debounceMap.filter { now.timeIntervalSince($0.value) < 60.0 }
     }
 }

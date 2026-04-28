@@ -11,21 +11,33 @@ struct SoundEvent: Identifiable {
     
     var timestamp: Date
     var threatLabel: String
+    var realThreatLabel: String
     var hitCount: Int = 1
     
     // ML Certainty (0.0 to 1.0)
     public let confidence: Double
     
+    // 🧠 Centralized profile lookup to keep the properties clean
+    private var profile: SoundProfile {
+        return SoundProfile.classify(threatLabel)
+    }
+    
     public var isEmergency: Bool {
-        return SoundProfile.classify(threatLabel).isEmergency
+        return profile.isEmergency
     }
     
     public var isVehicle: Bool {
-        return SoundProfile.classify(threatLabel).isVehicle
+        return profile.isVehicle
     }
     
+    // 🌫️ Fog of War gate for the UI
+    public var isRevealed: Bool {
+        return confidence >= profile.revealThreshold
+    }
+    
+    // 🎨 Pulls directly from our meticulously color-coded registry!
     public var dotColor: Color {
-        if (SoundProfile.classify(threatLabel).isEmergency) {return Color.red} else {return Color.cyan}
+        return profile.color
     }
     
     /// Tells the UI whether the inner circle should react (flash, pulse, change color, etc.)
@@ -49,6 +61,7 @@ struct SoundEvent: Identifiable {
         sessionID: UUID = UUID(),
         timestamp: Date = .now,
         threatLabel: String,
+        realThreatLabel: String,
         confidence: Double = 1.0,
         bearing: Double,
         distance: Double,
@@ -63,6 +76,7 @@ struct SoundEvent: Identifiable {
         self.sessionID = sessionID
         self.timestamp = timestamp
         self.threatLabel = threatLabel
+        self.realThreatLabel = realThreatLabel
         self.confidence = confidence
         self.bearing = bearing
         self.distance = distance
@@ -80,9 +94,9 @@ extension SoundEvent {
     
     var age: TimeInterval { Date().timeIntervalSince(timestamp) }
     
-    // Dynamic Lifespan based on ML certainty
+    // ⏳ Ties the visual fade directly to the physics engine's memory!
     var dynamicLifespan: TimeInterval {
-        return max(0.1, 6.0 * confidence)
+        return SoundProfile.classify(threatLabel).tailMemory
     }
     
     var opacity: Double {
@@ -98,5 +112,4 @@ extension SoundEvent {
         guard let lat = latitude, let lon = longitude else { return nil }
         return CLLocationCoordinate2D(latitude: lat, longitude: lon)
     }
-    
 }

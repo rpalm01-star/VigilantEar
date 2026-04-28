@@ -19,13 +19,13 @@ struct VerificationTask: Identifiable {
 }
 
 enum VerificationType: String {
-    // UPDATED: Changed from Spatial Audio to Stereo Array
     case stereoAudio = "Stereo Microphone Array"
     case audioRouting = "Audio Routing (Built-in Mic)"
     case orientation = "Landscape Orientation"
     case locationAccess = "GPS Tactical Mapping"
     case neuralEngine = "Neural Engine (CoreML)"
     case storage = "Storage Access"
+    case notifications = "Emergency Push Alerts" // 🚨 NEW: Verify our lock-screen bypass!
 }
 
 @Observable
@@ -45,13 +45,13 @@ final class StartupVerificationViewModel {
     
     private func resetSteps() {
         steps = [
-            // UPDATED
             VerificationTask(type: .stereoAudio),
             VerificationTask(type: .audioRouting),
             VerificationTask(type: .orientation),
             VerificationTask(type: .locationAccess),
             VerificationTask(type: .neuralEngine),
-            VerificationTask(type: .storage)
+            VerificationTask(type: .storage),
+            VerificationTask(type: .notifications) // 🚨 Added to UI checklist
         ]
         isFinished = false
     }
@@ -60,15 +60,15 @@ final class StartupVerificationViewModel {
         resetSteps()
         for i in steps.indices { steps[i].status = .running }
         
-        // UPDATED
         async let stereoResult = checkStereoAudio()
         async let routingResult = checkAudioRouting()
         let orientationResult = checkOrientation()
         async let locationResult = checkLocation()
         async let neuralResult = checkNeuralEngine()
         async let storageResult = checkStorage()
+        async let notificationResult = checkNotifications() // 🚨 Fire the new check
         
-        let results = await [stereoResult, routingResult, orientationResult, locationResult, neuralResult, storageResult]
+        let results = await [stereoResult, routingResult, orientationResult, locationResult, neuralResult, storageResult, notificationResult]
         
         for (index, result) in results.enumerated() {
             steps[index].status = result.status
@@ -98,9 +98,7 @@ final class StartupVerificationViewModel {
         }
     }
     
-    // MARK: - UPDATED: Stereo Acoustic Checks
-    
-    // MARK: - UPDATED: Stereo Acoustic Checks
+    // MARK: - Stereo Acoustic Checks
     
     private func checkStereoAudio() async -> (status: VerificationStatus, reason: String?) {
         let permission = AVAudioApplication.shared.recordPermission
@@ -114,9 +112,11 @@ final class StartupVerificationViewModel {
         let audioSession = AVAudioSession.sharedInstance()
         
         do {
-            // THE FIX: We must use .videoRecording mode to unlock the Stereo polar patterns!
-            // .measurement mode disables the extra mics and forces Mono.
             try audioSession.setCategory(.playAndRecord, mode: .videoRecording, options: [.defaultToSpeaker, .mixWithOthers])
+            
+            // 🚨 THE HAPTICS FIX: Ensure diagnostic tests don't kill the Taptic Engine!
+            try audioSession.setAllowHapticsAndSystemSoundsDuringRecording(true)
+            
             try audioSession.setActive(true)
         } catch {
             return (.failed, "Audio Session locked")
@@ -126,7 +126,6 @@ final class StartupVerificationViewModel {
             return (.failed, "No built-in mic detected")
         }
         
-        // Now that the session is in Video mode, the hardware will reveal its Stereo capabilities
         let hasStereo = builtInMic.dataSources?.contains { source in
             source.supportedPolarPatterns?.contains(.stereo) == true
         } ?? false
@@ -141,7 +140,9 @@ final class StartupVerificationViewModel {
     private func checkAudioRouting() async -> (status: VerificationStatus, reason: String?) {
         let audioSession = AVAudioSession.sharedInstance()
         do {
-            try audioSession.setCategory(.record, mode: .measurement, options: [])
+            // 🚨 THE HAPTICS FIX: Updated to match main app session to prevent lockouts
+            try audioSession.setCategory(.record, mode: .measurement, options: [.allowBluetoothHFP, .mixWithOthers])
+            try audioSession.setAllowHapticsAndSystemSoundsDuringRecording(true)
             try audioSession.setActive(true)
             
             let currentRoute = audioSession.currentRoute
@@ -184,6 +185,29 @@ final class StartupVerificationViewModel {
             }
         } catch {
             return (.failed, "Storage test failed")
+        }
+    }
+    
+    // MARK: - NEW: Notification Gate
+    private func checkNotifications() async -> (status: VerificationStatus, reason: String?) {
+        let center = UNUserNotificationCenter.current()
+        let settings = await center.notificationSettings()
+        
+        switch settings.authorizationStatus {
+        case .authorized, .provisional, .ephemeral:
+            return (.passed, nil)
+        case .denied:
+            return (.failed, "Push access denied in Settings")
+        case .notDetermined:
+            // Fallback: If it somehow hasn't been requested yet, request it right here to pass the diagnostic
+            do {
+                let granted = try await center.requestAuthorization(options: [.alert, .badge, .sound])
+                return granted ? (.passed, nil) : (.failed, "Permission required for alerts")
+            } catch {
+                return (.failed, "Notification test failed")
+            }
+        @unknown default:
+            return (.failed, "Unknown status")
         }
     }
 }

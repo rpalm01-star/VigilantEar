@@ -60,6 +60,11 @@ nonisolated struct AppGlobals {
         get { _simFireLabel.withLock { $0 } }
     }
     
+    private static let _waveform = Mutex<String>("waveform")
+    public static var waveform: String {
+        get { _waveform.withLock { $0 } }
+    }
+    
     private static let _logToCloud = Mutex<Bool>(false)
     public static var logToCloud: Bool {
         get { _logToCloud.withLock { $0 } }
@@ -89,8 +94,6 @@ nonisolated struct AppGlobals {
             await PerformanceLogger.shared.logTelemetry(step: step, message: message, logName: logName, isError: isError)
         }
     }
-
-    
     
     // MARK: - Location & Heading Power Tuning
     //
@@ -102,13 +105,13 @@ nonisolated struct AppGlobals {
     //   - Lower value (0.3–0.5) = more responsive map dot, but higher battery drain
     //   - Higher value (1.0–2.0) = smoother battery, but the blue dot on the map updates less often
     //   Recommended range: 0.6 – 1.2 seconds
-    static let locationUpdateThrottle: TimeInterval = 0.5
+    static let locationUpdateThrottle: TimeInterval = 0.3
     
     // locationDistanceFilter: iOS will only deliver a new location update after you've moved this many meters.
     //   - Lower value (3–5) = more frequent updates, feels more "live"
     //   - Higher value (10–15) = fewer updates, saves significant power
     //   Recommended range: 5 – 12 meters
-    static let locationDistanceFilter: Double = 8.0
+    static let locationDistanceFilter: Double = 15.0
     
     // === HEADING (COMPASS) ===
     // headingUpdateThrottle: How often (in seconds) we allow a new heading value to be sent to the pipeline.
@@ -116,27 +119,24 @@ nonisolated struct AppGlobals {
     //   - Lower value (0.1–0.15) = buttery smooth turning, slightly higher power
     //   - Higher value (0.25–0.4) = noticeable lag when rotating, better battery
     //   Recommended range: 0.12 – 0.25 seconds (0.18 feels great for most people)
-    static let headingUpdateThrottle: TimeInterval = 0.20
+    static let headingUpdateThrottle: TimeInterval = 0.18
     
     // headingFilterDegrees: iOS will only deliver a new heading update when the device has rotated at least this many degrees.
     //   - Lower value (1–2) = very sensitive, almost no filtering, can feel jittery
     //   - Higher value (5–8) = smoother but can feel "steppy" when turning slowly
     //   Recommended range: 2.5 – 4.5 degrees
-    static let headingFilterDegrees: Double = 3.5
+    static let headingFilterDegrees: Double = 2.5
     
-    // MARK: - Machine Learning Thresholds
+    // MARK: - Machine Learning Thresholds (mostly deprecated - now in SoundProfile)
     enum ML {
         /// Absolute floor for the observer to even bother looking at a result
-        static let absoluteMinimumConfidence: Double = 0.20
+        static let absoluteMinimumConfidence: Double = 0.35
         
         /// The confidence required to trigger a background Shazam match
-        static let shazamTriggerThreshold: Double = 0.65
+        static let shazamTriggerThreshold: Double = 0.60
         
         /// The pipeline floor for music to prevent it from dropping off during quiet parts
-        static let musicConfidenceFloor: Double = 0.50
-        
-        /// Confidence needed to treat a muffled emergency sound as a standard vehicle
-        static let emergencyDowngradeThreshold: Double = 0.70
+        static let musicConfidenceFloor: Double = 0.40
     }
     
     // MARK: - Acoustic Physics & Radar
@@ -148,22 +148,22 @@ nonisolated struct AppGlobals {
         static let minimumVehiclePeak: Float = 0.015
         
         /// How many degrees of bearing difference before we consider it a separate physical object
-        static let ambientBearingTolerance: Double = 45.0
-        static let vehicleBearingTolerance: Double = 10.0
+        static let ambientBearingTolerance: Double = 25.0
+        static let vehicleBearingTolerance: Double = 5.0
     }
     
     // MARK: - Timing & Debounce (Seconds)
     enum Timing {
         /// How long an old threat stays in the pipeline memory before being purged
-        static let threatMemoryLifespan: TimeInterval = 4.0
+        static let threatMemoryLifespan: TimeInterval = 5.0
         
         /// How long an event is allowed to live on the SwiftUI HUD
-        static let hudEventLifespan: TimeInterval = 10.0
+        static let hudEventLifespan: TimeInterval = 15.0
         
         /// The strict pipeline debounce to prevent sub-second FFT cloning
         static let pipelineDebounce: TimeInterval = 0.85
         
         /// How long to pause Shazam accumulation after a successful match
-        static let shazamCooldown: TimeInterval = 180.0
+        static let shazamCooldown: TimeInterval = 120.0
     }
 }

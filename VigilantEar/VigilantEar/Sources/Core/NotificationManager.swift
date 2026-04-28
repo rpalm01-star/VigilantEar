@@ -1,3 +1,11 @@
+//
+//  NotificationManager.swift
+//  VigilantEar
+//
+//  Created by Robert Palmer on 4/28/26.
+//
+
+
 import Foundation
 import UserNotifications
 
@@ -10,18 +18,6 @@ class NotificationManager {
     private let notificationCooldown: TimeInterval = 15.0 // Wait 15 seconds between push alerts
     
     private init() {}
-    
-    // Call this when the app launches or during onboarding
-    func requestPermission() {
-        let center = UNUserNotificationCenter.current()
-        center.requestAuthorization(options: [.alert, .badge, .sound]) { granted, error in
-            if let error = error {
-                AppGlobals.doLog(message: "Push Notification Error: \(error.localizedDescription)", step: "NOTIFICATIONS", isError: true)
-            } else {
-                AppGlobals.doLog(message: "Push Notifications Granted: \(granted)", step: "NOTIFICATIONS")
-            }
-        }
-    }
     
     // Call this from the pipeline when an emergency hits
     func sendEmergencyAlert(for label: String) {
