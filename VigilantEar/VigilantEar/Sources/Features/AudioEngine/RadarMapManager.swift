@@ -1,45 +1,47 @@
-//
-//  RadarMapManager.swift
-//  VigilantEar
-//
-//  Created by Robert Palmer on 4/23/26.
-//
-
 import Foundation
 import Observation
 
 @Observable
 class RadarMapManager {
     
-    // The internal dictionary keeping track of every active vehicle by its UUID
     private var activeTargets: [UUID: TrackedTarget] = [:]
+    var visibleTargets: [TrackedTarget] { Array(activeTargets.values) }
     
-    // The clean array exposed to your SwiftUI Map loop
-    var visibleTargets: [TrackedTarget] {
-        Array(activeTargets.values)
+    private var updateTask: Task<Void, Never>?
+    
+    init() {
+        startUpdateLoop()
+    }
+    
+    private func startUpdateLoop() {
+        updateTask = Task { [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .milliseconds(120))
+                await MainActor.run {
+                    self?.cleanupStaleTargets()
+                }
+            }
+        }
     }
     
     @MainActor
     func processNewEvent(_ event: SoundEvent) {
+        guard event.isRevealed else { return }
+        
         if let existingTarget = activeTargets[event.sessionID] {
             existingTarget.update(with: event)
         } else {
-            // Only spawn a visible target if the sound is persistent (e.g., more than just a transient click)
-            // For now, let's keep the spawn but increase the 'Stale' timer
             let newTarget = TrackedTarget(initialEvent: event)
             activeTargets[event.sessionID] = newTarget
         }
-        
-        cleanupStaleTargets()
     }
     
     private func cleanupStaleTargets() {
         let now = Date()
-        // INCREASE THIS: Wait 2.5 seconds before deleting an icon.
-        // This bridges the gaps in speech and music beats.
-        activeTargets = activeTargets.filter { _, target in
-            now.timeIntervalSince(target.lastUpdateTime) < 2.5
-        }
+        activeTargets = activeTargets.filter { now.timeIntervalSince($0.value.lastUpdateTime) < 6.0 }
     }
-
+    
+    deinit {
+        updateTask?.cancel()
+    }
 }

@@ -17,10 +17,7 @@ actor AcousticProcessingPipeline {
     
     private let fftProcessor: FFTProcessor
     
-    // --- THE INJECTED ROAD MANAGER ---
     private let roadManager: RoadManager
-    
-    // --- THE INJECTED SOUND EVENT MANAGER (for raw HUD labels) ---
     private let soundEventManager: SoundLabelEventManager
     
     private var isAnalyzerSetup = false
@@ -40,32 +37,25 @@ actor AcousticProcessingPipeline {
     
     private var activeThreats: [ActiveThreat] = []
     
-    private var dopplerFrequencyBuffer: [Double] = []
-    private let maxDopplerBufferSize = 40
-    private var dopplerBaselineCenter: Double?
-    
-    private var streamAnalyzer: SNAudioStreamAnalyzer?
-    private var resultsObserver: ThreatResultsObserver?
-    
-    private var shazamSession: SHSession?
-    private var shazamDelegate: ShazamResultsObserver?
-    private var signatureGenerator = SHSignatureGenerator()
-    private var accumulatedFrames: AVAudioFrameCount = 0
+    private var latestBuffer: AVAudioPCMBuffer?
     private var sampleRate: Double = 44100.0
+    private var lastKnownLocation: CLLocationCoordinate2D?
+    private var lastKnownHeading: Double = 0.0
+    private var currentSongLabel: String?
     
+    // Shazam / Music state
     private var isMusicCurrentlyPlaying = false
     private var lastMusicDetectedTime: Date = .distantPast
     private var lastShazamMatchTime: Date = .distantPast
     private var hasMatchedCurrentSong = false
-    private var currentSongLabel: String? = nil
     private var lastSongUpdate: Date = .distantPast
     private var isAccumulatingForShazam = false
-    
-    private var latestBuffer: AVAudioPCMBuffer?
-    private var latestTime: AVAudioTime?
-    
-    private var lastKnownLocation: CLLocationCoordinate2D? = nil
-    private var lastKnownHeading: Double = 0.0
+    private var accumulatedFrames: AVAudioFrameCount = 0
+    private var streamAnalyzer: SNAudioStreamAnalyzer?
+    private var resultsObserver: ThreatResultsObserver?
+    private var shazamSession: SHSession?
+    private var shazamDelegate: ShazamResultsObserver?
+    private var signatureGenerator = SHSignatureGenerator()
     
     init(roadManager: RoadManager, soundEventManager: SoundLabelEventManager) {
         let (stream, cont) = AsyncStream.makeStream(of: SoundEvent.self)
@@ -78,7 +68,7 @@ actor AcousticProcessingPipeline {
         
         self.fftProcessor = FFTProcessor(fftSize: Int(self.bufferSize))
         self.roadManager = roadManager
-        self.soundEventManager = soundEventManager   // ← NEW
+        self.soundEventManager = soundEventManager
     }
     
     public func updateLocation(_ coordinate: CLLocationCoordinate2D) {
@@ -89,8 +79,7 @@ actor AcousticProcessingPipeline {
         self.lastKnownHeading = heading
     }
     
-    // MARK: - Shazam (Clean Production Version)
-    
+    // MARK: - Shazam Helpers
     func startShazamAccumulation() {
         guard !isAccumulatingForShazam else { return }
         
@@ -108,7 +97,7 @@ actor AcousticProcessingPipeline {
     
     func processAudio(buffer: AVAudioPCMBuffer, time: AVAudioTime) async {
         self.latestBuffer = buffer
-        self.latestTime = time
+        self.sampleRate = buffer.format.sampleRate
         
         streamAnalyzer?.analyze(buffer, atAudioFramePosition: time.sampleTime)
         
@@ -138,11 +127,9 @@ actor AcousticProcessingPipeline {
         
         if accumulatedFrames >= AVAudioFrameCount(shazamFormat.sampleRate * 8) {
             let signature = signatureGenerator.signature()
-            
             if signature.duration > 3.0, let session = shazamSession {
                 session.match(signature)
             }
-            
             self.signatureGenerator = SHSignatureGenerator()
             self.accumulatedFrames = 0
         }
@@ -150,7 +137,6 @@ actor AcousticProcessingPipeline {
     
     func registerSongMatch(title: String, artist: String) async {
         let customLabel = "🎵 \(title) by \(artist)"
-        
         currentSongLabel = customLabel
         lastSongUpdate = Date()
         hasMatchedCurrentSong = true
@@ -169,15 +155,13 @@ actor AcousticProcessingPipeline {
     }
     
     func confirmThreatAndTrack(profile: SoundProfile, confidence: Double) async {
-                
         let now = Date()
-                
-        // Capture everything we need locally
+        
         let isVehicle = await profile.isVehicle
         let isMusic = await profile.isMusic
+        let isEmergency = await profile.isEmergency
         let categoryRawValue = profile.category.rawValue
         let shouldSnapToRoad = profile.shouldSnapToRoad
-        let hapticCount = profile.hapticCount
         let ceiling = profile.ceiling
         let maxRange = profile.maxRange
         let leadInTime = profile.leadInTime
@@ -186,10 +170,7 @@ actor AcousticProcessingPipeline {
         let effectiveLabel = profile.canonicalLabel
         let effectiveConfidence = confidence
         
-        // We still filter out categories explicitly marked as .ignored in AppGlobals
-        if AppGlobals.filteredCategories.contains(categoryRawValue) {
-            return
-        }
+        if AppGlobals.filteredCategories.contains(categoryRawValue) { return }
         
         guard let buffer = latestBuffer, let channelData = buffer.floatChannelData else { return }
         
@@ -270,15 +251,13 @@ actor AcousticProcessingPipeline {
             }
             
             let timeAlive = now.timeIntervalSince(threatFirstSeen)
-            
-            // 🚨 LOGIC CHANGE: We let GHOSTS through to the ticker, but don't draw them on map!
             let hasMetLeadIn = timeAlive >= leadInTime
             let currentLoc = self.lastKnownLocation
             let currentHead = self.lastKnownHeading
             let songToAttach = self.currentSongLabel
             let minConf = profile.minimumConfidence
             
-            Task.detached(priority: .userInitiated) { [weak self, threatSessionID, currentBearing, currentLoc, currentHead, effectiveLabel, effectiveConfidence, songToAttach, isVehicle, isMusic, shouldSnapToRoad, hapticCount, ceiling, maxRange, minConf, hasMetLeadIn] in
+            Task.detached(priority: .userInitiated) { [weak self, threatSessionID, currentBearing, currentLoc, currentHead, effectiveLabel, effectiveConfidence, songToAttach, isVehicle, isMusic, shouldSnapToRoad, ceiling, maxRange, minConf, hasMetLeadIn] in
                 guard let self = self else { return }
                 
                 let ambientFloor: Double = isVehicle ? 0.015 : 0.04
@@ -318,8 +297,6 @@ actor AcousticProcessingPipeline {
                 }
                 
                 let attachedSong = (isMusic) ? songToAttach : nil
-                
-                // ✅ REVEAL LOGIC: Map shows icon only if it passes LeadIn AND Confidence threshold
                 let isRevealed = hasMetLeadIn && (effectiveConfidence >= minConf)
                 
                 let newEvent = SoundEvent(
@@ -334,25 +311,17 @@ actor AcousticProcessingPipeline {
                     isApproaching: dopplerResult?.isApproaching ?? false,
                     latitude: targetLat,
                     longitude: targetLon,
-                    isRevealed: true,
+                    isRevealed: isRevealed,
                     songLabel: attachedSong,
                 )
                 
-                // Logging
-                let latStr = targetLat != nil ? String(format: "%.5f", targetLat!) : "N/A"
-                let lonStr = targetLon != nil ? String(format: "%.5f", targetLon!) : "N/A"
-                let confStr = String(format: "%.3f", effectiveConfidence)
-                let msg = "Tracked [\(effectiveLabel)] - Dist: \(Int(estimatedFeet))ft, Brg: \(Int(currentBearing))°, Lat: \(latStr), Lon: \(lonStr), Conf: \(confStr), Revealed: \(isRevealed)"
-                AppGlobals.doLog(message: msg, step: "2_TARGET_TRACKED")
+                if isVehicle {
+                    AppGlobals.doLog(message: "VEHICLE TRACKED [\(effectiveLabel)] Conf:\(String(format: "%.3f", effectiveConfidence)) Revealed:\(isRevealed) Dist:\(Int(estimatedFeet))ft", step: "VEHICLE_TRACK")
+                }
                 
                 await MainActor.run {
-                    if isRevealed {
-                        if hapticCount > 0 {
-                            HapticManager.shared.trigger(count: hapticCount, sessionID: threatSessionID)
-                        }
-                        if profile.isEmergency {
-                            NotificationManager.shared.sendEmergencyAlert(for: effectiveLabel)
-                        }
+                    if isRevealed && isEmergency {
+                        NotificationManager.shared.sendEmergencyAlert(for: effectiveLabel)
                     }
                 }
                 _ = self.continuation.yield(newEvent)
@@ -361,10 +330,7 @@ actor AcousticProcessingPipeline {
     }
     
     func setupAnalyzer(format: AVAudioFormat) throws {
-        guard !isAnalyzerSetup else {
-            AppGlobals.doLog(message: "Analyzer already setup. Ignoring redundant call.", step: "ACOUSTIC_PIPLINE_SETUP")
-            return
-        }
+        guard !isAnalyzerSetup else { return }
         isAnalyzerSetup = true
         
         self.sampleRate = format.sampleRate

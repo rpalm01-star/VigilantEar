@@ -13,16 +13,13 @@ class MicrophoneManager: NSObject, CLLocationManagerDelegate {
     var micWarning: String? = nil
     var latestDetection: String? = nil
     var currentLocation: CLLocation? = nil
-    var activeMicCount: Int = 0
+    var activeMicCount: Int = 0          // ← Now true hardware count (never drops in silence)
     
     public var isListening: Bool { isRunning }
     
     // MARK: - Private State
     private var tapInstalled = false
     private var isRunning = false
-    
-    private let activityThresholdDB: Float = -48.0
-    private var lastReportedCount: Int = 0
     
     private let locationManager = CLLocationManager()
     private let audioEngine = AVAudioEngine()
@@ -60,10 +57,9 @@ class MicrophoneManager: NSObject, CLLocationManagerDelegate {
         )
     }
     
-    // MARK: - Optimized Location + Heading (now using AppGlobals)
+    // MARK: - Optimized Location + Heading
     private func setupHeading() {
         locationManager.delegate = self
-        
         locationManager.desiredAccuracy = kCLLocationAccuracyNearestTenMeters
         locationManager.distanceFilter = AppGlobals.locationDistanceFilter
         locationManager.headingFilter = AppGlobals.headingFilterDegrees
@@ -78,15 +74,13 @@ class MicrophoneManager: NSObject, CLLocationManagerDelegate {
         locationManager.startUpdatingLocation()
     }
     
-    // MARK: - Location Delegate (uses AppGlobals throttle)
+    // MARK: - Location Delegate
     func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
         guard let location = locations.last else { return }
-        
         roadManager.processLocationUpdate(location)
         
         if Date().timeIntervalSince(lastLocationPush) >= AppGlobals.locationUpdateThrottle {
             lastLocationPush = Date()
-            
             Task {
                 await MainActor.run { self.currentLocation = location }
                 await acousticPipeline.updateLocation(location.coordinate)
@@ -94,13 +88,12 @@ class MicrophoneManager: NSObject, CLLocationManagerDelegate {
         }
     }
     
-    // MARK: - Heading Delegate (uses AppGlobals throttle)
+    // MARK: - Heading Delegate
     func locationManager(_ manager: CLLocationManager, didUpdateHeading newHeading: CLHeading) {
         let heading = newHeading.trueHeading > 0 ? newHeading.trueHeading : newHeading.magneticHeading
         
         if Date().timeIntervalSince(lastHeadingPush) >= AppGlobals.headingUpdateThrottle {
             lastHeadingPush = Date()
-            
             Task {
                 await MainActor.run { self.currentHeading = heading }
                 await acousticPipeline.updateHeading(heading)
@@ -108,7 +101,7 @@ class MicrophoneManager: NSObject, CLLocationManagerDelegate {
         }
     }
     
-    // MARK: - Audio Session (your cute logs preserved)
+    // MARK: - Audio Session
     func startCapturing() {
         guard !isRunning else { return }
         
@@ -170,14 +163,13 @@ class MicrophoneManager: NSObject, CLLocationManagerDelegate {
         
         let hardwareFormat = inputNode.inputFormat(forBus: 0)
         
+        // Set hardware mic count once (never drops in silence)
+        Task { @MainActor in
+            self.activeMicCount = Int(hardwareFormat.channelCount)
+        }
+        
         inputNode.installTap(onBus: 0, bufferSize: 4096, format: hardwareFormat) { [weak self] buffer, time in
             guard let self = self else { return }
-            
-            let currentCount = self.calculateActiveMicCount(from: buffer)
-            if currentCount != self.lastReportedCount {
-                self.lastReportedCount = currentCount
-                Task { @MainActor in self.activeMicCount = currentCount }
-            }
             
             Task {
                 await self.acousticPipeline.processAudio(buffer: buffer, time: time)
@@ -214,18 +206,6 @@ class MicrophoneManager: NSObject, CLLocationManagerDelegate {
             tapInstalled = false
         }
         isRunning = false
-    }
-    
-    private func calculateActiveMicCount(from buffer: AVAudioPCMBuffer) -> Int {
-        guard let channelData = buffer.floatChannelData?[0] else { return 0 }
-        let frameLength = Int(buffer.frameLength)
-        var activeSamples = 0
-        for i in 0..<frameLength {
-            if abs(channelData[i]) > 0.015 { activeSamples += 1 }
-        }
-        if activeSamples == 0 { return 0 }
-        if activeSamples < frameLength / 4 { return 1 }
-        return 2
     }
     
     @objc private func handleOrientationChange() {

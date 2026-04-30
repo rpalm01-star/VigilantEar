@@ -45,8 +45,8 @@ struct SoundProfile {
         // minConf: Dropped to 0.05 (Reveals the tail instantly)
         // tailMemory: Boosted to 8.0 seconds (Stretches the tail physically across the map)
         (["siren", "ambulance_siren", "police_siren", "fire_engine_siren", "civil_defense_siren", "emergency_vehicle", "simulated_fire_truck"], "light.beacon.max.fill", .red, 0.80, 900.0, .emergency, true, 4, 0.4, 0.25, 0.5, 2.75),        // 🚨 TRANSIENT EMERGENCY: Lead-In is 0.0, Tail is 4.0
-        (["fireworks", "gunshot_gunfire", "artillery_fire", "firecracker", "eruption", "boom"], "fireworks", .pink, 0.90, 1000.0, .emergency, false, 2, 0.8, 0.9, 0.0, 4.0),
-        (["smoke_detector", "alarm_clock", "door_bell", "reverse_beeps", "beep"], "exclamationmark.triangle.fill", .red, 0.80, 150.0, .emergency, false, 3, 0.4, 0.9, 1.0, 2.0),
+        (["fireworks", "gunshot_gunfire", "artillery_fire", "firecracker", "eruption", "boom"], "fireworks", .pink, 0.90, 1000.0, .ignored, false, 2, 0.8, 0.9, 0.0, 4.0),
+        (["smoke_detector", "alarm_clock", "door_bell"], "exclamationmark.triangle.fill", .red, 0.80, 150.0, .emergency, false, 3, 0.4, 0.9, 1.0, 2.0),
         (["person", "person_running", "person_walking"], "figure.walk.arrival", .red, 0.80, 150.0, .emergency, false, 2, 0.50, 0.60, 0.2, 2.0),
         // Stricter gate for environmental domestic sounds
         (["knock", "door_slam", "door", "doorbell", "door_sliding"], "door.left.hand.closed", .cyan, 0.5, 150.0, .emergency, true, 2, 0.50, 0.92, 0.4, 2.0),
@@ -84,7 +84,7 @@ struct SoundProfile {
         (["toilet_flush", "sink_filling_washing"], "toilet.fill", .white, 0.20, 20.0, .medium, false, 0, 2.0, 0.70, 1.0, 2.0),
         (["power_tool", "saw", "hammer", "drill", "hedge_trimmer", "chainsaw"], "hammer.fill", .orange, 0.60, 120.0, .ignored, false, 0, 1.2, 0.60, 0.5, 1.5),
         // 🚨 TRANSIENT EMERGENCY: Lead-In is 0.0, Tail is 3.0
-        (["glass_breaking"], "light.beacon.min.fill", .orange, 0.70, 100.0, .misc, false, 1, 1.4, 0.70, 0.0, 3.0),
+        (["glass_breaking"], "light.beacon.min.fill", .orange, 0.70, 100.0, .emergency, false, 1, 1.4, 0.70, 0.0, 3.0),
     ]
     
     private static let musicAndEntertainment: [(keywords: [String], icon: String, color: Color, ceiling: Double, maxRange: Double, category: ThreatCategory, snaps: Bool, haptics: Int, cooldown: Double, minConf: Double, leadIn: Double, tail: Double)] = [
@@ -100,7 +100,7 @@ struct SoundProfile {
         (["microwave_oven"], "oven", .orange, 0.60, 80.0, .ignored, false, 2, 1.2, 0.60, 0.5, 1.0),
         (["boiling"], "cup.and.saucer", .teal, 0.55, 60.0, .ignored, false, 2, 1.2, 0.60, 0.5, 1.0),
         (["chime", "wind_chime"], "wind", .cyan, 0.50, 150.0, .ignored, false, 1, 2.0, 0.60, 0.5, 2.0),
-        (["silence", "ringtone", "whale_vocalization", "horse_clip_clop", "singing_bowl", "person_shuffling", "wood_cracking", "chopping_wood"], "speaker.slash.fill", .gray, 0.0, 0.0, .ignored, false, 0, 1.5, 0.80, 1.0, 2.0),
+        (["silence", "ringtone", "whale_vocalization", "reverse_beeps", "beep", "horse_clip_clop", "singing_bowl", "person_shuffling", "wood_cracking", "chopping_wood"], "speaker.slash.fill", .gray, 0.0, 0.0, .ignored, false, 0, 1.5, 0.80, 1.0, 2.0),
     ]
     
     private static let rawRegistry: [(keywords: [String], icon: String, color: Color, ceiling: Double, maxRange: Double, category: ThreatCategory, snaps: Bool, haptics: Int, cooldown: Double, minConf: Double, leadIn: Double, tail: Double)] = {
