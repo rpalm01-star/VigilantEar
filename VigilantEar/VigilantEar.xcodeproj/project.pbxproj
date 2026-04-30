@@ -23,6 +23,9 @@
 		3053DCBF2F83718A00241892 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 3053DCAC2F83718A00241892 /* Assets.xcassets */; };
 		30774C912F946CE5008C16E9 /* SystemMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30774C902F946CE5008C16E9 /* SystemMonitor.swift */; };
 		3079CD4F2FA0938B003D6094 /* NotificationManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3079CD4E2FA0938B003D6094 /* NotificationManager.swift */; };
+		3079CD512FA1B3E8003D6094 /* MapTrackingViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3079CD502FA1B3E8003D6094 /* MapTrackingViewModel.swift */; };
+		3079CD532FA1BC1D003D6094 /* NeuralTickerHUD.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3079CD522FA1BC1D003D6094 /* NeuralTickerHUD.swift */; };
+		3079CD552FA1D103003D6094 /* SoundLabelEvent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3079CD542FA1D103003D6094 /* SoundLabelEvent.swift */; };
 		308EF3E72F8755A300885DCB /* StartupVerificationViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 308EF3E62F8755A300885DCB /* StartupVerificationViewModel.swift */; };
 		308EF3E92F8755BC00885DCB /* StartupVerificationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 308EF3E82F8755BC00885DCB /* StartupVerificationView.swift */; };
 		30A2B5112F9EA32100BF2E15 /* ThreatHUD.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30A2B5102F9EA32100BF2E15 /* ThreatHUD.swift */; };
@@ -59,6 +62,9 @@
 		3053DCAC2F83718A00241892 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		30774C902F946CE5008C16E9 /* SystemMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SystemMonitor.swift; sourceTree = "<group>"; };
 		3079CD4E2FA0938B003D6094 /* NotificationManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationManager.swift; sourceTree = "<group>"; };
+		3079CD502FA1B3E8003D6094 /* MapTrackingViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MapTrackingViewModel.swift; sourceTree = "<group>"; };
+		3079CD522FA1BC1D003D6094 /* NeuralTickerHUD.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NeuralTickerHUD.swift; sourceTree = "<group>"; };
+		3079CD542FA1D103003D6094 /* SoundLabelEvent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SoundLabelEvent.swift; sourceTree = "<group>"; };
 		308EF3E62F8755A300885DCB /* StartupVerificationViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StartupVerificationViewModel.swift; sourceTree = "<group>"; };
 		308EF3E82F8755BC00885DCB /* StartupVerificationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StartupVerificationView.swift; sourceTree = "<group>"; };
 		308EF3EB2F875A9400885DCB /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
@@ -178,6 +184,7 @@
 		3053DCA52F83718A00241892 /* UI */ = {
 			isa = PBXGroup;
 			children = (
+				3079CD522FA1BC1D003D6094 /* NeuralTickerHUD.swift */,
 				30A2B5122F9EB8AF00BF2E15 /* DebugHUD.swift */,
 				30A2B5102F9EA32100BF2E15 /* ThreatHUD.swift */,
 				3053A9F82F900010008C5419 /* MapView.swift */,
@@ -202,6 +209,8 @@
 		3053DCAA2F83718A00241892 /* Models */ = {
 			isa = PBXGroup;
 			children = (
+				3079CD542FA1D103003D6094 /* SoundLabelEvent.swift */,
+				3079CD502FA1B3E8003D6094 /* MapTrackingViewModel.swift */,
 				3053DCA92F83718A00241892 /* SoundEvent.swift */,
 				308EF3E62F8755A300885DCB /* StartupVerificationViewModel.swift */,
 			);
@@ -324,6 +333,7 @@
 				3053AA002F901777008C5419 /* SoundProfile.swift in Sources */,
 				304F42F62F95E816001C3B6B /* AppGlobals.swift in Sources */,
 				3053DCB12F83718A00241892 /* HardwareCalibration.swift in Sources */,
+				3079CD512FA1B3E8003D6094 /* MapTrackingViewModel.swift in Sources */,
 				30C55CC52F85FB1900D0B984 /* AcousticProcessingPipeline.swift in Sources */,
 				3053DCB22F83718A00241892 /* ClassificationService.swift in Sources */,
 				3053A9F92F900010008C5419 /* MapView.swift in Sources */,
@@ -336,9 +346,11 @@
 				3053DCB82F83718A00241892 /* AcousticCoordinator.swift in Sources */,
 				3053DCB92F83718A00241892 /* VigilantEarApp.swift in Sources */,
 				3053DCBA2F83718A00241892 /* MicrophoneManager.swift in Sources */,
+				3079CD552FA1D103003D6094 /* SoundLabelEvent.swift in Sources */,
 				3053DCBB2F83718A00241892 /* ContentView.swift in Sources */,
 				30D9FE1B2F9C234A006CCAAA /* ShazamResultsObserver.swift in Sources */,
 				30FEA0182F9DD7F100FFEE25 /* HapticManager.swift in Sources */,
+				3079CD532FA1BC1D003D6094 /* NeuralTickerHUD.swift in Sources */,
 				30CD987C2F8DEBA400AE7D0A /* RollingNoiseFloor.swift in Sources */,
 				30FEA0162F9D3FC500FFEE25 /* RoadManager.swift in Sources */,
 				3053DCBC2F83718A00241892 /* DependencyContainer.swift in Sources */,

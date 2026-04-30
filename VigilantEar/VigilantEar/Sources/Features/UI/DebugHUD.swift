@@ -101,21 +101,3 @@ struct DebugHUD: View {
         }
     }
 }
-
-#Preview {
-    let mockRoadManager = RoadManager()
-    let mockManager = MicrophoneManager(
-        acousticCoordinator: AcousticCoordinator(),
-        classificationService: ClassificationService(),
-        roadManager: mockRoadManager,
-        acousticPipeline: AcousticProcessingPipeline(roadManager: mockRoadManager)
-    )
-        
-    DebugHUD(
-        manager: mockManager,
-        roadManager: mockRoadManager
-    )
-    .padding()
-    .background(Color.black.opacity(0.8))
-}
-

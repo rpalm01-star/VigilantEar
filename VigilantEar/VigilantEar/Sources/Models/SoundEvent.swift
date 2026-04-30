@@ -11,11 +11,13 @@ struct SoundEvent: Identifiable {
     
     var timestamp: Date
     var threatLabel: String
-    var realThreatLabel: String
     var hitCount: Int = 1
     
     // ML Certainty (0.0 to 1.0)
     public let confidence: Double
+    
+    // 🛡️ THE REVEAL GATE: Now a stored property so the pipeline can force it to true/false
+    public let isRevealed: Bool
     
     // 🧠 Centralized profile lookup to keep the properties clean
     private var profile: SoundProfile {
@@ -30,18 +32,12 @@ struct SoundEvent: Identifiable {
         return profile.isVehicle
     }
     
-    // 🌫️ Fog of War gate for the UI
-    public var isRevealed: Bool {
-        return confidence >= profile.revealThreshold
-    }
-    
     // 🎨 Pulls directly from our meticulously color-coded registry!
     public var dotColor: Color {
         return profile.color
     }
     
     /// Tells the UI whether the inner circle should react (flash, pulse, change color, etc.)
-    /// Currently used for all emergency events (fire trucks, sirens, etc.)
     public var shouldInnerCircleReact: Bool {
         return isEmergency
     }
@@ -61,7 +57,6 @@ struct SoundEvent: Identifiable {
         sessionID: UUID = UUID(),
         timestamp: Date = .now,
         threatLabel: String,
-        realThreatLabel: String,
         confidence: Double = 1.0,
         bearing: Double,
         distance: Double,
@@ -70,13 +65,13 @@ struct SoundEvent: Identifiable {
         isApproaching: Bool = false,
         latitude: Double? = nil,
         longitude: Double? = nil,
+        isRevealed: Bool,
         songLabel: String? = nil
     ) {
         self.id = id
         self.sessionID = sessionID
         self.timestamp = timestamp
         self.threatLabel = threatLabel
-        self.realThreatLabel = realThreatLabel
         self.confidence = confidence
         self.bearing = bearing
         self.distance = distance
@@ -85,6 +80,7 @@ struct SoundEvent: Identifiable {
         self.isApproaching = isApproaching
         self.latitude = latitude
         self.longitude = longitude
+        self.isRevealed = isRevealed
         self.songLabel = songLabel
     }
 }

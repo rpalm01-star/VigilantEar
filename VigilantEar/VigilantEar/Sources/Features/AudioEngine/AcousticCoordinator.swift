@@ -16,15 +16,21 @@ class AcousticCoordinator {
     
     /// The most recent verified threat
     var latestEvent: SoundEvent?
+    
     /// Current listening status
     var isTracking: Bool = false
+    
     // Is the cleanup running?
     var isCleaning: Bool = false
+    
     // THE FIX: Add this to hold the simulation path
     var simulatedRoute: MKRoute? = nil
+    
     // Task to manage the async stream lifecycle
     private var streamTask: Task<Void, Never>?
+    
     private var cleanupTimer: Timer?
+    
     // The new variable your SwiftUI views will read from
     var activeSong: String? = nil
     
@@ -62,11 +68,7 @@ class AcousticCoordinator {
     
     @MainActor
     func addEvent(_ event: SoundEvent) {
-        // Because every 'bell' ring creates a NEW SoundEvent() instance
-        // with a NEW UUID, they will overlap and pulse correctly.
         activeEvents.append(event)
-        
-        // Pass manual simulation events to the Map Manager too!
         mapManager.processNewEvent(event)
     }
     
@@ -74,11 +76,8 @@ class AcousticCoordinator {
         isTracking = true
         streamTask = Task {
             for await event in pipeline.eventStream {
-                // 1. Feed the raw event to the array (for the HUD)
                 activeEvents.append(event)
                 self.latestEvent = event
-                
-                // 2. Feed the raw event to the Map Manager (for smoothed map tracking!)
                 self.mapManager.processNewEvent(event)
             }
         }
@@ -100,8 +99,7 @@ class AcousticCoordinator {
         streamTask = nil
         isTracking = false
         activeEvents.removeAll()
-        
-        // Reset the Map Manager when we stop tracking
         mapManager = RadarMapManager()
     }
+    
 }

@@ -104,7 +104,6 @@ actor CloudLogger {
         var eventData: [String: Any] = [
             "sessionID": event.sessionID.uuidString,
             "threatLabel": event.threatLabel,
-            "realThreatLabel": event.realThreatLabel,
             "bearing": event.bearing,
             "distance": event.distance,
             "energy": event.energy,

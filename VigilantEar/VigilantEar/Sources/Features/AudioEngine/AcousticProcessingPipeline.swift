@@ -20,6 +20,9 @@ actor AcousticProcessingPipeline {
     // --- THE INJECTED ROAD MANAGER ---
     private let roadManager: RoadManager
     
+    // --- THE INJECTED SOUND EVENT MANAGER (for raw HUD labels) ---
+    private let soundEventManager: SoundLabelEventManager
+    
     private var isAnalyzerSetup = false
     
     struct ActiveThreat {
@@ -30,7 +33,7 @@ actor AcousticProcessingPipeline {
         var firstSeen: Date
         var lastSeen: Date
         var category: String
-        var label: String       // 🏷️ NEW: Anchor the object to its name!
+        var label: String
         var hitCount: Int
         var tailMemory: Double
     }
@@ -64,7 +67,7 @@ actor AcousticProcessingPipeline {
     private var lastKnownLocation: CLLocationCoordinate2D? = nil
     private var lastKnownHeading: Double = 0.0
     
-    init(roadManager: RoadManager) {
+    init(roadManager: RoadManager, soundEventManager: SoundLabelEventManager) {
         let (stream, cont) = AsyncStream.makeStream(of: SoundEvent.self)
         self.eventStream = stream
         self.continuation = cont
@@ -75,6 +78,7 @@ actor AcousticProcessingPipeline {
         
         self.fftProcessor = FFTProcessor(fftSize: Int(self.bufferSize))
         self.roadManager = roadManager
+        self.soundEventManager = soundEventManager   // ← NEW
     }
     
     public func updateLocation(_ coordinate: CLLocationCoordinate2D) {
@@ -156,11 +160,18 @@ actor AcousticProcessingPipeline {
         _ = songContinuation.yield(customLabel)
     }
     
-    func confirmThreatAndTrack(label: String, confidence: Double) async {
+    nonisolated func sendRawLabelToHUD(_ rawLabel: String, confidence: Double) {
+        if (confidence > AppGlobals.ML.absoluteMinimumConfidence) {
+            Task.detached { [weak self] in
+                self?.soundEventManager.addOrUpdateDetached(rawLabel)
+            }
+        }
+    }
+    
+    func confirmThreatAndTrack(profile: SoundProfile, confidence: Double) async {
+                
         let now = Date()
-        
-        let profile = await MainActor.run { SoundProfile.classify(label) }
-        
+                
         // Capture everything we need locally
         let isVehicle = await profile.isVehicle
         let isMusic = await profile.isMusic
@@ -169,22 +180,19 @@ actor AcousticProcessingPipeline {
         let hapticCount = profile.hapticCount
         let ceiling = profile.ceiling
         let maxRange = profile.maxRange
-        let leadInTime = profile.leadInTime   // ⏳ Capture Physics
-        let tailMemory = profile.tailMemory   // 👻 Capture Physics
-        
+        let leadInTime = profile.leadInTime
+        let tailMemory = profile.tailMemory
         let minimumPeak: Float = isVehicle ? AppGlobals.Physics.minimumVehiclePeak : AppGlobals.Physics.minimumAmbientPeak
-        
-        // Let everything through here! The UI handles the reveal mask, we just need it to exist
-        // guard confidence >= profile.minimumConfidence else { return } // <-- REMOVED (Handled by UI / Observer)
-        
         let effectiveLabel = profile.canonicalLabel
         let effectiveConfidence = confidence
         
+        // We still filter out categories explicitly marked as .ignored in AppGlobals
         if AppGlobals.filteredCategories.contains(categoryRawValue) {
             return
         }
         
         guard let buffer = latestBuffer, let channelData = buffer.floatChannelData else { return }
+        
         let safeCount = min(Int(buffer.frameLength), 4096)
         let peak = Array(UnsafeBufferPointer(start: channelData[0], count: safeCount)).map(abs).max() ?? 0.0
         
@@ -213,8 +221,6 @@ actor AcousticProcessingPipeline {
             currentBearing = 0.0
         }
         
-        // 🛡️ DYNAMIC TAIL PROTECTION
-        // Ensure the pipeline memory is mathematically guaranteed to be longer than the Observer's cooldown!
         let safeTailMemory = max(tailMemory, profile.cooldown + 1.0)
         activeThreats.removeAll { now.timeIntervalSince($0.lastSeen) > safeTailMemory }
         
@@ -222,9 +228,6 @@ actor AcousticProcessingPipeline {
             let currentFreq = target.frequency
             var matchIndex: Int? = nil
             
-            // 🏷️ FIX 1: MATCH BY LABEL
-            // This stops echoes from spawning dozens of ghost dots.
-            // If we hear the same label, we assume it's the same object and just update its position.
             for (index, threat) in activeThreats.enumerated() {
                 if threat.label == effectiveLabel {
                     matchIndex = index
@@ -238,14 +241,10 @@ actor AcousticProcessingPipeline {
             
             if let index = matchIndex {
                 activeThreats[index].lastFrequency = currentFreq
-                
-                // Smooth the bearing so the dot doesn't violently teleport around the map on echoes
                 let oldBearing = activeThreats[index].lastBearing
                 activeThreats[index].lastBearing = (oldBearing * 0.7) + (currentBearing * 0.3)
-                
                 activeThreats[index].lastSeen = now
                 activeThreats[index].hitCount += 1
-                
                 dopplerResult = (isVehicle || isMusic) ? nil : activeThreats[index].dopplerTracker.update(with: currentFreq, confidence: target.confidence)
                 threatSessionID = activeThreats[index].sessionID
                 threatFirstSeen = activeThreats[index].firstSeen
@@ -262,7 +261,7 @@ actor AcousticProcessingPipeline {
                     firstSeen: now,
                     lastSeen: now,
                     category: categoryRawValue,
-                    label: effectiveLabel, // 🏷️ Save the label anchor
+                    label: effectiveLabel,
                     hitCount: 1,
                     tailMemory: safeTailMemory
                 ))
@@ -270,30 +269,23 @@ actor AcousticProcessingPipeline {
                 threatFirstSeen = now
             }
             
-            // ==========================================
-            // 🚨 GHOST TRACKING GATE (LEAD-IN TIME)
-            // ==========================================
             let timeAlive = now.timeIntervalSince(threatFirstSeen)
-            if timeAlive < leadInTime {
-                AppGlobals.doLog(message: "👻 GHOST TRACKING: [\(effectiveLabel)] is building history. (Alive: \(String(format: "%.2f", timeAlive))s / Need: \(leadInTime)s)", step: "GHOST_TRACKING")
-                continue
-            }
             
+            // 🚨 LOGIC CHANGE: We let GHOSTS through to the ticker, but don't draw them on map!
+            let hasMetLeadIn = timeAlive >= leadInTime
             let currentLoc = self.lastKnownLocation
             let currentHead = self.lastKnownHeading
             let songToAttach = self.currentSongLabel
-            let minConf = profile.minimumConfidence // Capture for the Haptic gate
+            let minConf = profile.minimumConfidence
             
-            Task.detached(priority: .userInitiated) { [weak self, threatSessionID, currentBearing, currentLoc, currentHead, effectiveLabel, effectiveConfidence, songToAttach, isVehicle, isMusic, shouldSnapToRoad, hapticCount, ceiling, maxRange, minConf] in
+            Task.detached(priority: .userInitiated) { [weak self, threatSessionID, currentBearing, currentLoc, currentHead, effectiveLabel, effectiveConfidence, songToAttach, isVehicle, isMusic, shouldSnapToRoad, hapticCount, ceiling, maxRange, minConf, hasMetLeadIn] in
                 guard let self = self else { return }
                 
                 let ambientFloor: Double = isVehicle ? 0.015 : 0.04
                 let safePeak = min(max(Double(peak), ambientFloor), ceiling)
                 let linearRatio = (ceiling - safePeak) / (ceiling - ambientFloor)
-                
                 let adjustedMaxRange = isVehicle ? 600.0 : maxRange
                 let curvePower = isVehicle ? 2.0 : 2.5
-                
                 let estimatedFeet = max(10.0, pow(linearRatio, curvePower) * adjustedMaxRange)
                 let normalizedUI_Distance = estimatedFeet / 1000.0
                 
@@ -301,7 +293,6 @@ actor AcousticProcessingPipeline {
                 var targetLon: Double? = nil
                 
                 if let origin = currentLoc {
-                    // ... (Your exact same GPS Math remains unchanged here) ...
                     let earthRadius = 6378137.0
                     let distanceMeters = estimatedFeet * 0.3048
                     let angularDist = distanceMeters / earthRadius
@@ -328,11 +319,13 @@ actor AcousticProcessingPipeline {
                 
                 let attachedSong = (isMusic) ? songToAttach : nil
                 
+                // ✅ REVEAL LOGIC: Map shows icon only if it passes LeadIn AND Confidence threshold
+                let isRevealed = hasMetLeadIn && (effectiveConfidence >= minConf)
+                
                 let newEvent = SoundEvent(
                     sessionID: threatSessionID,
                     timestamp: Date(),
                     threatLabel: effectiveLabel,
-                    realThreatLabel: label,
                     confidence: effectiveConfidence,
                     bearing: currentBearing,
                     distance: normalizedUI_Distance,
@@ -341,28 +334,22 @@ actor AcousticProcessingPipeline {
                     isApproaching: dopplerResult?.isApproaching ?? false,
                     latitude: targetLat,
                     longitude: targetLon,
-                    songLabel: attachedSong
+                    isRevealed: true,
+                    songLabel: attachedSong,
                 )
                 
+                // Logging
                 let latStr = targetLat != nil ? String(format: "%.5f", targetLat!) : "N/A"
                 let lonStr = targetLon != nil ? String(format: "%.5f", targetLon!) : "N/A"
                 let confStr = String(format: "%.3f", effectiveConfidence)
-                
-                // ✅ FIX 2: Check if the UI is actually going to reveal this sound
-                let isRevealed = effectiveConfidence >= minConf
-                
-                let msg = "Tracked [\(effectiveLabel)] - Dist: \(Int(estimatedFeet))ft, Brg: \(Int(currentBearing))°, LAT: \(latStr), LON: \(lonStr), Conf: \(confStr), Revealed: \(isRevealed)"
+                let msg = "Tracked [\(effectiveLabel)] - Dist: \(Int(estimatedFeet))ft, Brg: \(Int(currentBearing))°, Lat: \(latStr), Lon: \(lonStr), Conf: \(confStr), Revealed: \(isRevealed)"
                 AppGlobals.doLog(message: msg, step: "2_TARGET_TRACKED")
                 
                 await MainActor.run {
                     if isRevealed {
-                        // 1. Fire the physical vibration
                         if hapticCount > 0 {
                             HapticManager.shared.trigger(count: hapticCount, sessionID: threatSessionID)
                         }
-                        
-                        // 2. 🚨 INJECT NOTIFICATIONS HERE 🚨
-                        // If it's a critical emergency, punch a Time Sensitive alert to the lock screen
                         if profile.isEmergency {
                             NotificationManager.shared.sendEmergencyAlert(for: effectiveLabel)
                         }

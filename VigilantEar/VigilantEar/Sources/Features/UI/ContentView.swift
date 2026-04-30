@@ -3,8 +3,6 @@ import SwiftUI
 struct ContentView: View {
     @Environment(MicrophoneManager.self) private var microphoneManager
     @Environment(AcousticCoordinator.self) private var coordinator
-
-    let title = "VIGILANT EAR"
     
     var body: some View {
         GeometryReader { geo in
@@ -24,20 +22,20 @@ struct ContentView: View {
                         // TOP LEFT: Title & Compact Controls
                         VStack(alignment: .leading, spacing: 12) {
                             
-                            Text(title)
+                            Text(AppGlobals.appplicationTitle)
                                 .font(.system(.headline, design: .monospaced))
                                 .tracking(3)
                                 .foregroundStyle(.black)
                                 .background {
                                     // Soft mint background glow (behind everything)
-                                    Text(title)
+                                    Text(AppGlobals.appplicationTitle)
                                         .font(.system(.headline, design: .monospaced))
                                         .tracking(3)
                                         .foregroundStyle(AppGlobals.darkGray.opacity(0.9))
                                         .blur(radius: 10)
                                 }
                                 .overlay {
-                                    Text(title)
+                                    Text(AppGlobals.appplicationTitle)
                                         .font(.system(.headline, design: .monospaced))
                                         .tracking(3)
                                         .foregroundStyle(.green)
@@ -87,7 +85,7 @@ struct ContentView: View {
                             Circle()
                                 .fill(microphoneManager.isListening ? Color.green : Color.gray)
                                 .frame(width: 8, height: 8)
-                            Text(coordinator.activeEvents.last?.realThreatLabel.uppercased() ?? (microphoneManager.isListening ? "LISTENING..." : "OFFLINE"))
+                            Text(coordinator.activeEvents.last?.threatLabel.uppercased() ?? (microphoneManager.isListening ? "LISTENING..." : "OFFLINE"))
                                 .font(.caption2.monospaced())
                                 .foregroundStyle(.green)
                         }
@@ -136,20 +134,20 @@ struct ContentView: View {
                 if isPortrait {
                     Color.black.opacity(0.85).ignoresSafeArea()
                     VStack(spacing: 20) {
-                        Text(title)
+                        Text(AppGlobals.appplicationTitle)
                             .font(.system(.headline, design: .monospaced))
                             .tracking(3)
                             .foregroundStyle(.black)
                             .background {
                                 // Soft mint background glow (behind everything)
-                                Text(title)
+                                Text(AppGlobals.appplicationTitle)
                                     .font(.system(.headline, design: .monospaced))
                                     .tracking(3)
                                     .foregroundStyle(.mint.opacity(0.9))
                                     .blur(radius: 10)
                             }
                             .overlay {
-                                Text(title)
+                                Text(AppGlobals.appplicationTitle)
                                     .font(.system(.headline, design: .monospaced))
                                     .tracking(3)
                                     .foregroundStyle(.green)

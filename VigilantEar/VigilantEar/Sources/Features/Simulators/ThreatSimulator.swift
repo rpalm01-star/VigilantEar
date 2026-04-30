@@ -63,6 +63,12 @@ struct ThreatSimulator {
                 var isApproaching = true
                 let threatSessionID = UUID()
                 
+                // 🚨 INTERSECTION STOP LOGIC
+                // Find the midpoint of the route to trigger a stop
+                let intersectionIndex = pathCoordinates.count / 2
+                // Timer runs every 0.1s, so 50 ticks = 5 seconds of idling
+                var intersectionStopTicks = 50
+                
                 // DRIVE LOGIC
                 Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { timer in
                     let currentCoord = pathCoordinates[step]
@@ -84,19 +90,24 @@ struct ThreatSimulator {
                     let simulatedEnergy = max(0.05, 1.0 - (distanceInFeet / 1000.0))
                     let simulatedConfidence = max(0.3, 1.0 - (distanceInFeet / 1000.0))
                     
+                    // 🚨 If we are actively stopped, kill the Doppler shift!
+                    let isCurrentlyStopped = (step == intersectionIndex && intersectionStopTicks > 0)
+                    let activeDoppler = isCurrentlyStopped ? 0.0 : (isApproaching ? 15.6 : -15.6)
+                    
                     let newEvent = SoundEvent(
                         sessionID: threatSessionID,
                         timestamp: Date(),
                         threatLabel: AppGlobals.simulatedFireTruck,
-                        realThreatLabel: AppGlobals.simulatedFireTruck,
                         confidence: simulatedConfidence,
                         bearing: relativeBearing,
                         distance: normalizedDistance,
                         energy: Float(simulatedEnergy),
-                        dopplerRate: isApproaching ? 15.6 : -15.6,
+                        dopplerRate: Float(activeDoppler),
                         isApproaching: isApproaching,
                         latitude: truckLocation.coordinate.latitude,
-                        longitude: truckLocation.coordinate.longitude
+                        longitude: truckLocation.coordinate.longitude,
+                        isRevealed: true, // 🚨 ADD THIS SO THE SIMULATOR STILL WORKS
+                        songLabel: nil
                     )
                     
                     // UI Feed
@@ -111,16 +122,20 @@ struct ThreatSimulator {
                         }
                     }
                     
-                    step += 1
+                    // 🚨 MOVEMENT ADVANCEMENT LOGIC
+                    if isCurrentlyStopped {
+                        // Keep burning ticks, but don't move the truck
+                        intersectionStopTicks -= 1
+                    } else {
+                        // Truck is free to move forward
+                        step += 1
+                    }
+                    
+                    // Check for completion
                     if step >= pathCoordinates.count {
                         timer.invalidate()
                         Task { @MainActor in
                             coordinator.simulatedRoute = nil
-                            let profile = SoundProfile.classify(AppGlobals.simulatedFireTruck)
-                            if (profile.hapticCount > 0) {
-                                AppGlobals.doLog(message: "🌀 " + AppGlobals.simulatedFireTruck.capitalized + ": Haptic request @end for : \(profile.hapticCount) pulses.", step: "FIRESIM")
-                                HapticManager.shared.trigger(count: profile.hapticCount, sessionID: newEvent.sessionID)
-                            }
                         }
                     }
                 }

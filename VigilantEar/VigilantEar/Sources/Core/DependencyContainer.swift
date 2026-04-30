@@ -10,6 +10,7 @@ final class DependencyContainer {
     let classificationService: ClassificationService
     let microphoneManager: MicrophoneManager
     let roadManager: RoadManager
+    let soundEventLabelManager: SoundLabelEventManager
     let acousticPipeline: AcousticProcessingPipeline
     
     init() {
@@ -17,9 +18,8 @@ final class DependencyContainer {
         self.acousticCoordinator = AcousticCoordinator()
         self.classificationService = ClassificationService()
         self.roadManager = RoadManager()
-        self.acousticPipeline = AcousticProcessingPipeline(roadManager: self.roadManager)
-        
-        // 3. Pass it into the Mic Manager
+        self.soundEventLabelManager = SoundLabelEventManager()
+        self.acousticPipeline = AcousticProcessingPipeline(roadManager: self.roadManager, soundEventManager: self.soundEventLabelManager)
         self.microphoneManager = MicrophoneManager(
             acousticCoordinator: acousticCoordinator,
             classificationService: classificationService,

@@ -24,7 +24,7 @@ enum VerificationType: String {
     case orientation = "Landscape Orientation"
     case locationAccess = "GPS Tactical Mapping"
     case neuralEngine = "Neural Engine (CoreML)"
-    case storage = "Storage Access"
+    case storage = "Storage Availability"
     case notifications = "Emergency Push Alerts" // 🚨 NEW: Verify our lock-screen bypass!
 }
 

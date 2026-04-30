@@ -35,6 +35,12 @@ nonisolated struct AppGlobals {
         get { _appVersion.withLock { $0 } }
     }
     
+    private static let _appTitle = Mutex<String>(String(localized: "VIGILANT EAR"))
+    public static var appplicationTitle: String {
+        get { _appTitle.withLock { $0 } }
+        set { _appTitle.withLock { $0 = newValue } }
+    }
+    
     private static let _dataStoreName = Mutex<String>("threats")
     public static var dataStoreName: String {
         get { _dataStoreName.withLock { $0 } }
@@ -54,7 +60,7 @@ nonisolated struct AppGlobals {
     public static var exceptionsDataStoreName: String {
         get { _exceptionDataStoreName.withLock { $0 } }
     }
-
+    
     private static let _simFireLabel = Mutex<String>("simulated_fire_truck")
     public static var simulatedFireTruck: String {
         get { _simFireLabel.withLock { $0 } }
@@ -130,7 +136,7 @@ nonisolated struct AppGlobals {
     // MARK: - Machine Learning Thresholds (mostly deprecated - now in SoundProfile)
     enum ML {
         /// Absolute floor for the observer to even bother looking at a result
-        static let absoluteMinimumConfidence: Double = 0.35
+        static let absoluteMinimumConfidence: Double = 0.25
         
         /// The confidence required to trigger a background Shazam match
         static let shazamTriggerThreshold: Double = 0.60
@@ -165,5 +171,46 @@ nonisolated struct AppGlobals {
         
         /// How long to pause Shazam accumulation after a successful match
         static let shazamCooldown: TimeInterval = 120.0
+    }
+    
+    /// Neural Ticker HUD configuration
+    enum NeuralTicker {
+        
+        /// How long each label stays visible before auto-removing (seconds)
+        static let ttl: TimeInterval = 15.0
+        
+        /// Cooldown period before a timed-out label can re-enter the queue (seconds)
+        /// Should be ≥ ttl to prevent rapid re-addition
+        static let cooldown: TimeInterval = 25.0
+        
+        /// Maximum number of visible rows in the ticker
+        static let maxVisibleRows: Int = 12
+        
+        /// Hard cap on the underlying feed array (slightly higher than visible rows)
+        static let maxFeedSize: Int = 15
+        
+        /// Labels longer than this many characters get truncated after the last "_"
+        static let truncationThreshold: Int = 20
+        
+        /// Top offset (in points) to position ticker below the "VIGILANT EAR" title
+        static let topOffset: CGFloat = 65
+        
+        /// Height multiplier relative to screen height (0.9 = 90%)
+        static let heightMultiplier: CGFloat = 0.9
+        
+        /// Font size for ticker labels
+        static let fontSize: CGFloat = 11
+        
+        /// Text opacity for ticker labels
+        static let textOpacity: Double = 0.92
+        
+        /// Animation response for insertion (spring)
+        static let insertResponse: Double = 0.42
+        
+        /// Animation damping for insertion (spring)
+        static let insertDamping: Double = 0.78
+        
+        /// Fade-out animation duration when labels expire
+        static let fadeOutDuration: Double = 0.5
     }
 }
