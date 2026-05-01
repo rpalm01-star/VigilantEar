@@ -1,16 +1,53 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
-<dict>
-	<key>UIApplicationSupportsPrintCommand</key>
-	<true/>
-	<key>UIBackgroundModes</key>
-	<array>
-		<string>remote-notification</string>
-		<string>processing</string>
-		<string>audio</string>
-	</array>
-	<key>UIFileSharingEnabled</key>
-	<true/>
-</dict>
+    <dict>
+        
+        <!-- Basic App Info -->
+        <key>CFBundleDisplayName</key>
+        <string>VigilantEar</string>
+        <key>CFBundleIdentifier</key>
+        <string>com.rpalm01.VigilantEar</string>
+        <key>CFBundleName</key>
+        <string>VigilantEar</string>
+        <key>CFBundleShortVersionString</key>
+        <string>1.0</string>
+        <key>CFBundleVersion</key>
+        <string>1</string>
+        
+        <!-- Background Modes -->
+        <key>UIBackgroundModes</key>
+        <array>
+            <string>audio</string>
+            <string>location</string>
+            <string>processing</string>
+        </array>
+        
+        <!-- Required for 'processing' background mode -->
+        <key>BGTaskSchedulerPermittedIdentifiers</key>
+        <array>
+            <string>com.rpalm01.VigilantEar.background</string>
+        </array>
+        
+        <!-- Privacy Descriptions -->
+        <key>NSMicrophoneUsageDescription</key>
+        <string>VigilantEar needs microphone access to detect sounds around you in real time.</string>
+        
+        <key>NSLocationWhenInUseUsageDescription</key>
+        <string>VigilantEar uses your location to show where detected sounds are coming from on the map.</string>
+        
+        <key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+        <string>VigilantEar needs background location to continuously track your position while monitoring sounds.</string>
+        
+        <!-- Other Recommended Keys -->
+        <key>NSAppTransportSecurity</key>
+        <dict>
+            <key>NSAllowsArbitraryLoads</key>
+            <false/>
+        </dict>
+        
+        <key>ITSAppUsesNonExemptEncryption</key>
+        <false/>
+        
+    </dict>
 </plist>
