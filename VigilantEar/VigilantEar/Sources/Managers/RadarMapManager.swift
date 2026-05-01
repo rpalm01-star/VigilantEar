@@ -16,7 +16,7 @@ class RadarMapManager {
     private func startUpdateLoop() {
         updateTask = Task { [weak self] in
             while !Task.isCancelled {
-                try? await Task.sleep(for: .milliseconds(120))
+                try? await Task.sleep(for: .milliseconds(250))
                 await MainActor.run {
                     self?.cleanupStaleTargets()
                 }

@@ -1,26 +1,40 @@
 import SwiftUI
 
+// MARK: - Threat Categories
 enum ThreatCategory: String, Sendable {
-    case emergency, vehicle, medium, quiet, animal, misc, unknown, music, ignored
+    case emergency      // Sirens, alarms, emergency vehicles — highest priority
+    case vehicle        // Cars, trucks, motorcycles, engines
+    case medium         // Human speech, household sounds
+    case quiet          // Subtle ambient sounds
+    case animal         // Dogs, birds, insects, etc.
+    case misc           // Everything else that should still show on radar
+    case unknown        // Fallback for unexpected ML labels
+    case music          // Music and singing
+    case ignored        // Sounds we deliberately never show to the user
 }
 
+// MARK: - SoundProfile
+/// Represents a tuned profile for a specific sound category.
+/// Controls detection sensitivity, how long we wait before showing it to the user (leadInTime),
+/// and how long the icon stays on the radar after the sound stops (tailMemory).
 struct SoundProfile {
-    let icon: String
-    let color: Color
-    let ceiling: Double
-    let maxRange: Double
-    let category: ThreatCategory
-    let canonicalLabel: String
-    let shouldSnapToRoad: Bool
-    let hapticCount: Int
-    let cooldown: Double
-    let originalLabel: String
+    let icon: String                    // SF Symbol name shown on HUD and map
+    let color: Color                    // Tint color for the icon/dot
+    let ceiling: Double                 // Expected maximum amplitude (used for distance estimation curve)
+    let maxRange: Double                // Maximum detection range in feet
+    let category: ThreatCategory        // High-level group (controls special behavior like notifications)
+    let canonicalLabel: String          // Clean display name shown to the user
+    let shouldSnapToRoad: Bool          // Whether to snap the estimated position to the nearest road
+    let hapticCount: Int                // Number of haptic pulses when this threat is revealed (0 = none)
+    let cooldown: Double                // Minimum seconds between repeated alerts for the same threat
+    let originalLabel: String           // The raw ML label that created this profile (for debugging)
     
-    // THE NEW RADAR PHYSICS
-    let minimumConfidence: Double
-    let leadInTime: Double    // ⏳ Seconds the sound must exist BEFORE triggering UI
-    let tailMemory: Double    // 👻 Seconds the sound stays on radar AFTER ML stops hearing it
+    // === Core Accumulation & Visibility Controls ===
+    let minimumConfidence: Double       // Minimum ML confidence required before we consider this a real detection
+    let leadInTime: Double              // Seconds the sound must be consistently detected BEFORE isRevealed becomes true
+    let tailMemory: Double              // Seconds the icon stays visible on the radar AFTER the sound stops being heard
     
+    // Convenience computed properties
     var isEmergency: Bool { return category == .emergency }
     var isMusic: Bool { return category == .music }
     var isVehicle: Bool { return category == .vehicle }
@@ -29,32 +43,45 @@ struct SoundProfile {
         return minimumConfidence
     }
     
+    // MARK: - Internal Caching
     private static var lookupTable: [String: SoundProfile] = [:]
     private static let queue = DispatchQueue(label: "com.VigilantEar.profileCache", attributes: .concurrent)
     
-    // MARK: - THE REGISTRY
-    // Tuple: (Keywords, Icon, Color, Ceiling, MaxRange, Category, Snaps, Haptics, Cooldown, minConf, leadInTime, tailMemory)
+    // MARK: - Registry (Tuple Order Documentation)
+    // Each tuple has exactly 12 values in this order:
+    // (keywords, icon, color, ceiling, maxRange, category, snaps, haptics, cooldown, minConf, leadIn, tail)
+    //
+    // keywords   = Array of ML labels that should match this profile
+    // icon       = SF Symbol name
+    // color      = SwiftUI Color
+    // ceiling    = Expected max amplitude
+    // maxRange   = Max detection distance in feet
+    // category   = ThreatCategory
+    // snaps      = shouldSnapToRoad (Bool)
+    // haptics    = hapticCount (Int)
+    // cooldown   = cooldown in seconds
+    // minConf    = minimumConfidence
+    // leadIn     = leadInTime in seconds  ← Most important for "too soon" issues
+    // tail       = tailMemory in seconds
+    
+    // MARK: - Profile Definitions
     
     private static let cuteAndPleasant: [(keywords: [String], icon: String, color: Color, ceiling: Double, maxRange: Double, category: ThreatCategory, snaps: Bool, haptics: Int, cooldown: Double, minConf: Double, leadIn: Double, tail: Double)] = [
         (["clock", "tick", "tick_tock"], "clock", .brown, 0.55, 100.0, .misc, false, 1, 1.5, 0.80, 1.0, 1.5),
     ]
     
     private static let emergencyAndSafety: [(keywords: [String], icon: String, color: Color, ceiling: Double, maxRange: Double, category: ThreatCategory, snaps: Bool, haptics: Int, cooldown: Double, minConf: Double, leadIn: Double, tail: Double)] = [
-        // Updated Parameters:
-        // maxDistance: Boosted to 5000.0 feet (Prevents edge-clamping)
-        // minConf: Dropped to 0.05 (Reveals the tail instantly)
-        // tailMemory: Boosted to 8.0 seconds (Stretches the tail physically across the map)
-        (["siren", "ambulance_siren", "police_siren", "fire_engine_siren", "civil_defense_siren", "emergency_vehicle", "simulated_fire_truck"], "light.beacon.max.fill", .red, 0.80, 900.0, .emergency, true, 4, 0.4, 0.25, 0.5, 2.75),        // 🚨 TRANSIENT EMERGENCY: Lead-In is 0.0, Tail is 4.0
+        // Siren: More conservative settings to reduce false positives from echoes
+        (["siren", "ambulance_siren", "police_siren", "fire_engine_siren", "civil_defense_siren", "emergency_vehicle", "simulated_fire_truck"], "light.beacon.max.fill", .red, 0.80, 900.0, .emergency, true, 4, 0.4, 0.35, 3.5, 3.0),
+        
         (["fireworks", "gunshot_gunfire", "artillery_fire", "firecracker", "eruption", "boom"], "fireworks", .pink, 0.90, 1000.0, .ignored, false, 2, 0.8, 0.9, 0.0, 4.0),
         (["smoke_detector", "alarm_clock", "door_bell"], "exclamationmark.triangle.fill", .red, 0.80, 150.0, .emergency, false, 3, 0.4, 0.9, 1.0, 2.0),
         (["person", "person_running", "person_walking"], "figure.walk.arrival", .red, 0.80, 150.0, .emergency, false, 2, 0.50, 0.60, 0.2, 2.0),
-        // Stricter gate for environmental domestic sounds
         (["knock", "door_slam", "door", "doorbell", "door_sliding"], "door.left.hand.closed", .cyan, 0.5, 150.0, .emergency, true, 2, 0.50, 0.92, 0.4, 2.0),
     ]
     
     private static let vehicles: [(keywords: [String], icon: String, color: Color, ceiling: Double, maxRange: Double, category: ThreatCategory, snaps: Bool, haptics: Int, cooldown: Double, minConf: Double, leadIn: Double, tail: Double)] = [
-        (["car", "car_horn", "car_passing_by", "race_car", "truck", "bus", "motorcycle", "traffic_noise", "engine", "engine_accelerating_revving", "engine_starting", "engine_idling", "engine_knocking", "vehicle_skidding"], "car.fill", .blue, 0.30, 500.0, .vehicle, true, 0, 0.1, 0.45, 0.5, 2.0),
-        (["train_horn", "foghorn", "air_horn", "train_whistle"], "horn.fill", .blue, 0.60, 500.0, .ignored, true, 0, 2.0, 0.60, 0.2, 2.0),
+        (["car", "car_horn", "car_passing_by", "race_car", "truck", "bus", "motorcycle", "traffic_noise", "engine", "engine_accelerating_revving", "engine_starting", "engine_idling", "engine_knocking", "vehicle_skidding"], "car.fill", .blue, 0.30, 500.0, .vehicle, true, 0, 0.1, 0.35, 0.3, 1.2),        (["train_horn", "foghorn", "air_horn", "train_whistle"], "horn.fill", .blue, 0.60, 500.0, .ignored, true, 0, 2.0, 0.60, 0.2, 2.0),
         (["train", "rail_transport", "railroad_car", "train_wheels_squealing", "subway_metro", "aircraft", "helicopter", "airplane", "boat_water_vehicle", "sailing", "rowboat_canoe_kayak", "motorboat_speedboat"], "tram.fill.tunnel", .blue, 0.15, 600.0, .ignored, false, 0, 0.8, 0.50, 1.0, 3.0),
         (["bicycle"], "bicycle", .blue, 0.40, 800.0, .medium, false, 0, 1.5, 0.50, 0.5, 1.5),
     ]
@@ -83,7 +110,6 @@ struct SoundProfile {
         (["sewing_machine", "mechanical_fan", "air_conditioner"], "fan.fill", .gray, 0.20, 20.0, .ignored, false, 0, 1.6, 0.70, 1.0, 2.0),
         (["toilet_flush", "sink_filling_washing"], "toilet.fill", .white, 0.20, 20.0, .medium, false, 0, 2.0, 0.70, 1.0, 2.0),
         (["power_tool", "saw", "hammer", "drill", "hedge_trimmer", "chainsaw"], "hammer.fill", .orange, 0.60, 120.0, .ignored, false, 0, 1.2, 0.60, 0.5, 1.5),
-        // 🚨 TRANSIENT EMERGENCY: Lead-In is 0.0, Tail is 3.0
         (["glass_breaking"], "light.beacon.min.fill", .orange, 0.70, 100.0, .emergency, false, 1, 1.4, 0.70, 0.0, 3.0),
     ]
     
@@ -118,7 +144,6 @@ struct SoundProfile {
     }()
     
     private static func createAndCache(profile entry: (keywords: [String], icon: String, color: Color, ceiling: Double, maxRange: Double, category: ThreatCategory, snaps: Bool, haptics: Int, cooldown: Double, minConf: Double, leadIn: Double, tail: Double), for label: String) -> SoundProfile {
-        
         let p = SoundProfile(
             icon: entry.icon,
             color: entry.color,

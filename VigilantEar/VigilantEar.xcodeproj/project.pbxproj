@@ -26,6 +26,8 @@
 		3079CD512FA1B3E8003D6094 /* MapTrackingViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3079CD502FA1B3E8003D6094 /* MapTrackingViewModel.swift */; };
 		3079CD532FA1BC1D003D6094 /* NeuralTickerHUD.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3079CD522FA1BC1D003D6094 /* NeuralTickerHUD.swift */; };
 		3079CD552FA1D103003D6094 /* SoundLabelEvent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3079CD542FA1D103003D6094 /* SoundLabelEvent.swift */; };
+		30857FAC2FA42C24008C9C1B /* SoundLabelEventManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30857FAB2FA42C24008C9C1B /* SoundLabelEventManager.swift */; };
+		30857FB22FA42FCE008C9C1B /* CLLocationCoordinate2D.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30857FB12FA42FCE008C9C1B /* CLLocationCoordinate2D.swift */; };
 		308EF3E72F8755A300885DCB /* StartupVerificationViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 308EF3E62F8755A300885DCB /* StartupVerificationViewModel.swift */; };
 		308EF3E92F8755BC00885DCB /* StartupVerificationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 308EF3E82F8755BC00885DCB /* StartupVerificationView.swift */; };
 		30A2B5112F9EA32100BF2E15 /* ThreatHUD.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30A2B5102F9EA32100BF2E15 /* ThreatHUD.swift */; };
@@ -65,6 +67,8 @@
 		3079CD502FA1B3E8003D6094 /* MapTrackingViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MapTrackingViewModel.swift; sourceTree = "<group>"; };
 		3079CD522FA1BC1D003D6094 /* NeuralTickerHUD.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NeuralTickerHUD.swift; sourceTree = "<group>"; };
 		3079CD542FA1D103003D6094 /* SoundLabelEvent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SoundLabelEvent.swift; sourceTree = "<group>"; };
+		30857FAB2FA42C24008C9C1B /* SoundLabelEventManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SoundLabelEventManager.swift; sourceTree = "<group>"; };
+		30857FB12FA42FCE008C9C1B /* CLLocationCoordinate2D.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CLLocationCoordinate2D.swift; sourceTree = "<group>"; };
 		308EF3E62F8755A300885DCB /* StartupVerificationViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StartupVerificationViewModel.swift; sourceTree = "<group>"; };
 		308EF3E82F8755BC00885DCB /* StartupVerificationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StartupVerificationView.swift; sourceTree = "<group>"; };
 		308EF3EB2F875A9400885DCB /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
@@ -93,11 +97,6 @@
 		3053A9FC2F900FA2008C5419 /* Simulators */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = Simulators;
-			sourceTree = "<group>";
-		};
-		30BDE8F32F9B459700074009 /* Deprecated */ = {
-			isa = PBXFileSystemSynchronizedRootGroup;
-			path = Deprecated;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -147,6 +146,7 @@
 				30774C902F946CE5008C16E9 /* SystemMonitor.swift */,
 				30A396472F90900700D441A0 /* CloudLogger.swift */,
 				3053DC912F83718A00241892 /* DependencyContainer.swift */,
+				30857FB12FA42FCE008C9C1B /* CLLocationCoordinate2D.swift */,
 			);
 			path = Core;
 			sourceTree = "<group>";
@@ -154,21 +154,10 @@
 		3053DC992F83718A00241892 /* AudioEngine */ = {
 			isa = PBXGroup;
 			children = (
-				30FEA0172F9DD7F100FFEE25 /* HapticManager.swift */,
-				30FEA0152F9D3FC500FFEE25 /* RoadManager.swift */,
-				30D9FE1C2F9C2356006CCAAA /* ThreatResultsObserver.swift */,
-				30D9FE1A2F9C234A006CCAAA /* ShazamResultsObserver.swift */,
 				3053A9FF2F901777008C5419 /* SoundProfile.swift */,
-				30BDE8EF2F9B353A00074009 /* RadarMapManager.swift */,
-				30BDE8ED2F9B342600074009 /* TrackedTarget.swift */,
-				30CD987D2F8DF27100AE7D0A /* SirenDopplerTracker.swift */,
-				30CD987B2F8DEBA400AE7D0A /* RollingNoiseFloor.swift */,
 				30C55CC42F85FB1500D0B984 /* AcousticProcessingPipeline.swift */,
 				3053DC932F83718A00241892 /* AcousticCoordinator.swift */,
-				3053DC942F83718A00241892 /* FFTProcessor.swift */,
 				3053DC952F83718A00241892 /* HardwareCalibration.swift */,
-				3053DC962F83718A00241892 /* MicrophoneManager.swift */,
-				3053DC972F83718A00241892 /* PermissionManager.swift */,
 			);
 			path = AudioEngine;
 			sourceTree = "<group>";
@@ -194,24 +183,10 @@
 			path = UI;
 			sourceTree = "<group>";
 		};
-		3053DCA62F83718A00241892 /* Features */ = {
-			isa = PBXGroup;
-			children = (
-				3053A9FC2F900FA2008C5419 /* Simulators */,
-				3044384A2F837A1D00F57539 /* Logging */,
-				3053DC992F83718A00241892 /* AudioEngine */,
-				3053DC9B2F83718A00241892 /* Classification */,
-				3053DCA52F83718A00241892 /* UI */,
-			);
-			path = Features;
-			sourceTree = "<group>";
-		};
 		3053DCAA2F83718A00241892 /* Models */ = {
 			isa = PBXGroup;
 			children = (
-				3079CD542FA1D103003D6094 /* SoundLabelEvent.swift */,
 				3079CD502FA1B3E8003D6094 /* MapTrackingViewModel.swift */,
-				3053DCA92F83718A00241892 /* SoundEvent.swift */,
 				308EF3E62F8755A300885DCB /* StartupVerificationViewModel.swift */,
 			);
 			path = Models;
@@ -220,11 +195,18 @@
 		3053DCAB2F83718A00241892 /* Sources */ = {
 			isa = PBXGroup;
 			children = (
-				30BDE8F32F9B459700074009 /* Deprecated */,
 				3053DC8F2F83718A00241892 /* App */,
+				3053DC992F83718A00241892 /* AudioEngine */,
+				3053DC9B2F83718A00241892 /* Classification */,
 				3053DC922F83718A00241892 /* Core */,
-				3053DCA62F83718A00241892 /* Features */,
+				30857FAD2FA42C81008C9C1B /* Events */,
+				3044384A2F837A1D00F57539 /* Logging */,
+				30857FAE2FA42CB2008C9C1B /* Managers */,
 				3053DCAA2F83718A00241892 /* Models */,
+				30857FB02FA42D22008C9C1B /* Observers */,
+				30857FAF2FA42D03008C9C1B /* Physics */,
+				3053A9FC2F900FA2008C5419 /* Simulators */,
+				3053DCA52F83718A00241892 /* UI */,
 			);
 			path = Sources;
 			sourceTree = "<group>";
@@ -238,6 +220,48 @@
 				3053DCAC2F83718A00241892 /* Assets.xcassets */,
 			);
 			path = VigilantEar;
+			sourceTree = "<group>";
+		};
+		30857FAD2FA42C81008C9C1B /* Events */ = {
+			isa = PBXGroup;
+			children = (
+				3079CD542FA1D103003D6094 /* SoundLabelEvent.swift */,
+				3053DCA92F83718A00241892 /* SoundEvent.swift */,
+			);
+			path = Events;
+			sourceTree = "<group>";
+		};
+		30857FAE2FA42CB2008C9C1B /* Managers */ = {
+			isa = PBXGroup;
+			children = (
+				30857FAB2FA42C24008C9C1B /* SoundLabelEventManager.swift */,
+				3053DC972F83718A00241892 /* PermissionManager.swift */,
+				3053DC962F83718A00241892 /* MicrophoneManager.swift */,
+				30BDE8EF2F9B353A00074009 /* RadarMapManager.swift */,
+				30FEA0172F9DD7F100FFEE25 /* HapticManager.swift */,
+				30FEA0152F9D3FC500FFEE25 /* RoadManager.swift */,
+				30CD987D2F8DF27100AE7D0A /* SirenDopplerTracker.swift */,
+			);
+			path = Managers;
+			sourceTree = "<group>";
+		};
+		30857FAF2FA42D03008C9C1B /* Physics */ = {
+			isa = PBXGroup;
+			children = (
+				3053DC942F83718A00241892 /* FFTProcessor.swift */,
+				30BDE8ED2F9B342600074009 /* TrackedTarget.swift */,
+				30CD987B2F8DEBA400AE7D0A /* RollingNoiseFloor.swift */,
+			);
+			path = Physics;
+			sourceTree = "<group>";
+		};
+		30857FB02FA42D22008C9C1B /* Observers */ = {
+			isa = PBXGroup;
+			children = (
+				30D9FE1C2F9C2356006CCAAA /* ThreatResultsObserver.swift */,
+				30D9FE1A2F9C234A006CCAAA /* ShazamResultsObserver.swift */,
+			);
+			path = Observers;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -258,7 +282,6 @@
 			fileSystemSynchronizedGroups = (
 				3044384A2F837A1D00F57539 /* Logging */,
 				3053A9FC2F900FA2008C5419 /* Simulators */,
-				30BDE8F32F9B459700074009 /* Deprecated */,
 			);
 			name = VigilantEar;
 			packageProductDependencies = (
@@ -338,6 +361,7 @@
 				3053DCB22F83718A00241892 /* ClassificationService.swift in Sources */,
 				3053A9F92F900010008C5419 /* MapView.swift in Sources */,
 				30CD987E2F8DF27100AE7D0A /* SirenDopplerTracker.swift in Sources */,
+				30857FAC2FA42C24008C9C1B /* SoundLabelEventManager.swift in Sources */,
 				30BDE8EE2F9B342600074009 /* TrackedTarget.swift in Sources */,
 				3053DCB42F83718A00241892 /* FFTProcessor.swift in Sources */,
 				308EF3E72F8755A300885DCB /* StartupVerificationViewModel.swift in Sources */,
@@ -348,6 +372,7 @@
 				3053DCBA2F83718A00241892 /* MicrophoneManager.swift in Sources */,
 				3079CD552FA1D103003D6094 /* SoundLabelEvent.swift in Sources */,
 				3053DCBB2F83718A00241892 /* ContentView.swift in Sources */,
+				30857FB22FA42FCE008C9C1B /* CLLocationCoordinate2D.swift in Sources */,
 				30D9FE1B2F9C234A006CCAAA /* ShazamResultsObserver.swift in Sources */,
 				30FEA0182F9DD7F100FFEE25 /* HapticManager.swift in Sources */,
 				3079CD532FA1BC1D003D6094 /* NeuralTickerHUD.swift in Sources */,

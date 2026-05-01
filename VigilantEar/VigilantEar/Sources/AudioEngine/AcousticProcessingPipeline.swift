@@ -171,7 +171,7 @@ actor AcousticProcessingPipeline {
         let effectiveConfidence = confidence
         
         if AppGlobals.filteredCategories.contains(categoryRawValue) { return }
-        
+
         guard let buffer = latestBuffer, let channelData = buffer.floatChannelData else { return }
         
         let safeCount = min(Int(buffer.frameLength), 4096)

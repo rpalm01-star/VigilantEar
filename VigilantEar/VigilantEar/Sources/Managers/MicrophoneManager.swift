@@ -20,6 +20,7 @@ class MicrophoneManager: NSObject, CLLocationManagerDelegate {
     // MARK: - Private State
     private var tapInstalled = false
     private var isRunning = false
+    private var lastProcessTime: Date = .distantPast
     
     private let locationManager = CLLocationManager()
     private let audioEngine = AVAudioEngine()
@@ -78,7 +79,6 @@ class MicrophoneManager: NSObject, CLLocationManagerDelegate {
     func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
         guard let location = locations.last else { return }
         roadManager.processLocationUpdate(location)
-        
         if Date().timeIntervalSince(lastLocationPush) >= AppGlobals.locationUpdateThrottle {
             lastLocationPush = Date()
             Task {
@@ -170,7 +170,9 @@ class MicrophoneManager: NSObject, CLLocationManagerDelegate {
         
         inputNode.installTap(onBus: 0, bufferSize: 4096, format: hardwareFormat) { [weak self] buffer, time in
             guard let self = self else { return }
-            
+            let now = Date()
+            guard now.timeIntervalSince(self.lastProcessTime) > 0.04 else { return }
+            self.lastProcessTime = now
             Task {
                 await self.acousticPipeline.processAudio(buffer: buffer, time: time)
             }

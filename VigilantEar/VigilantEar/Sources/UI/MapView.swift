@@ -45,7 +45,7 @@ struct MapView: View {
             if let location = userLocation {
                 let center = location.coordinate
                 let hasEmergencyInside500ft = events.contains { event in
-                    event.isEmergency && (event.distance * 1000.0) <= 500.0
+                    event.isEmergency && event.isRevealed && (event.distance * 1000.0) <= 500.0
                 }
                 
                 // 1000ft red circle

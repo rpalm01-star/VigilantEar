@@ -111,7 +111,7 @@ nonisolated struct AppGlobals {
     //   - Lower value (0.3–0.5) = more responsive map dot, but higher battery drain
     //   - Higher value (1.0–2.0) = smoother battery, but the blue dot on the map updates less often
     //   Recommended range: 0.6 – 1.2 seconds
-    static let locationUpdateThrottle: TimeInterval = 0.3
+    static let locationUpdateThrottle: TimeInterval = 1.2
     
     // locationDistanceFilter: iOS will only deliver a new location update after you've moved this many meters.
     //   - Lower value (3–5) = more frequent updates, feels more "live"
@@ -148,10 +148,10 @@ nonisolated struct AppGlobals {
     // MARK: - Acoustic Physics & Radar
     enum Physics {
         /// The minimum volume peak required to track a standard sound
-        static let minimumAmbientPeak: Float = 0.04
+        static let minimumAmbientPeak: Float = 0.05
         
         /// The minimum volume peak required to track a vehicle (lower because of low frequencies)
-        static let minimumVehiclePeak: Float = 0.015
+        static let minimumVehiclePeak: Float = 0.025
         
         /// How many degrees of bearing difference before we consider it a separate physical object
         static let ambientBearingTolerance: Double = 25.0

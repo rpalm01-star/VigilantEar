@@ -1,14 +1,10 @@
+//
+//  SoundLabelEventManager.swift
+//  VigilantEar
+//
+//  Created by Robert Palmer on 4/30/26.
+//
 import Foundation
-
-struct SoundLabelEvent {
-    let rawMLSoundLabel: String
-    var creationTime: Date
-    
-    public nonisolated init(rawMLSoundLabel: String, creationTime: Date) {
-        self.rawMLSoundLabel = rawMLSoundLabel
-        self.creationTime = creationTime
-    }
-}
 
 actor SoundLabelEventManager {
     private var events: [String: SoundLabelEvent] = [:]
