@@ -1,4 +1,4 @@
-# Terms of Service for VigilantEar
+# Terms of Service for VigilantEar 👂🛰️
 
 **Effective Date:** May 1, 2026
 
