@@ -19,7 +19,6 @@
 		308580012FA46267008C9C1B /* coverage.geojson */ = {isa = PBXFileReference; lastKnownFileType = text; path = coverage.geojson; sourceTree = "<group>"; };
 		308EF3EB2F875A9400885DCB /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		30A396422F908D4800D441A0 /* GoogleService-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "GoogleService-Info.plist"; sourceTree = "<group>"; };
-		30CA44A52F88AB5D0059C1D7 /* Settings.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Settings.xcconfig; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -100,7 +99,6 @@
 		304F73BC2F830A8800F67563 = {
 			isa = PBXGroup;
 			children = (
-				30CA44A52F88AB5D0059C1D7 /* Settings.xcconfig */,
 				3053DCAD2F83718A00241892 /* VigilantEar */,
 				304F73C62F830A8800F67563 /* Products */,
 			);
