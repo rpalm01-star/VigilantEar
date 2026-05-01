@@ -1,4 +1,4 @@
-# Privacy Policy for VigilantEar
+# Privacy Policy for VigilantEar 👂🛰️
 
 **Effective Date:** May 1, 2026
 
