@@ -4,6 +4,7 @@ import CoreLocation
 
 struct MapView: View {
     @Environment(AcousticCoordinator.self) private var coordinator
+    @State private var showLegalSheet = false
     
     static let CAMERA_DISTANCE: Double = 400
     
@@ -36,6 +37,41 @@ struct MapView: View {
         .overlay(alignment: .trailing) {
             NeuralTickerHUD()
                 .allowsHitTesting(false)
+        }
+        .overlay(alignment: .bottomTrailing) {
+            Button {
+                showLegalSheet = true
+            } label: {
+                Text("Legal")
+                    .font(.system(size: 13, weight: .semibold, design: .monospaced))
+                    .foregroundColor(.cyan.opacity(0.7))
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 4)
+                    .background(
+                        GeometryReader { geo in
+                            ZStack(alignment: .trailing) {
+                                // Base background (same as ticker)
+                                RoundedRectangle(cornerRadius: 5)
+                                    .fill(Color.black.opacity(0.10))
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 5)
+                                            .stroke(Color.cyan.opacity(0.25), lineWidth: 0.8)
+                                    )
+                                
+                                // 0% confidence fill (almost invisible)
+                                RoundedRectangle(cornerRadius: 5)
+                                    .fill(Color.cyan.opacity(0.0))   // 0% fill
+                                    .frame(width: geo.size.width * 0.0)
+                            }
+                        }
+                    )
+                    .clipShape(RoundedRectangle(cornerRadius: 5))
+            }
+            .padding(.trailing, 30)
+            .padding(.bottom, 8)
+        }
+        .sheet(isPresented: $showLegalSheet) {
+            LegalView()
         }
     }
     
