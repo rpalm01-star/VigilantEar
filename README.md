@@ -1,5 +1,7 @@
 # VigilantEar 👂🛰️
 
+**Effective Date:** May 1, 2026
+
 **VigilantEar** is an iOS-based acoustic research and accessibility tool designed to provide real-time directional awareness for the deaf and hard-of-hearing (D/HH) community.
 
 By leveraging on-device machine learning and advanced acoustic physics, the app acts as an "Air Traffic Control" radar for the street. It identifies emergency vehicles (sirens) and broadband mobile noise sources (tire roar/engines), tracking their movement through physical space using multi-target frequency isolation, Phase-Transform spatial mapping, and geographic sensor fusion.
