@@ -176,9 +176,12 @@ nonisolated struct AppGlobals {
     /// Neural Ticker HUD configuration
     enum NeuralTicker {
         
+        /// The minimum confidence from the ML before being accepted.  Values greater than this value are accepted.
+        static let minimumConfidence: Double = 0.55
+        
         /// How long each label stays visible before auto-removing (seconds)
         static let ttl: TimeInterval = 15.0
-        
+
         /// Cooldown period before a timed-out label can re-enter the queue (seconds)
         /// Should be ≥ ttl to prevent rapid re-addition
         static let cooldown: TimeInterval = 25.0

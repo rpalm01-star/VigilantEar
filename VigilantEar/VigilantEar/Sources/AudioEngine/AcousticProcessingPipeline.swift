@@ -5,6 +5,8 @@ import SwiftUI
 import CoreLocation
 import ShazamKit
 
+/// Core actor responsible for real-time audio processing, ML classification,
+/// multi-target tracking, TDOA bearing calculation, and event generation.
 actor AcousticProcessingPipeline {
     
     private let bufferSize: AVAudioFrameCount = 4096
@@ -147,13 +149,14 @@ actor AcousticProcessingPipeline {
     }
     
     nonisolated func sendRawLabelToHUD(_ rawLabel: String, confidence: Double) {
-        if (confidence > AppGlobals.ML.absoluteMinimumConfidence) {
+        if (confidence > AppGlobals.NeuralTicker.minimumConfidence) {
             Task.detached { [weak self] in
-                self?.soundEventManager.addOrUpdateDetached(rawLabel)
+                self?.soundEventManager.addOrUpdateDetached(rawLabel, confidence: confidence)
             }
         }
     }
     
+    // MARK: - Main Threat Processing (Optimized)
     func confirmThreatAndTrack(profile: SoundProfile, confidence: Double) async {
         let now = Date()
         
@@ -171,7 +174,7 @@ actor AcousticProcessingPipeline {
         let effectiveConfidence = confidence
         
         if AppGlobals.filteredCategories.contains(categoryRawValue) { return }
-
+        
         guard let buffer = latestBuffer, let channelData = buffer.floatChannelData else { return }
         
         let safeCount = min(Int(buffer.frameLength), 4096)
@@ -179,29 +182,52 @@ actor AcousticProcessingPipeline {
         
         guard peak > minimumPeak else { return }
         
-        var targets = self.fftProcessor.analyzeMultiple(samples: Array(UnsafeBufferPointer(start: channelData[0], count: safeCount)), sampleRate: self.sampleRate, maxPeaks: 1)
-        
-        if isVehicle {
-            targets = [(frequency: 100.0, confidence: Float(effectiveConfidence))]
-        } else if targets.isEmpty {
-            return
-        }
-        
+        // ─────────────────────────────────────────────────────────────
+        // OFFLOAD HEAVY DSP (FFT + TDOA) TO DETACHED TASK
+        // ─────────────────────────────────────────────────────────────
         let localSampleRate = self.sampleRate
         let exactMicDistance = await HardwareCalibration.micBaseline
+        let currentLoc = self.lastKnownLocation
+        let currentHead = self.lastKnownHeading
+        let songToAttach = self.currentSongLabel
+        let minConf = profile.minimumConfidence
         
-        let currentBearing: Double
-        if buffer.format.channelCount >= 2 {
-            currentBearing = self.fftProcessor.calculateTDOA(
-                left: Array(UnsafeBufferPointer(start: channelData[0], count: safeCount)),
-                right: Array(UnsafeBufferPointer(start: channelData[1], count: safeCount)),
+        let analysisResult = await Task.detached(priority: .userInitiated) { [weak self] in
+            guard let self = self else { return ([(frequency: Double, confidence: Float)](), 0.0) }
+            
+            var targets = self.fftProcessor.analyzeMultiple(
+                samples: Array(UnsafeBufferPointer(start: channelData[0], count: safeCount)),
                 sampleRate: localSampleRate,
-                micDistance: exactMicDistance
-            ) ?? 0.0
-        } else {
-            currentBearing = 0.0
-        }
+                maxPeaks: 1
+            )
+            
+            if isVehicle {
+                targets = [(frequency: 100.0, confidence: Float(effectiveConfidence))]
+            } else if targets.isEmpty {
+                return ([], 0.0)
+            }
+            
+            let currentBearing: Double
+            if buffer.format.channelCount >= 2 {
+                currentBearing = self.fftProcessor.calculateTDOA(
+                    left: Array(UnsafeBufferPointer(start: channelData[0], count: safeCount)),
+                    right: Array(UnsafeBufferPointer(start: channelData[1], count: safeCount)),
+                    sampleRate: localSampleRate,
+                    micDistance: exactMicDistance
+                ) ?? 0.0
+            } else {
+                currentBearing = 0.0
+            }
+            
+            return (targets, currentBearing)
+        }.value
         
+        let (targets, currentBearing) = analysisResult
+        if targets.isEmpty { return }
+        
+        // ─────────────────────────────────────────────────────────────
+        // LIGHTWEIGHT TRACKING LOGIC (on actor)
+        // ─────────────────────────────────────────────────────────────
         let safeTailMemory = max(tailMemory, profile.cooldown + 1.0)
         activeThreats.removeAll { now.timeIntervalSince($0.lastSeen) > safeTailMemory }
         
@@ -252,11 +278,8 @@ actor AcousticProcessingPipeline {
             
             let timeAlive = now.timeIntervalSince(threatFirstSeen)
             let hasMetLeadIn = timeAlive >= leadInTime
-            let currentLoc = self.lastKnownLocation
-            let currentHead = self.lastKnownHeading
-            let songToAttach = self.currentSongLabel
-            let minConf = profile.minimumConfidence
             
+            // Final lightweight work in detached task
             Task.detached(priority: .userInitiated) { [weak self, threatSessionID, currentBearing, currentLoc, currentHead, effectiveLabel, effectiveConfidence, songToAttach, isVehicle, isMusic, shouldSnapToRoad, ceiling, maxRange, minConf, hasMetLeadIn] in
                 guard let self = self else { return }
                 

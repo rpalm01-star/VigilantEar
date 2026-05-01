@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		3053DCBF2F83718A00241892 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 3053DCAC2F83718A00241892 /* Assets.xcassets */; };
+		308580022FA46267008C9C1B /* coverage.geojson in Resources */ = {isa = PBXBuildFile; fileRef = 308580012FA46267008C9C1B /* coverage.geojson */; };
 		30A396432F908D4800D441A0 /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = 30A396422F908D4800D441A0 /* GoogleService-Info.plist */; };
 		30A396462F908DF700D441A0 /* FirebaseFirestore in Frameworks */ = {isa = PBXBuildFile; productRef = 30A396452F908DF700D441A0 /* FirebaseFirestore */; };
 /* End PBXBuildFile section */
@@ -15,6 +16,7 @@
 /* Begin PBXFileReference section */
 		304F73C52F830A8800F67563 /* VigilantEar.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = VigilantEar.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		3053DCAC2F83718A00241892 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		308580012FA46267008C9C1B /* coverage.geojson */ = {isa = PBXFileReference; lastKnownFileType = text; path = coverage.geojson; sourceTree = "<group>"; };
 		308EF3EB2F875A9400885DCB /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		30A396422F908D4800D441A0 /* GoogleService-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "GoogleService-Info.plist"; sourceTree = "<group>"; };
 		30CA44A52F88AB5D0059C1D7 /* Settings.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Settings.xcconfig; sourceTree = "<group>"; };
@@ -134,6 +136,7 @@
 		3053DCAD2F83718A00241892 /* VigilantEar */ = {
 			isa = PBXGroup;
 			children = (
+				308580012FA46267008C9C1B /* coverage.geojson */,
 				30A396422F908D4800D441A0 /* GoogleService-Info.plist */,
 				308EF3EB2F875A9400885DCB /* Info.plist */,
 				3053DCAB2F83718A00241892 /* Sources */,
@@ -223,6 +226,7 @@
 			files = (
 				3053DCBF2F83718A00241892 /* Assets.xcassets in Resources */,
 				30A396432F908D4800D441A0 /* GoogleService-Info.plist in Resources */,
+				308580022FA46267008C9C1B /* coverage.geojson in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

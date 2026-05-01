@@ -49,14 +49,15 @@ actor SoundLabelEventManager {
     }
     
     // MARK: - Private core logic
-    private func _addOrUpdate(_ rawMLSoundLabel: String) async {
+    private func _addOrUpdate(_ rawMLSoundLabel: String, confidence: Double) async {
         let now = Date()
         
         events.removeValue(forKey: rawMLSoundLabel)   // remove any previous
         
         let event = SoundLabelEvent(
             rawMLSoundLabel: rawMLSoundLabel,
-            creationTime: now
+            creationTime: now,
+            confidence: confidence
         )
         events[rawMLSoundLabel] = event
         
@@ -65,9 +66,9 @@ actor SoundLabelEventManager {
     }
     
     // MARK: - Public API (only this one)
-    nonisolated func addOrUpdateDetached(_ rawMLSoundLabel: String) {
+    nonisolated func addOrUpdateDetached(_ rawMLSoundLabel: String, confidence: Double) {
         Task.detached { [weak self] in
-            await self?._addOrUpdate(rawMLSoundLabel)
+            await self?._addOrUpdate(rawMLSoundLabel, confidence: confidence)
         }
     }
     

@@ -40,11 +40,11 @@ struct DebugHUD: View {
             HStack(spacing: 4) {
                 Image(systemName: "gearshape.fill")
                     .font(.system(size: 9))
-                    .foregroundColor(isCloudLoggingEnabled ? .cyan : .gray)
+                    .foregroundColor(isCloudLoggingEnabled ? .cyan : .green)
                 
                 Text("Telemetry")
                     .font(.system(size: 9, weight: .bold, design: .monospaced))
-                    .foregroundColor(isCloudLoggingEnabled ? .cyan : .gray)
+                    .foregroundColor(isCloudLoggingEnabled ? .cyan : .green)
             }
             
             HStack(spacing: 5) {
@@ -74,22 +74,23 @@ struct DebugHUD: View {
             HStack(spacing: 5) {
                 Text("OSM:")
                     .font(.system(size: 10, weight: .medium, design: .monospaced))
-                Text("\(roadManager.cachedRoadSegments.count) rds")
+                Text("\(roadManager.cachedRoadSegments.count) roads")
                     .font(.system(size: 10, weight: .bold, design: .monospaced))
                     .foregroundColor(roadManager.cachedRoadSegments.isEmpty ? .red : .green)
             }
         }
         .padding(.horizontal, 8)
         .padding(.vertical, 5)
-        .frame(width: 110, alignment: .leading)
+        .frame(width: 100, alignment: .leading)
         .background(
             .ultraThinMaterial,
             in: RoundedRectangle(cornerRadius: 7)
         )
         .overlay(
             RoundedRectangle(cornerRadius: 7)
-                .stroke(isCloudLoggingEnabled ? Color.cyan.opacity(0.6) : Color.clear, lineWidth: 1)
+                .stroke(isCloudLoggingEnabled ? Color.cyan.opacity(0.65) : Color.clear, lineWidth: 1)
         )
+        .opacity(0.45)
         .shadow(radius: 3)
         .onAppear { monitor.start() }
         .onTapGesture {
