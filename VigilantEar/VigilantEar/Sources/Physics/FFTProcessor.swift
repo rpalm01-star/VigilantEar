@@ -1,18 +1,43 @@
+//
+//  FFTProcessor.swift
+//  VigilantEar
+//
+//  Created by Robert Palmer on 4/13/26.
+//  Reviewed and refined by Grok on 5/2/2026
+//
+
 import Foundation
 import Accelerate
 
-/// Optimized, thread-safe FFT processor using Accelerate with GCC-PHAT and Multi-Target Tracking.
+/// High-performance FFT processor using Apple's Accelerate framework.
+///
+/// This class handles:
+/// - Single dominant frequency analysis
+/// - Multi-target peak detection (up to N simultaneous sounds)
+/// - GCC-PHAT Time Difference of Arrival (TDOA) for bearing estimation
+/// - Quadratic interpolation for sub-bin frequency accuracy
+///
+/// It is the core DSP engine behind all real-time acoustic detection.
 final class FFTProcessor: @unchecked Sendable {
+    
+    // MARK: - Configuration
+    
+    private let fftSize: Int
     private let log2n: vDSP_Length
     nonisolated(unsafe) private let fftSetup: FFTSetup
     private let window: [Float]
-    private let fftSize: Int
+    
+    // MARK: - Initialization
     
     nonisolated init(fftSize: Int) {
-        precondition(fftSize > 0 && (fftSize & (fftSize - 1)) == 0, "FFT size must be a power of 2")
+        precondition(fftSize > 0 && (fftSize & (fftSize - 1)) == 0,
+                     "FFT size must be a power of 2")
+        
         self.fftSize = fftSize
         self.log2n = vDSP_Length(log2(Double(fftSize)))
         self.fftSetup = vDSP_create_fftsetup(self.log2n, FFTRadix(kFFTRadix2))!
+        
+        // Pre-compute Hann window for better frequency resolution
         self.window = {
             var w = [Float](repeating: 0, count: fftSize)
             vDSP_hann_window(&w, vDSP_Length(fftSize), 0)
@@ -20,10 +45,13 @@ final class FFTProcessor: @unchecked Sendable {
         }()
     }
     
-    deinit { vDSP_destroy_fftsetup(fftSetup) }
+    deinit {
+        vDSP_destroy_fftsetup(fftSetup)
+    }
     
-    // MARK: - Core Analysis
+    // MARK: - Single Target Analysis
     
+    /// Analyzes a single audio buffer and returns the dominant frequency + confidence.
     nonisolated func analyze(samples: [Float], sampleRate: Double) -> (frequency: Double, confidence: Float) {
         guard samples.count == fftSize else { return (0, 0) }
         
@@ -59,7 +87,9 @@ final class FFTProcessor: @unchecked Sendable {
         return (frequency, confidence)
     }
     
-    /// MULTI-TARGET TRACKER: Finds up to N independent frequency peaks in the audio wash
+    // MARK: - Multi-Target Analysis
+    
+    /// Finds up to `maxPeaks` independent frequency peaks in the audio buffer.
     nonisolated func analyzeMultiple(samples: [Float], sampleRate: Double, maxPeaks: Int = 3) -> [(frequency: Double, confidence: Float)] {
         guard samples.count == fftSize else { return [] }
         
@@ -105,14 +135,14 @@ final class FFTProcessor: @unchecked Sendable {
         }
     }
     
-    // MARK: - TDOA
+    // MARK: - TDOA Bearing Estimation (GCC-PHAT)
+    
+    /// Calculates bearing using GCC-PHAT Time Difference of Arrival.
     nonisolated func calculateTDOA(left: [Float], right: [Float], sampleRate: Double, micDistance: Double = 0.15) -> Double? {
-        // Ensure we never process more than the internal FFT setup can handle
         let safeLeft = Array(left.prefix(fftSize))
         let safeRight = Array(right.prefix(fftSize))
         
-        // If we don't have enough data to fill a single FFT window, abort safely
-        guard safeLeft.count == fftSize, safeRight.count == fftSize else { return 0.0 }
+        guard safeLeft.count == fftSize, safeRight.count == fftSize else { return nil }
         
         let halfSize = fftSize / 2
         var leftReal = [Float](repeating: 0, count: halfSize)
@@ -126,12 +156,11 @@ final class FFTProcessor: @unchecked Sendable {
         var crossReal = [Float](repeating: 0, count: halfSize)
         var crossImag = [Float](repeating: 0, count: halfSize)
         
-        // --- THE ALIASING FIX: Frequency Domain Low-Pass Filter ---
+        // Frequency-domain low-pass filter (removes high-frequency noise)
         let cutoffFrequency: Double = 1200.0
         let maxBin = Int((cutoffFrequency / sampleRate) * Double(fftSize))
         
         for i in 0..<halfSize {
-            // THE MISSING FIX: Actually use the maxBin to zero out the high frequencies!
             if i > maxBin {
                 crossReal[i] = 0.0
                 crossImag[i] = 0.0
@@ -160,12 +189,11 @@ final class FFTProcessor: @unchecked Sendable {
         let virtualMicDistance = micDistance * 1.2
         let maxSampleDelay = Int(ceil((virtualMicDistance / speedOfSound) * sampleRate))
         
-        // --- THE NEW TDOA INTERPOLATION MATH ---
+        // Find highest peak within physical constraints
         var maxVal: Float = -1.0
         var absolutePeakIndex = 0
         var logicalLagIndex = 0
         
-        // Find highest peak within the physical constraints
         for i in 0...maxSampleDelay {
             if crossCorr[i] > maxVal {
                 maxVal = crossCorr[i]
@@ -181,23 +209,18 @@ final class FFTProcessor: @unchecked Sendable {
             }
         }
         
-        // 1. Interpolate using your existing quadratic helper
         let fractionalPeak = quadraticInterpolate(magnitudes: crossCorr, peakIndex: absolutePeakIndex)
-        
-        // 2. Determine the sub-sample offset (-0.5 to +0.5) from the integer peak
         let offset = Double(fractionalPeak) - Double(absolutePeakIndex)
-        
-        // 3. Apply the fractional offset to the physical lag
         let refinedLag = Double(logicalLagIndex) + offset
-        // ---------------------------------------
         
         let deltaT = refinedLag / sampleRate
         let ratio = (deltaT * speedOfSound) / micDistance
         let constrainedRatio = max(-1.0, min(1.0, ratio))
         let theta = asin(constrainedRatio)
-        var degrees = theta * (180.0 / .pi)
         
+        var degrees = theta * (180.0 / .pi)
         degrees *= -1.0
+        
         let horizontalSpread = 2.5
         let finalBearing = degrees * horizontalSpread
         let clampedBearing = max(-90.0, min(90.0, finalBearing))
@@ -206,7 +229,7 @@ final class FFTProcessor: @unchecked Sendable {
         return clampedBearing + jitter
     }
     
-    // MARK: - Private Helpers
+    // MARK: - Private FFT Helpers
     
     nonisolated private func forwardFFT(_ input: [Float], real: inout [Float], imag: inout [Float]) {
         let halfSize = fftSize / 2

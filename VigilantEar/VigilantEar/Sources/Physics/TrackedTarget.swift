@@ -1,33 +1,44 @@
+//
+//  TrackedTarget.swift
+//  VigilantEar
+//
+//  Created by Robert Palmer on 4/13/26.
+//  Reviewed and refined by Grok on 5/2/2026
+//
+
 import Foundation
 import CoreLocation
 import Observation
 import SwiftUI
 
+/// A smoothed, persistent vehicle/target shown on the map with dead-reckoning.
+/// Uses complementary filtering + coasting when new data is sparse.
 @Observable
+@MainActor
 class TrackedTarget: Identifiable {
+    
+    // MARK: - Public Identity & State
     
     let id: UUID
     var currentLabel: String
     
     var smoothedCoordinate: CLLocationCoordinate2D
-    var smoothedDistance: Double = 0.0          // ← NEW: stable distance for UI
+    var smoothedDistance: Double = 0.0
+    
+    // MARK: - Physics State
     
     private(set) var lastUpdateTime: Date
     private var estimatedHeading: Double = 0.0
     private var estimatedSpeedMPS: Double = 0.0
+    
     private let smoothingFactor = 0.85
-    private let distanceSmoothingFactor = 0.7   // ← NEW: how much to smooth distance
+    private let distanceSmoothingFactor = 0.70
+    
+    // MARK: - Dead Reckoning Timer
     
     private var glideTimer: Timer?
     
-    @MainActor
-    private func startDeadReckoning() {
-        glideTimer = Timer.scheduledTimer(withTimeInterval: 0.03, repeats: true) { [weak self] _ in
-            guard let self = self, self.estimatedSpeedMPS > 0 else { return }
-            let coastedCoordinate = self.projectCoordinate(from: self.smoothedCoordinate, heading: self.estimatedHeading, distanceMeters: self.estimatedSpeedMPS * 0.03)
-            self.smoothedCoordinate = coastedCoordinate
-        }
-    }
+    // MARK: - Initialization
     
     init(initialEvent: SoundEvent) {
         self.id = initialEvent.sessionID
@@ -38,8 +49,37 @@ class TrackedTarget: Identifiable {
         )
         self.smoothedDistance = initialEvent.distance
         self.lastUpdateTime = initialEvent.timestamp
+        
         startDeadReckoning()
     }
+    
+    @MainActor
+    deinit {
+        glideTimer?.invalidate()
+    }
+    
+    // MARK: - Dead Reckoning (Coasting)
+    @MainActor
+    private func startDeadReckoning() {
+        glideTimer = Timer.scheduledTimer(withTimeInterval: 0.03, repeats: true) { [weak self] _ in
+            guard let self = self else { return }
+            
+            // Now safely inside a strong reference + @MainActor context
+            Task { @MainActor in
+                guard self.estimatedSpeedMPS > 0 else { return }
+                
+                let coastedCoordinate = self.projectCoordinate(
+                    from: self.smoothedCoordinate,
+                    heading: self.estimatedHeading,
+                    distanceMeters: self.estimatedSpeedMPS * 0.03
+                )
+                
+                self.smoothedCoordinate = coastedCoordinate
+            }
+        }
+    }
+    
+    // MARK: - Main Update
     
     func update(with rawEvent: SoundEvent) {
         guard let rawLat = rawEvent.latitude, let rawLon = rawEvent.longitude else { return }
@@ -50,7 +90,7 @@ class TrackedTarget: Identifiable {
         
         let rawCoordinate = CLLocationCoordinate2D(latitude: rawLat, longitude: rawLon)
         
-        // Smooth the distance (this is the key fix)
+        // Smooth distance
         let rawDistance = rawEvent.distance
         smoothedDistance = (smoothedDistance * distanceSmoothingFactor) + (rawDistance * (1.0 - distanceSmoothingFactor))
         
@@ -60,7 +100,11 @@ class TrackedTarget: Identifiable {
             self.estimatedSpeedMPS = min(distance / deltaTime, 35.0)
         }
         
-        let predictedCoordinate = projectCoordinate(from: smoothedCoordinate, heading: estimatedHeading, distanceMeters: estimatedSpeedMPS * deltaTime)
+        let predictedCoordinate = projectCoordinate(
+            from: smoothedCoordinate,
+            heading: estimatedHeading,
+            distanceMeters: estimatedSpeedMPS * deltaTime
+        )
         
         let blendedLat = (predictedCoordinate.latitude * smoothingFactor) + (rawCoordinate.latitude * (1.0 - smoothingFactor))
         let blendedLon = (predictedCoordinate.longitude * smoothingFactor) + (rawCoordinate.longitude * (1.0 - smoothingFactor))
@@ -75,6 +119,8 @@ class TrackedTarget: Identifiable {
         self.currentLabel = rawEvent.threatLabel
         self.lastUpdateTime = now
     }
+    
+    // MARK: - Helper Functions (unchanged)
     
     private func calculateDistance(from: CLLocationCoordinate2D, to: CLLocationCoordinate2D) -> Double {
         let loc1 = CLLocation(latitude: from.latitude, longitude: from.longitude)
@@ -100,9 +146,16 @@ class TrackedTarget: Identifiable {
         let bearingRad = heading * .pi / 180.0
         let originLatRad = from.latitude * .pi / 180.0
         let originLonRad = from.longitude * .pi / 180.0
+        
         let destLatRad = asin(sin(originLatRad) * cos(angularDist) + cos(originLatRad) * sin(angularDist) * cos(bearingRad))
-        let destLonRad = originLonRad + atan2(sin(bearingRad) * sin(angularDist) * cos(originLatRad), cos(angularDist) - sin(originLatRad) * sin(destLatRad))
-        return CLLocationCoordinate2D(latitude: destLatRad * 180.0 / .pi, longitude: destLonRad * 180.0 / .pi)
+        let destLonRad = originLonRad + atan2(
+            sin(bearingRad) * sin(angularDist) * cos(originLatRad),
+            cos(angularDist) - sin(originLatRad) * sin(destLatRad)
+        )
+        
+        return CLLocationCoordinate2D(
+            latitude: destLatRad * 180.0 / .pi,
+            longitude: destLonRad * 180.0 / .pi
+        )
     }
-    
 }

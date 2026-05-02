@@ -69,6 +69,20 @@ final class StartupVerificationViewModel {
         resetSteps()
     }
     
+    // MARK: - Private Helpers
+    
+    private func resetSteps() {
+        steps = [
+            VerificationTask(type: .stereoAudio),
+            VerificationTask(type: .audioRouting),
+            VerificationTask(type: .orientation),
+            VerificationTask(type: .locationAccess),
+            VerificationTask(type: .neuralEngine),
+            VerificationTask(type: .storage),
+            VerificationTask(type: .notifications)
+        ]
+        isFinished = false
+    }
     
     // MARK: - Public API
     
@@ -120,7 +134,7 @@ final class StartupVerificationViewModel {
         if finalStatus == .authorizedWhenInUse || finalStatus == .authorizedAlways {
             return (.passed, nil)
         } else {
-            return (.failed, "Location permission required for tactical mapping.")
+            return (.failed, "Location access required")
         }
     }
     
@@ -137,66 +151,48 @@ final class StartupVerificationViewModel {
             }
         }
         
-        let audioSession = AVAudioSession.sharedInstance()
-        
-        do {
-            try audioSession.setCategory(.playAndRecord, mode: .videoRecording, options: [.defaultToSpeaker, .mixWithOthers])
-            try audioSession.setAllowHapticsAndSystemSoundsDuringRecording(true)
-            try audioSession.setActive(true)
-        } catch {
-            return (.failed, "Failed to configure audio session")
-        }
-        
-        guard let builtInMic = audioSession.availableInputs?.first(where: { $0.portType == .builtInMic }) else {
-            return (.failed, "No built-in microphone detected")
-        }
-        
-        let hasStereo = builtInMic.dataSources?.contains { source in
-            source.supportedPolarPatterns?.contains(.stereo) == true
-        } ?? false
-        
-        return hasStereo ? (.passed, nil) : (.failed, "Device does not support stereo microphone array")
+        // Delegate to the single source of truth
+        return await DependencyContainer.shared.microphoneManager.verifyStereoCapability()
     }
     
     private func checkAudioRouting() async -> (status: VerificationStatus, reason: String?) {
-        let audioSession = AVAudioSession.sharedInstance()
+        let permission = AVAudioApplication.shared.recordPermission
         
-        do {
-            try audioSession.setCategory(.record, mode: .measurement, options: [.allowBluetoothHFP, .mixWithOthers])
-            try audioSession.setAllowHapticsAndSystemSoundsDuringRecording(true)
-            try audioSession.setActive(true)
-            
-            let currentRoute = audioSession.currentRoute
-            if currentRoute.inputs.contains(where: { $0.portType == .bluetoothHFP || $0.portType == .headsetMic || $0.portType == .carAudio }) {
-                return (.failed, "Please disconnect external microphones")
-            }
-            return (.passed, nil)
-        } catch {
-            return (.failed, "Audio routing configuration failed")
+        if permission == .denied {
+            return (.failed, "Microphone permission denied")
         }
+        
+        if permission == .undetermined {
+            guard await AVAudioApplication.requestRecordPermission() else {
+                return (.failed, "Microphone permission denied")
+            }
+        }
+        
+        // Delegate to the single source of truth
+        return await DependencyContainer.shared.microphoneManager.verifyAudioRouting()
     }
     
     private func checkOrientation() -> (status: VerificationStatus, reason: String?) {
         guard let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene else {
-            return (.failed, "Unable to determine device orientation")
+            return (.failed, "Cannot determine device orientation")
         }
         
         if scene.effectiveGeometry.interfaceOrientation.isLandscape {
             return (.passed, nil)
         } else {
-            return (.failed, "Please rotate device to Landscape mode")
+            return (.failed, "Rotate device to Landscape mode")
         }
     }
     
     private func checkNeuralEngine() async -> (status: VerificationStatus, reason: String?) {
         let hasANE = MLComputeDevice.allComputeDevices.contains { if case .neuralEngine = $0 { return true }; return false }
-        return hasANE ? (.passed, nil) : (.failed, "Neural Engine (ANE) not available on this device")
+        return hasANE ? (.passed, nil) : (.failed, "ANE neural engine required but missing")
     }
     
     private func checkStorage() async -> (status: VerificationStatus, reason: String?) {
         let fileManager = FileManager.default
         guard let url = fileManager.urls(for: .documentDirectory, in: .userDomainMask).first else {
-            return (.failed, "Unable to access storage")
+            return (.failed, "Stoarge required but unavailable")
         }
         
         do {
@@ -204,7 +200,7 @@ final class StartupVerificationViewModel {
             if let capacity = values.volumeAvailableCapacityForImportantUsage, capacity > 80 * 1024 * 1024 {
                 return (.passed, nil)
             } else {
-                return (.failed, "Insufficient storage (minimum 80 MB required)")
+                return (.failed, "Insufficient storage (minimum 80MB req'd)")
             }
         } catch {
             return (.failed, "Storage check failed")
@@ -219,32 +215,17 @@ final class StartupVerificationViewModel {
         case .authorized, .provisional, .ephemeral:
             return (.passed, nil)
         case .denied:
-            return (.failed, "Notifications are disabled in Settings")
+            return (.failed, "Notifications disabled in Settings")
         case .notDetermined:
             do {
                 let granted = try await center.requestAuthorization(options: [.alert, .badge, .sound])
                 return granted ? (.passed, nil) : (.failed, "Notification permission required")
             } catch {
-                return (.failed, "Failed to request notification permission")
+                return (.failed, "Notification permission required")
             }
         @unknown default:
             return (.failed, "Unknown notification status")
         }
     }
-    
-    
-    // MARK: - Private Helpers
-    
-    private func resetSteps() {
-        steps = [
-            VerificationTask(type: .stereoAudio),
-            VerificationTask(type: .audioRouting),
-            VerificationTask(type: .orientation),
-            VerificationTask(type: .locationAccess),
-            VerificationTask(type: .neuralEngine),
-            VerificationTask(type: .storage),
-            VerificationTask(type: .notifications)
-        ]
-        isFinished = false
-    }
+
 }

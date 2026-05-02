@@ -300,10 +300,16 @@ actor AcousticProcessingPipeline {
                     let angularDist = distanceMeters / earthRadius
                     let trueBearing = (currentHead + currentBearing).truncatingRemainder(dividingBy: 360.0)
                     let bearingRad = trueBearing * .pi / 180.0
+                    
                     let originLatRad = origin.latitude * .pi / 180.0
                     let originLonRad = origin.longitude * .pi / 180.0
+                    
+                    // Correct spherical destination point formula
                     let destLatRad = asin(sin(originLatRad) * cos(angularDist) + cos(originLatRad) * sin(angularDist) * cos(bearingRad))
-                    let destLonRad = originLonRad + atan2(sin(bearingRad) * sin(angularDist) * cos(originLatRad), cos(originLatRad) * sin(destLatRad))
+                    let destLonRad = originLonRad + atan2(
+                        sin(bearingRad) * sin(angularDist) * cos(originLatRad),
+                        cos(angularDist) - sin(originLatRad) * sin(destLatRad)
+                    )
                     
                     let rawTargetLat = destLatRad * 180.0 / .pi
                     let rawTargetLon = destLonRad * 180.0 / .pi
@@ -320,6 +326,8 @@ actor AcousticProcessingPipeline {
                 }
                 
                 let attachedSong = (isMusic) ? songToAttach : nil
+                let dopplerRate = dopplerResult?.shiftHz != nil ? Float(dopplerResult!.shiftHz) : nil
+                let isApproaching = dopplerResult?.isApproaching ?? false
                 let isRevealed = hasMetLeadIn && (effectiveConfidence >= minConf)
                 
                 let newEvent = SoundEvent(
@@ -330,16 +338,32 @@ actor AcousticProcessingPipeline {
                     bearing: currentBearing,
                     distance: normalizedUI_Distance,
                     energy: Float(safePeak),
-                    dopplerRate: dopplerResult?.shiftHz != nil ? Float(dopplerResult!.shiftHz) : nil,
-                    isApproaching: dopplerResult?.isApproaching ?? false,
+                    dopplerRate: dopplerRate,
+                    isApproaching: isApproaching,
                     latitude: targetLat,
                     longitude: targetLon,
                     isRevealed: isRevealed,
                     songLabel: attachedSong,
                 )
                 
+                let outputLat = String(format: "%.3f", targetLat ?? 0.00)
+                let outputLon = String(format: "%.3f", targetLon ?? 0.00)
+                let outputPeak = String(format: "%.3f", safePeak)
+                let outputDopp = String(format: "%.3f", dopplerRate ?? 0.00)
+                
+                // Current phone (user) location
+                let userLat = await String(format: "%.3f", DependencyContainer.shared.microphoneManager.currentLocation?.coordinate.latitude ?? 0.0)
+                let userLon = await String(format: "%.3f", DependencyContainer.shared.microphoneManager.currentLocation?.coordinate.longitude ?? 0.0)
+                
                 if isVehicle {
-                    AppGlobals.doLog(message: "VEHICLE TRACKED [\(effectiveLabel)] Conf:\(String(format: "%.3f", effectiveConfidence)) Revealed:\(isRevealed) Dist:\(Int(estimatedFeet))ft", step: "VEHICLE_TRACK")
+                    AppGlobals.doLog(
+                        message: "VEHICLE [\(effectiveLabel)] Sess:\(threatSessionID) Conf:\(String(format: "%.3f", effectiveConfidence)) Reveal:\(isRevealed) Dist:\(Int(estimatedFeet))ft UserLat:\(userLat) UserLon:\(userLon) TargetLat:\(outputLat) TargetLon:\(outputLon) Peak:\(outputPeak) Dopp:\(outputDopp) Approach:\(isApproaching)",
+                        step: "VEHICLE_TRACK"
+                    )
+                    AppGlobals.doLog(
+                        message: "VEHICLE REVEAL_DECISION [\(effectiveLabel)] Conf:\(String(format: "%.3f", effectiveConfidence)) >= \(minConf) ? \(effectiveConfidence >= minConf) | LeadIn:\(hasMetLeadIn) (alive \(String(format: "%.2f", timeAlive))s) → Revealed:\(isRevealed)",
+                        step: "REVEAL_DEBUG"
+                    )
                 }
                 
                 await MainActor.run {

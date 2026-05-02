@@ -6,6 +6,8 @@
 
 import Synchronization
 import SwiftUI
+import OSLog
+import Foundation
 
 nonisolated struct AppGlobals {
     
@@ -77,7 +79,7 @@ nonisolated struct AppGlobals {
         set { _logToCloud.withLock { $0 = newValue } }
     }
     
-    private static let _purgeCloudLogsOnStartup = Mutex<Bool>(true)
+    private static let _purgeCloudLogsOnStartup = Mutex<Bool>(false)
     public static var purgeCloudLogsOnStartup: Bool {
         get { _purgeCloudLogsOnStartup.withLock { $0 } }
         set { _purgeCloudLogsOnStartup.withLock { $0 = newValue } }
@@ -92,15 +94,24 @@ nonisolated struct AppGlobals {
         ThreatCategory.ignored.rawValue
     ]
     
-    // MARK: - Global Logging (new)
-    /// Fire-and-forget log that can be called from **any** context safely.
-    nonisolated static func doLog(message: String, step: String = "APP", logName: String = AppGlobals.logDataStoreName, isError: Bool = false) {
-        Task.detached(priority: .background) {
-            print(message)
-            await PerformanceLogger.shared.logTelemetry(step: step, message: message, logName: logName, isError: isError)
-        }
+    private static let _standardLog = Mutex<OSLog>(OSLog(subsystem: "com.VigilantEar.app", category: "General"))
+    public static var standardLog: OSLog {
+        get { _standardLog.withLock { $0 } }
     }
     
+    private static let _performanceLog = Mutex<OSLog>(OSLog(subsystem: "com.VigilantEar.app", category: "Performance"))
+    public static var performanceLog: OSLog {
+        get { _performanceLog.withLock { $0 } }
+    }
+
+    // MARK: - Global Logging (new)
+    /// Fire-and-forget log that can be called from **any** context safely.
+    nonisolated static func doLog(message: String, step: String = "APP", firestoreCollectionName: String = AppGlobals.logDataStoreName, isError: Bool = false) {
+        Task.detached(priority: .background) {
+            await PerformanceLogger.shared.fireStoreTelemetry(step: step, message: message, firestoreCollectionName: firestoreCollectionName, isError: isError)
+        }
+    }
+        
     // MARK: - Location & Heading Power Tuning
     //
     // These four values control the balance between battery life and how "alive" the app feels.
@@ -216,4 +227,5 @@ nonisolated struct AppGlobals {
         /// Fade-out animation duration when labels expire
         static let fadeOutDuration: Double = 0.5
     }
+    
 }

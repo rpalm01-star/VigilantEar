@@ -213,4 +213,31 @@ class MicrophoneManager: NSObject, CLLocationManagerDelegate {
     @objc private func handleOrientationChange() {
         // Future use
     }
+    
+    // MARK: - Verification Helpers (called by StartupVerificationViewModel)
+    
+    func verifyStereoCapability() async -> (status: VerificationStatus, reason: String?) {
+        let session = AVAudioSession.sharedInstance()
+        
+        guard let builtInMic = session.availableInputs?.first(where: { $0.portType == .builtInMic }) else {
+            return (.failed, "No built-in microphone detected")
+        }
+        
+        let hasStereo = builtInMic.dataSources?.contains { source in
+            source.supportedPolarPatterns?.contains(.stereo) == true
+        } ?? false
+        
+        return hasStereo ? (.passed, nil) : (.failed, "Device does not support stereo microphone array")
+    }
+    
+    func verifyAudioRouting() async -> (status: VerificationStatus, reason: String?) {
+        let session = AVAudioSession.sharedInstance()
+        
+        let currentRoute = session.currentRoute
+        if currentRoute.inputs.contains(where: { $0.portType == .bluetoothHFP || $0.portType == .headsetMic || $0.portType == .carAudio }) {
+            return (.failed, "Please disconnect external microphones")
+        }
+        return (.passed, nil)
+    }
+    
 }

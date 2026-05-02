@@ -11,7 +11,7 @@ struct DebugHUD: View {
     @Bindable var manager: MicrophoneManager
     var roadManager: RoadManager
     
-    @StateObject private var monitor = SystemMonitor.shared
+    @StateObject private var monitor = TelemetryManager.shared
     @State private var isCloudLoggingEnabled: Bool = AppGlobals.logToCloud
     
     private var thermalIcon: String {

@@ -4,8 +4,8 @@ import Combine
 import UIKit // <--- ADD THIS for UIDevice
 
 @MainActor
-final class SystemMonitor: ObservableObject {
-    static let shared = SystemMonitor()
+final class TelemetryManager: ObservableObject {
+    static let shared = TelemetryManager()
     
     @Published var cpuUsage: Double = 0.0
     @Published var memoryUsageMB: Double = 0.0
@@ -24,10 +24,10 @@ final class SystemMonitor: ObservableObject {
     func start() {
         timer?.invalidate()
         
-        // Poll the system twice a second
-        timer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
+        // Poll the system regularly
+        timer = Timer.scheduledTimer(withTimeInterval: 5.0, repeats: true) { [weak self] _ in
             Task.detached(priority: .background) {
-                let metrics = SystemMonitor.fetchMetrics()
+                let metrics = TelemetryManager.fetchMetrics()
                 await self?.updateUI(cpu: metrics.cpu, mem: metrics.mem)
             }
         }

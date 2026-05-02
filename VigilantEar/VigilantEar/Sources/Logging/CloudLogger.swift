@@ -13,6 +13,7 @@ actor CloudLogger {
     private var isCleanupRunning = false
     
     func logEvent(_ event: SoundEvent) async {
+        
         guard AppGlobals.logToCloud else { return }
         
         let now = Date()
@@ -38,7 +39,7 @@ actor CloudLogger {
     func purgeOldLogs() async {
         
         if (!AppGlobals.purgeCloudLogsOnStartup) {
-            let msg = "✨ Firestore '\(AppGlobals.logDataStoreName)' purge is disabled because AppGlobals.purgeCloudLogsOnStartup is true."
+            let msg = "✨ Firestore '\(AppGlobals.logDataStoreName)' purge is disabled because AppGlobals.purgeCloudLogsOnStartup is false."
             AppGlobals.doLog(message: msg, step: "CLOUDLOGGER")
             return
         }
@@ -68,7 +69,7 @@ actor CloudLogger {
             AppGlobals.doLog(message: msg, step: "CLOUDLOGGER")
             
         } catch {
-            let msg = "⚠️ Failed to purge old logs: \(error.localizedDescription)"
+            let msg = "⚠️ Failed to purge old logs from Firestore: \(error.localizedDescription)"
             AppGlobals.doLog(message: msg, step: "CLOUDLOGGER")
         }
     }
@@ -101,6 +102,9 @@ actor CloudLogger {
     }
     
     private func writeToCloud(event: SoundEvent, status: String) async {
+        
+        guard AppGlobals.logToCloud else { return }
+
         var eventData: [String: Any] = [
             "sessionID": event.sessionID.uuidString,
             "threatLabel": event.threatLabel,
@@ -125,8 +129,7 @@ actor CloudLogger {
         do {
             try await db.collection(AppGlobals.dataStoreName).document(event.id.uuidString).setData(eventData)
         } catch {
-            let msg = "⚠️ Cloud write queued (Offline): \(error.localizedDescription)"
-            AppGlobals.doLog(message: msg, step: "CLOUDLOGGER")
+            // No action
         }
     }
 }

@@ -81,7 +81,17 @@ struct SoundProfile {
     ]
     
     private static let vehicles: [(keywords: [String], icon: String, color: Color, ceiling: Double, maxRange: Double, category: ThreatCategory, snaps: Bool, haptics: Int, cooldown: Double, minConf: Double, leadIn: Double, tail: Double)] = [
-        (["car", "car_horn", "car_passing_by", "race_car", "truck", "bus", "motorcycle", "traffic_noise", "engine", "engine_accelerating_revving", "engine_starting", "engine_idling", "engine_knocking", "vehicle_skidding"], "car.fill", .blue, 0.50, 500.0, .vehicle, true, 0, 0.1, 0.25, 0.15, 1.8),
+        (["car", "car_horn", "car_passing_by", "race_car", "truck", "bus", "motorcycle", "traffic_noise", "engine", "engine_accelerating_revving", "engine_starting", "engine_idling", "engine_knocking", "vehicle_skidding"], "car.fill",
+         .blue,
+         0.50,
+         500.0,
+        .vehicle,
+         true,
+         0,
+         0.1,
+         0.20,
+         0.08,
+         2.5),
         (["train", "rail_transport", "air_horn", "train_whistle", "foghorn", "train_horn", "railroad_car", "train_wheels_squealing", "subway_metro", "aircraft", "helicopter", "airplane", "boat_water_vehicle", "sailing", "rowboat_canoe_kayak", "motorboat_speedboat"], "tram.fill.tunnel", .blue, 0.15, 600.0, .ignored, false, 0, 0.8, 0.50, 1.0, 3.0),
         (["bicycle","bicycle_bell"], "bicycle", .blue, 0.65, 250.0, .medium, true, 0, 1.5, 0.40, 0.5, 0.5),
     ]
@@ -103,7 +113,7 @@ struct SoundProfile {
     ]
     
     private static let household: [(keywords: [String], icon: String, color: Color, ceiling: Double, maxRange: Double, category: ThreatCategory, snaps: Bool, haptics: Int, cooldown: Double, minConf: Double, leadIn: Double, tail: Double)] = [
-        (["lawn_mower", "cutlery_silverware", "chopping_food", "frying_food", "blender", "water_tap_faucet", "bathtub_filling_washing", "hair_dryer", "drawer_open_close", "toothbrush", "vacuum_cleaner", "electric_shaver", "zipper"], "house.fill", .mint, 0.40, 40.0, .ignored, false, 0, 1.6, 0.65, 0.8, 1.5),
+        (["lawn_mower", "cutlery_silverware", "dishes_pots_pans", "chopping_food", "frying_food", "blender", "water_tap_faucet", "bathtub_filling_washing", "hair_dryer", "drawer_open_close", "toothbrush", "vacuum_cleaner", "electric_shaver", "zipper"], "house.fill", .mint, 0.40, 40.0, .ignored, false, 0, 1.6, 0.65, 0.8, 1.5),
         (["typing", "tap", "typewriter", "typing_computer_keyboard", "writing", "camera", "printer"], "keyboard", .mint, 0.35, 40.0, .ignored, false, 0, 2.2, 0.65, 0.5, 1.5),
         (["door", "squeak", "keys_jangling", "coin_dropping", "scissors", "ratchet_and_pawl", "power_windows"], "door.left.hand.closed", .mint, 0.60, 30.0, .misc, false, 0, 1.6, 0.60, 0.2, 1.5),
         (["liquid_splashing", "liquid_sloshing", "liquid_squishing", "liquid_dripping", "liquid_trickle_dribble", "liquid_filling_container", "liquid_spraying", "water_pump", "underwater_bubbling", "whoosh_swoosh_swish", "thump_thud", "crushing", "crumpling_crinkling", "tearing", "click"], "drop.fill", .mint, 0.45, 50.0, .ignored, false, 0, 2.2, 0.65, 0.5, 1.5),
@@ -176,9 +186,9 @@ struct SoundProfile {
             }
         }
         
-        AppGlobals.doLog(message: "⚠️ UNEXPECTED: Sound label [\(lowerLabel)] was NOT in registry.",
+        AppGlobals.doLog(message: "⚠️ UNEXPECTED: Sound label [\(lowerLabel)] was not in the registry! \(Date()).",
                          step: "SOUNDPROFILE_CLASSIFY",
-                         logName: AppGlobals.logDataStoreName,
+                         firestoreCollectionName: AppGlobals.exceptionsDataStoreName,
                          isError: true)
         
         let fallback = SoundProfile(
