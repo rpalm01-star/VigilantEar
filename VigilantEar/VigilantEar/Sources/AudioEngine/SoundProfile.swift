@@ -81,8 +81,8 @@ struct SoundProfile {
     ]
     
     private static let vehicles: [(keywords: [String], icon: String, color: Color, ceiling: Double, maxRange: Double, category: ThreatCategory, snaps: Bool, haptics: Int, cooldown: Double, minConf: Double, leadIn: Double, tail: Double)] = [
-        (["car", "car_horn", "car_passing_by", "race_car", "truck", "bus", "motorcycle", "traffic_noise", "engine", "engine_accelerating_revving", "engine_starting", "engine_idling", "engine_knocking", "vehicle_skidding"], "car.fill", .blue, 0.50, 500.0, .vehicle, true, 0, 0.1, 0.25, 0.3, 1.2),        (["train_horn", "foghorn", "air_horn", "train_whistle"], "horn.fill", .blue, 0.60, 500.0, .ignored, true, 0, 2.0, 0.60, 0.2, 2.0),
-        (["train", "rail_transport", "railroad_car", "train_wheels_squealing", "subway_metro", "aircraft", "helicopter", "airplane", "boat_water_vehicle", "sailing", "rowboat_canoe_kayak", "motorboat_speedboat"], "tram.fill.tunnel", .blue, 0.15, 600.0, .ignored, false, 0, 0.8, 0.50, 1.0, 3.0),
+        (["car", "car_horn", "car_passing_by", "race_car", "truck", "bus", "motorcycle", "traffic_noise", "engine", "engine_accelerating_revving", "engine_starting", "engine_idling", "engine_knocking", "vehicle_skidding"], "car.fill", .blue, 0.50, 500.0, .vehicle, true, 0, 0.1, 0.25, 0.15, 1.8),
+        (["train", "rail_transport", "air_horn", "train_whistle", "foghorn", "train_horn", "railroad_car", "train_wheels_squealing", "subway_metro", "aircraft", "helicopter", "airplane", "boat_water_vehicle", "sailing", "rowboat_canoe_kayak", "motorboat_speedboat"], "tram.fill.tunnel", .blue, 0.15, 600.0, .ignored, false, 0, 0.8, 0.50, 1.0, 3.0),
         (["bicycle","bicycle_bell"], "bicycle", .blue, 0.65, 250.0, .medium, true, 0, 1.5, 0.40, 0.5, 0.5),
     ]
     

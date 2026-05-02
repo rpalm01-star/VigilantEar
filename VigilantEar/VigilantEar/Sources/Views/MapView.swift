@@ -43,10 +43,11 @@ struct MapView: View {
                 showLegalSheet = true
             } label: {
                 Text("Legal")
-                    .font(.system(size: 13, weight: .semibold, design: .monospaced))
-                    .foregroundColor(.cyan.opacity(0.7))
+                    .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                    .foregroundColor(.gray.opacity(0.7))
                     .padding(.horizontal, 10)
                     .padding(.vertical, 4)
+                    .underline()
                     .background(
                         GeometryReader { geo in
                             ZStack(alignment: .trailing) {

@@ -22,20 +22,20 @@ struct ContentView: View {
                         // TOP LEFT: Title & Compact Controls
                         VStack(alignment: .leading, spacing: 12) {
                             
-                            Text(AppGlobals.appplicationTitle)
+                            Text(AppGlobals.applicationTitle)
                                 .font(.system(.headline, design: .monospaced))
                                 .tracking(3)
                                 .foregroundStyle(.black)
                                 .background {
                                     // Soft mint background glow (behind everything)
-                                    Text(AppGlobals.appplicationTitle)
+                                    Text(AppGlobals.applicationTitle)
                                         .font(.system(.headline, design: .monospaced))
                                         .tracking(3)
                                         .foregroundStyle(AppGlobals.darkGray.opacity(0.9))
                                         .blur(radius: 10)
                                 }
                                 .overlay {
-                                    Text(AppGlobals.appplicationTitle)
+                                    Text(AppGlobals.applicationTitle)
                                         .font(.system(.headline, design: .monospaced))
                                         .tracking(3)
                                         .foregroundStyle(.green)
@@ -134,20 +134,20 @@ struct ContentView: View {
                 if isPortrait {
                     Color.black.opacity(0.85).ignoresSafeArea()
                     VStack(spacing: 20) {
-                        Text(AppGlobals.appplicationTitle)
+                        Text(AppGlobals.applicationTitle)
                             .font(.system(.headline, design: .monospaced))
                             .tracking(3)
                             .foregroundStyle(.black)
                             .background {
                                 // Soft mint background glow (behind everything)
-                                Text(AppGlobals.appplicationTitle)
+                                Text(AppGlobals.applicationTitle)
                                     .font(.system(.headline, design: .monospaced))
                                     .tracking(3)
                                     .foregroundStyle(.mint.opacity(0.9))
                                     .blur(radius: 10)
                             }
                             .overlay {
-                                Text(AppGlobals.appplicationTitle)
+                                Text(AppGlobals.applicationTitle)
                                     .font(.system(.headline, design: .monospaced))
                                     .tracking(3)
                                     .foregroundStyle(.green)
