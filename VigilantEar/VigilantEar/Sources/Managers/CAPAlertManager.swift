@@ -1,17 +1,10 @@
-//
-//  CAPAlert.swift
-//  VigilantEar
-//
-//  Created by Robert Palmer on 5/3/26.
-//
-
-
 import Foundation
 import CoreLocation
 import Observation
 
 struct CAPAlert: Identifiable {
     let id = UUID()
+    let event: String
     let headline: String
     let polygon: [CLLocationCoordinate2D]
 }
@@ -26,18 +19,20 @@ class CAPAlertManager: NSObject {
     private var lastLocation: CLLocationCoordinate2D?
     private var isFetching = false
     
-    // Example: US NWS CAP Feed (Can add Canada/UK URLs to an array and loop them)
-    private let feedURL = URL(string: "https://api.weather.gov/alerts/active.atom")!
-    
-    // XML Parsing State
-    private var currentElement = ""
-    private var currentHeadline = ""
-    private var currentPolygonStr = ""
-    private var tempAlerts: [CAPAlert] = []
+    // The Global CAP Feeds Array
+    private let feedURLs: [URL] = [
+        URL(string: "https://api.weather.gov/alerts/active.atom")!,                        // US: National Weather Service
+        URL(string: "https://feeds.meteoalarm.org/feeds/meteoalarm-legacy-atom-spain")!,   // EU: Spain (Meteoalarm)
+        URL(string: "https://feeds.meteoalarm.org/feeds/meteoalarm-legacy-atom-germany")!, // EU: Germany (Meteoalarm)
+        URL(string: "https://feeds.meteoalarm.org/feeds/meteoalarm-legacy-atom-ireland")!  // EU: Ireland (Meteoalarm)
+        
+        // (You can add more European countries just by copying the URL
+        // and changing the country name at the very end!)
+    ]
     
     func startPolling() {
         // Poll every 5 minutes
-        Timer.scheduledTimer(withTimeInterval: 300, repeats: true) { [weak self] _ in
+        Timer.scheduledTimer(withTimeInterval: 900, repeats: true) { [weak self] _ in
             Task { await self?.fetchFeeds() }
         }
         Task { await fetchFeeds() }
@@ -52,31 +47,40 @@ class CAPAlertManager: NSObject {
         guard !isFetching else { return }
         isFetching = true
         
-        do {
-            var request = URLRequest(url: feedURL)
-            request.setValue("VigilantEar/1.0 (Rpalm01@gmail.com)", forHTTPHeaderField: "User-Agent")
-            request.setValue("application/cap+xml", forHTTPHeaderField: "Accept")
-            
-            let (data, response) = try await URLSession.shared.data(for: request)
-            
-            if let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode != 200 {
-                AppGlobals.doLog(message: "⚠️ NWS returned status code: \(httpResponse.statusCode)", step: "CAP_MGR", isError: true)
+        var combinedAlerts: [CAPAlert] = []
+        
+        // Loop through all international feeds
+        for url in feedURLs {
+            do {
+                var request = URLRequest(url: url)
+                request.setValue("\(AppGlobals.appTitle)/\(AppGlobals.appVersion) (\(AppGlobals.appEmail))", forHTTPHeaderField: "User-Agent")
+                request.setValue("application/cap+xml", forHTTPHeaderField: "Accept")
+                
+                // Don't let a dead international server hang the other feeds
+                request.timeoutInterval = 10
+                
+                let (data, response) = try await URLSession.shared.data(for: request)
+                
+                if let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 {
+                    // Run the parser directly on the current actor
+                    let parser = CAPFeedParser()
+                    let parsedAlerts = parser.parse(data: data)
+                    combinedAlerts.append(contentsOf: parsedAlerts)
+                } else {
+                    let status = (response as? HTTPURLResponse)?.statusCode ?? 0
+                    AppGlobals.doLog(message: "⚠️ Bad status \(status) from \(url.host ?? "Unknown")", step: "CAP_MGR", isError: true)
+                }
+                
+            } catch {
+                AppGlobals.doLog(message: "⚠️ Fetch Failed for \(url.host ?? "Unknown"): \(error.localizedDescription)", step: "CAP_MGR", isError: true)
             }
-            
-            // Hop off the Main thread to parse the huge XML synchronously
-            let parsedAlerts = await Task.detached {
-                let parser = CAPFeedParser()
-                return parser.parse(data: data)
-            }.value
-            
-            self.allActiveAlerts = parsedAlerts
-            recalculateIntersections()
-            
-            AppGlobals.doLog(message: "🌍 CAP Feed Parsed. \(allActiveAlerts.count) active alerts globally.", step: "CAP_MGR")
-            
-        } catch {
-            AppGlobals.doLog(message: "⚠️ CAP Fetch Failed: \(error.localizedDescription)", step: "CAP_MGR", isError: true)
         }
+        
+        // Overwrite the master array only after all feeds have been processed
+        self.allActiveAlerts = combinedAlerts
+        recalculateIntersections()
+        
+        AppGlobals.doLog(message: "🌍 CAP Feeds Parsed. \(allActiveAlerts.count) active alerts globally.", step: "CAP_MGR")
         
         isFetching = false
     }
@@ -106,13 +110,14 @@ class CAPAlertManager: NSObject {
         }
         return isInside
     }
-    
 }
 
+// MARK: - Synchronous XML Parser
 class CAPFeedParser: NSObject, XMLParserDelegate {
     private var alerts: [CAPAlert] = []
     
     private var currentElement = ""
+    private var currentEvent = ""
     private var currentHeadline = ""
     private var currentPolygonStr = ""
     
@@ -132,24 +137,23 @@ class CAPFeedParser: NSObject, XMLParserDelegate {
         let trimmed = string.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
         
-        // Supports both US ATOM feeds (title) and Global CAP feeds (headline)
         if currentElement == "title" || currentElement == "headline" {
             currentHeadline += string
+        } else if currentElement == "cap:event" || currentElement == "event" {
+            currentEvent += string
         } else if currentElement == "cap:polygon" || currentElement == "polygon" {
             currentPolygonStr += string
         }
     }
     
     func parser(_ parser: XMLParser, didEndElement elementName: String, namespaceURI: String?, qualifiedName qName: String?) {
-        // Stop recording characters for this element
         if elementName == currentElement {
             currentElement = ""
         }
         
-        // "entry" is for US ATOM, "info" is for Global CAP
         if elementName == "entry" || elementName == "info" {
             if !currentPolygonStr.isEmpty {
-                let pairs = currentPolygonStr.split(separator: " ")
+                let pairs = currentPolygonStr.components(separatedBy: .whitespacesAndNewlines).filter { !$0.isEmpty }
                 var coordinates: [CLLocationCoordinate2D] = []
                 
                 for pair in pairs {
@@ -160,11 +164,15 @@ class CAPFeedParser: NSObject, XMLParserDelegate {
                 }
                 
                 if !coordinates.isEmpty {
-                    alerts.append(CAPAlert(headline: currentHeadline, polygon: coordinates))
+                    let cleanEvent = currentEvent.trimmingCharacters(in: .whitespacesAndNewlines)
+                    let finalEvent = cleanEvent.isEmpty ? "EMERGENCY ALERT" : cleanEvent
+                    
+                    alerts.append(CAPAlert(event: finalEvent, headline: currentHeadline, polygon: coordinates))
                 }
             }
             
             // Reset for the next alert block
+            currentEvent = ""
             currentHeadline = ""
             currentPolygonStr = ""
         }

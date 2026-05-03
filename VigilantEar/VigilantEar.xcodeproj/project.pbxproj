@@ -11,6 +11,7 @@
 		308580022FA46267008C9C1B /* coverage.geojson in Resources */ = {isa = PBXBuildFile; fileRef = 308580012FA46267008C9C1B /* coverage.geojson */; };
 		30A396432F908D4800D441A0 /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = 30A396422F908D4800D441A0 /* GoogleService-Info.plist */; };
 		30A396462F908DF700D441A0 /* FirebaseFirestore in Frameworks */ = {isa = PBXBuildFile; productRef = 30A396452F908DF700D441A0 /* FirebaseFirestore */; };
+		30ADE5382FA7BBB200697479 /* NWSTestLocation.gpx in Resources */ = {isa = PBXBuildFile; fileRef = 30ADE5372FA7BBB200697479 /* NWSTestLocation.gpx */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -19,6 +20,7 @@
 		308580012FA46267008C9C1B /* coverage.geojson */ = {isa = PBXFileReference; lastKnownFileType = text; path = coverage.geojson; sourceTree = "<group>"; };
 		308EF3EB2F875A9400885DCB /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		30A396422F908D4800D441A0 /* GoogleService-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "GoogleService-Info.plist"; sourceTree = "<group>"; };
+		30ADE5372FA7BBB200697479 /* NWSTestLocation.gpx */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = NWSTestLocation.gpx; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -139,6 +141,7 @@
 				308EF3EB2F875A9400885DCB /* Info.plist */,
 				3053DCAB2F83718A00241892 /* Sources */,
 				3053DCAC2F83718A00241892 /* Assets.xcassets */,
+				30ADE5372FA7BBB200697479 /* NWSTestLocation.gpx */,
 			);
 			path = VigilantEar;
 			sourceTree = "<group>";
@@ -224,6 +227,7 @@
 			files = (
 				3053DCBF2F83718A00241892 /* Assets.xcassets in Resources */,
 				30A396432F908D4800D441A0 /* GoogleService-Info.plist in Resources */,
+				30ADE5382FA7BBB200697479 /* NWSTestLocation.gpx in Resources */,
 				308580022FA46267008C9C1B /* coverage.geojson in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

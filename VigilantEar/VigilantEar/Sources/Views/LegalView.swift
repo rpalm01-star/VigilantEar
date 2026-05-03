@@ -14,20 +14,20 @@ struct LegalView: View {
                 
                 Spacer()
                 
-                Text(AppGlobals.applicationTitle)
+                Text(AppGlobals.appTitle)
                     .font(.system(.headline, design: .monospaced))
                     .tracking(3)
                     .foregroundStyle(.black)
                     .background {
                         // Soft mint background glow (behind everything)
-                        Text(AppGlobals.applicationTitle)
+                        Text(AppGlobals.appTitle)
                             .font(.system(.headline, design: .monospaced))
                             .tracking(3)
                             .foregroundStyle(AppGlobals.darkGray.opacity(0.9))
                             .blur(radius: 10)
                     }
                     .overlay {
-                        Text(AppGlobals.applicationTitle)
+                        Text(AppGlobals.appTitle)
                             .font(.system(.headline, design: .monospaced))
                             .tracking(3)
                             .foregroundStyle(.green)

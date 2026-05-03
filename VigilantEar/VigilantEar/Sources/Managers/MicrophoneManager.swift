@@ -24,12 +24,15 @@ class MicrophoneManager: NSObject, CLLocationManagerDelegate {
     
     private let locationManager = CLLocationManager()
     private let audioEngine = AVAudioEngine()
+
     
     private let acousticPipeline: AcousticProcessingPipeline
     private let acousticCoordinator: AcousticCoordinator
     private let classificationService: ClassificationService
+    private let capAlertManager: CAPAlertManager
+
     public let roadManager: RoadManager
-    
+
     private var lastLocationPush: Date = .distantPast
     private var lastHeadingPush: Date = .distantPast
     
@@ -39,8 +42,10 @@ class MicrophoneManager: NSObject, CLLocationManagerDelegate {
         NotificationCenter.default.removeObserver(self)
         stopCapturing()
     }
+
     
-    init(acousticCoordinator: AcousticCoordinator, classificationService: ClassificationService, roadManager: RoadManager, acousticPipeline: AcousticProcessingPipeline) {
+    init(acousticCoordinator: AcousticCoordinator, classificationService: ClassificationService, roadManager: RoadManager, acousticPipeline: AcousticProcessingPipeline, capAlertManager: CAPAlertManager) {
+        self.capAlertManager = capAlertManager
         self.acousticCoordinator = acousticCoordinator
         self.classificationService = classificationService
         self.roadManager = roadManager
@@ -79,6 +84,11 @@ class MicrophoneManager: NSObject, CLLocationManagerDelegate {
     func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
         guard let location = locations.last else { return }
         roadManager.processLocationUpdate(location)
+        
+        Task { @MainActor in
+            self.capAlertManager.updateLocation(location.coordinate)
+        }
+        
         if Date().timeIntervalSince(lastLocationPush) >= AppGlobals.locationUpdateThrottle {
             lastLocationPush = Date()
             Task {

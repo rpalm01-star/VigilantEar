@@ -38,9 +38,14 @@ nonisolated struct AppGlobals {
     }
     
     private static let _appTitle = Mutex<String>(String(localized: "VIGILANT EAR"))
-    public static var applicationTitle: String {
+    public static var appTitle: String {
         get { _appTitle.withLock { $0 } }
         set { _appTitle.withLock { $0 = newValue } }
+    }
+    
+    private static let _appEmail = Mutex<String>(String(localized: "vigilantear@wingdingssocial.com"))
+    public static var appEmail: String {
+        get { _appEmail.withLock { $0 } }
     }
     
     private static let _dataStoreName = Mutex<String>("threats")

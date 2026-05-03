@@ -3,6 +3,9 @@ import SwiftUI
 struct ContentView: View {
     @Environment(MicrophoneManager.self) private var microphoneManager
     @Environment(AcousticCoordinator.self) private var coordinator
+    @Environment(CAPAlertManager.self) private var capManager
+    
+    @State private var showLegalSheet = false // --- ADDED LEGAL STATE ---
     
     var body: some View {
         GeometryReader { geo in
@@ -22,29 +25,27 @@ struct ContentView: View {
                         // TOP LEFT: Title & Compact Controls
                         VStack(alignment: .leading, spacing: 12) {
                             
-                            Text(AppGlobals.applicationTitle)
+                            Text(AppGlobals.appTitle)
                                 .font(.system(.headline, design: .monospaced))
                                 .tracking(3)
                                 .foregroundStyle(.black)
                                 .background {
-                                    // Soft mint background glow (behind everything)
-                                    Text(AppGlobals.applicationTitle)
+                                    Text(AppGlobals.appTitle)
                                         .font(.system(.headline, design: .monospaced))
                                         .tracking(3)
                                         .foregroundStyle(AppGlobals.darkGray.opacity(0.9))
                                         .blur(radius: 10)
                                 }
                                 .overlay {
-                                    Text(AppGlobals.applicationTitle)
+                                    Text(AppGlobals.appTitle)
                                         .font(.system(.headline, design: .monospaced))
                                         .tracking(3)
                                         .foregroundStyle(.green)
-                                        .blur(radius: 0.9)                   // ← tweak this for outline thickness
+                                        .blur(radius: 0.9)
                                 }
                             
-                            // THE COMPACT CONTROLS (Size locked to 40x40)
+                            // THE COMPACT CONTROLS
                             HStack(spacing: 12) {
-                                // Simulation Button (Fire First)
                                 Button(action: {
                                     ThreatSimulator.runFireTruckDriveBy(location: microphoneManager.currentLocation,
                                                                         heading: microphoneManager.currentHeading,
@@ -61,7 +62,6 @@ struct ContentView: View {
                                         .overlay(Circle().stroke(Color.white.opacity(0.2), lineWidth: 1))
                                 }
                                 
-                                // Snap to User Button (Nav Second)
                                 Button(action: {
                                     NotificationCenter.default.post(name: NSNotification.Name("SnapToUser"), object: nil)
                                 }) {
@@ -98,7 +98,7 @@ struct ContentView: View {
                     
                     Spacer()
                     
-                    // BOTTOM OVERLAY AREA (Threats & Shazam)
+                    // BOTTOM OVERLAY AREA (Threats, Shazam, Legal, & CAP Banner)
                     HStack(alignment: .bottom) {
                         VStack(alignment: .leading, spacing: 12) {
                             ThreatHUD(events: coordinator.activeEvents)
@@ -122,6 +122,59 @@ struct ContentView: View {
                                     removal: .opacity
                                 ))
                             }
+                            
+                            // --- LEGAL BUTTON & CAP BANNER GROUP ---
+                            HStack(spacing: 12) {
+                                // 1. Legal Button (Always visible)
+                                Button {
+                                    showLegalSheet = true
+                                } label: {
+                                    Text("Legal")
+                                        .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                                        .foregroundColor(.gray.opacity(0.7))
+                                        .padding(.horizontal, 10)
+                                        .padding(.vertical, 4)
+                                        .underline()
+                                        .background(
+                                            GeometryReader { geo in
+                                                ZStack(alignment: .trailing) {
+                                                    RoundedRectangle(cornerRadius: 5)
+                                                        .fill(Color.black.opacity(0.10))
+                                                        .overlay(
+                                                            RoundedRectangle(cornerRadius: 5)
+                                                                .stroke(Color.cyan.opacity(0.25), lineWidth: 0.8)
+                                                        )
+                                                    RoundedRectangle(cornerRadius: 5)
+                                                        .fill(Color.cyan.opacity(0.0))
+                                                        .frame(width: geo.size.width * 0.0)
+                                                }
+                                            }
+                                        )
+                                        .clipShape(RoundedRectangle(cornerRadius: 5))
+                                }
+                                
+                                // 2. CAP Emergency Banner
+                                if let activeAlert = capManager.nearbyAlerts.first {
+                                    // NO MORE STRING HACKING HERE
+                                    
+                                    HStack(spacing: 8) {
+                                        Image(systemName: "exclamationmark.triangle.fill")
+                                            .font(.system(size: 14, weight: .bold))
+                                        
+                                        // JUST USE THE DIRECT EVENT TAG
+                                        Text(activeAlert.event.uppercased())
+                                            .font(.system(size: 13, weight: .bold, design: .monospaced))
+                                            .lineLimit(1)
+                                    }
+                                    .padding(.horizontal, 16)
+                                    .padding(.vertical, 8)
+                                    .background(.red.opacity(0.6))
+                                    .foregroundStyle(.white.opacity(0.95))
+                                    .clipShape(Capsule())
+                                    .shadow(color: .black.opacity(0.3), radius: 4, x: 0, y: 2)
+                                    .transition(.move(edge: .leading).combined(with: .opacity))
+                                }
+                            }
                         }
                         .padding(.leading, 10)
                         
@@ -130,28 +183,28 @@ struct ContentView: View {
                     .padding(.bottom, 15)
                 }
                 .animation(.easeInOut, value: coordinator.activeSong)
+                .animation(.easeInOut, value: capManager.nearbyAlerts.count)
                 
                 if isPortrait {
                     Color.black.opacity(0.85).ignoresSafeArea()
                     VStack(spacing: 20) {
-                        Text(AppGlobals.applicationTitle)
+                        Text(AppGlobals.appTitle)
                             .font(.system(.headline, design: .monospaced))
                             .tracking(3)
                             .foregroundStyle(.black)
                             .background {
-                                // Soft mint background glow (behind everything)
-                                Text(AppGlobals.applicationTitle)
+                                Text(AppGlobals.appTitle)
                                     .font(.system(.headline, design: .monospaced))
                                     .tracking(3)
                                     .foregroundStyle(.mint.opacity(0.9))
                                     .blur(radius: 10)
                             }
                             .overlay {
-                                Text(AppGlobals.applicationTitle)
+                                Text(AppGlobals.appTitle)
                                     .font(.system(.headline, design: .monospaced))
                                     .tracking(3)
                                     .foregroundStyle(.green)
-                                    .blur(radius: 0.9)                   // ← tweak this for outline thickness
+                                    .blur(radius: 0.9)
                             }
                         Image(systemName: "iphone.landscape").font(.system(size: 80)).foregroundStyle(.red)
                         Text("SPATIAL ARRAY MISALIGNED").font(.title2.monospaced().bold()).foregroundStyle(.red)
@@ -164,7 +217,9 @@ struct ContentView: View {
                     .padding(.bottom, 12)
                     .padding(.trailing, 12)
             }
-            // Bridge the GPS from the Mic Manager to the Road Manager
+            .sheet(isPresented: $showLegalSheet) {
+                LegalView()
+            }
             .onChange(of: microphoneManager.currentLocation) { _, newLocation in
                 if let location = newLocation {
                     microphoneManager.roadManager.processLocationUpdate(location)

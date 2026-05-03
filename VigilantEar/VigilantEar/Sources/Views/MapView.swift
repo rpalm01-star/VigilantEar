@@ -4,7 +4,7 @@ import CoreLocation
 
 struct MapView: View {
     @Environment(AcousticCoordinator.self) private var coordinator
-    @State private var showLegalSheet = false
+    @Environment(CAPAlertManager.self) private var capManager
     
     static let CAMERA_DISTANCE: Double = 400
     
@@ -38,47 +38,19 @@ struct MapView: View {
             NeuralTickerHUD()
                 .allowsHitTesting(false)
         }
-        .overlay(alignment: .bottomTrailing) {
-            Button {
-                showLegalSheet = true
-            } label: {
-                Text("Legal")
-                    .font(.system(size: 11, weight: .semibold, design: .monospaced))
-                    .foregroundColor(.gray.opacity(0.7))
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 4)
-                    .underline()
-                    .background(
-                        GeometryReader { geo in
-                            ZStack(alignment: .trailing) {
-                                // Base background (same as ticker)
-                                RoundedRectangle(cornerRadius: 5)
-                                    .fill(Color.black.opacity(0.10))
-                                    .overlay(
-                                        RoundedRectangle(cornerRadius: 5)
-                                            .stroke(Color.cyan.opacity(0.25), lineWidth: 0.8)
-                                    )
-                                
-                                // 0% confidence fill (almost invisible)
-                                RoundedRectangle(cornerRadius: 5)
-                                    .fill(Color.cyan.opacity(0.0))   // 0% fill
-                                    .frame(width: geo.size.width * 0.0)
-                            }
-                        }
-                    )
-                    .clipShape(RoundedRectangle(cornerRadius: 5))
-            }
-            .padding(.trailing, 30)
-            .padding(.bottom, 8)
-        }
-        .sheet(isPresented: $showLegalSheet) {
-            LegalView()
-        }
     }
     
-    // MARK: - Extracted Overlays (Fixed opaque return type)
+    // MARK: - Extracted Overlays
     private var userLocationOverlays: some MapContent {
         Group {
+            
+            // --- THE SOFTENED EMERGENCY POLYGONS ---
+            ForEach(capManager.nearbyAlerts) { alert in
+                MapPolygon(coordinates: alert.polygon)
+                    .foregroundStyle(.red.opacity(0.10))
+                    .stroke(.red.opacity(0.6), style: StrokeStyle(lineWidth: 2, dash: [6, 6]))
+            }
+            
             if let location = userLocation {
                 let center = location.coordinate
                 let hasEmergencyInside500ft = events.contains { event in
@@ -201,27 +173,24 @@ struct ThreatMarker: View {
     
     var body: some View {
         let profile = SoundProfile.classify(currentLabel)
-        
-        // Use tracked vehicle's unique tint for the inner icon
         let iconColor = activeEvent?.trackedTarget?.iconTintColor ?? profile.color
         
         ZStack {
             if profile.isEmergency {
                 Image(systemName: profile.icon)
                     .font(.system(size: 24, weight: .bold))
-                    .foregroundColor(iconColor)           // ← tinted
+                    .foregroundColor(iconColor)
                     .shadow(color: iconColor, radius: 10)
             } else {
                 Image(systemName: profile.icon)
                     .font(.system(size: 18, weight: .semibold))
-                    .foregroundColor(iconColor)           // ← tinted
+                    .foregroundColor(iconColor)
                     .padding(8)
                     .background(.ultraThinMaterial)
                     .clipShape(Circle())
                     .shadow(radius: 3)
             }
             
-            // Doppler chevron stays the same
             if let event = activeEvent, let rate = event.dopplerRate, abs(rate) > 0.1 {
                 let pointingAngle = event.isApproaching ? (event.bearing + 180) : event.bearing
                 

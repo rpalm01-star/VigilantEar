@@ -91,7 +91,7 @@ struct StartupVerificationView: View {
     
     private var header: some View {
         VStack(alignment: isLandscape ? .leading : .center, spacing: 4) {
-            Text(AppGlobals.applicationTitle)
+            Text(AppGlobals.appTitle)
                 .font(.system(size: 32, weight: .black, design: .monospaced))
             // 🚨 Double-stacked shadow for the true CRT radar glow
                 .foregroundStyle(.green)

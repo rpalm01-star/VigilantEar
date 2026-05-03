@@ -35,6 +35,7 @@ struct VigilantEarApp: App {
                         .environment(deps.microphoneManager)
                         .environment(deps.classificationService)
                         .environment(deps.acousticCoordinator)
+                        .environment(deps.capAlertManager)
                     
                 } else {
                     VStack(spacing: 0) {
