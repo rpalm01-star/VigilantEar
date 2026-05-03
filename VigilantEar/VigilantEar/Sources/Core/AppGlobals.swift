@@ -32,7 +32,7 @@ nonisolated struct AppGlobals {
         get { _darkerGrayWithOpacity.withLock { $0 } }
     }
     
-    private static let _appVersion = Mutex<String>(" 1.0.0")
+    private static let _appVersion = Mutex<String>("1.0.1")
     public static var appVersion: String {
         get { _appVersion.withLock { $0 } }
     }
