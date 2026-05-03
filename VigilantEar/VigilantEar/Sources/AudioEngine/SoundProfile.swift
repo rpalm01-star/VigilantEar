@@ -90,7 +90,7 @@ struct SoundProfile {
          0,
          0.1,
          0.20,
-         0.08,
+         0.05,
          2.5),
         (["train", "rail_transport", "air_horn", "train_whistle", "foghorn", "train_horn", "railroad_car", "train_wheels_squealing", "subway_metro", "aircraft", "helicopter", "airplane", "boat_water_vehicle", "sailing", "rowboat_canoe_kayak", "motorboat_speedboat"], "tram.fill.tunnel", .blue, 0.15, 600.0, .ignored, false, 0, 0.8, 0.50, 1.0, 3.0),
         (["bicycle","bicycle_bell"], "bicycle", .blue, 0.65, 250.0, .medium, true, 0, 1.5, 0.40, 0.5, 0.5),
@@ -103,7 +103,7 @@ struct SoundProfile {
         (["horse_neigh", "cow_moo", "pig_oink", "sheep_bleat", "lion_roar", "insect", "cricket_chirp", "mosquito_buzz", "fly_buzz", "bee_buzz", "frog", "frog_croak", "snake_hiss", "snake_rattle", "elk_bugle"], "pawprint.fill", .brown, 0.40, 100.0, .ignored, false, 0, 0.8, 0.60, 0.5, 1.5),
         (["wind_rustling_leaves"], "leaf.fill", .green, 0.45, 200.0, .ignored, false, 0, 1.5, 0.55, 1.0, 1.5),
         (["wind", "wind_noise_microphone"], "wind", .teal, 0.30, 300.0, .ignored, false, 0, 1.5, 0.55, 1.0, 2.0),
-        (["thunderstorm", "thunder", "water", "rain", "raindrop", "stream_burbling", "waterfall", "ocean", "sea_waves", "gurgling"], "cloud.heavyrain.fill", .blue, 0.35, 400.0, .ignored, false, 0, 1.8, 0.60, 1.0, 2.0),
+        (["thunderstorm", "thunder", "water", "rain", "raindrop", "liquid_pouring", "stream_burbling", "waterfall", "ocean", "sea_waves", "gurgling"], "cloud.heavyrain.fill", .blue, 0.35, 400.0, .misc, false, 0, 1.8, 0.60, 1.0, 2.0),
         (["fire", "fire_crackle"], "flame.fill", .orange, 0.50, 150.0, .ignored, false, 0, 1.5, 0.60, 0.5, 1.5),
     ]
     

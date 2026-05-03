@@ -147,7 +147,7 @@ nonisolated struct AppGlobals {
     // MARK: - Machine Learning Thresholds (mostly deprecated - now in SoundProfile)
     enum ML {
         /// Absolute floor for the observer to even bother looking at a result
-        static let absoluteMinimumConfidence: Double = 0.25
+        static let absoluteMinimumConfidence: Double = 0.15
         
         /// The confidence required to trigger a background Shazam match
         static let shazamTriggerThreshold: Double = 0.60

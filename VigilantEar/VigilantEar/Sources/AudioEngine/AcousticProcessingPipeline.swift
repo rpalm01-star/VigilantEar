@@ -328,7 +328,7 @@ actor AcousticProcessingPipeline {
                 let attachedSong = (isMusic) ? songToAttach : nil
                 let dopplerRate = dopplerResult?.shiftHz != nil ? Float(dopplerResult!.shiftHz) : nil
                 let isApproaching = dopplerResult?.isApproaching ?? false
-                let isRevealed = hasMetLeadIn && (effectiveConfidence >= minConf)
+                let isRevealed = (hasMetLeadIn && effectiveConfidence >= minConf) || effectiveConfidence >= 0.42
                 
                 let newEvent = SoundEvent(
                     sessionID: threatSessionID,
