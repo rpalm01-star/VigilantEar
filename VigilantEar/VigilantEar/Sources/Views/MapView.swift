@@ -194,8 +194,7 @@ struct MapView: View {
     }
 }
 
-// MARK: - Extracted Threat Marker
-private struct ThreatMarker: View {
+struct ThreatMarker: View {
     let currentLabel: String
     let smoothedCoordinate: CLLocationCoordinate2D
     let activeEvent: SoundEvent?
@@ -203,22 +202,26 @@ private struct ThreatMarker: View {
     var body: some View {
         let profile = SoundProfile.classify(currentLabel)
         
+        // Use tracked vehicle's unique tint for the inner icon
+        let iconColor = activeEvent?.trackedTarget?.iconTintColor ?? profile.color
+        
         ZStack {
             if profile.isEmergency {
                 Image(systemName: profile.icon)
                     .font(.system(size: 24, weight: .bold))
-                    .foregroundColor(profile.color)
-                    .shadow(color: profile.color, radius: 10)
+                    .foregroundColor(iconColor)           // ← tinted
+                    .shadow(color: iconColor, radius: 10)
             } else {
                 Image(systemName: profile.icon)
                     .font(.system(size: 18, weight: .semibold))
-                    .foregroundColor(profile.color)
+                    .foregroundColor(iconColor)           // ← tinted
                     .padding(8)
                     .background(.ultraThinMaterial)
                     .clipShape(Circle())
                     .shadow(radius: 3)
             }
             
+            // Doppler chevron stays the same
             if let event = activeEvent, let rate = event.dopplerRate, abs(rate) > 0.1 {
                 let pointingAngle = event.isApproaching ? (event.bearing + 180) : event.bearing
                 

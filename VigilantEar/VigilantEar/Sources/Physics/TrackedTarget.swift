@@ -1,23 +1,10 @@
-//
-//  TrackedTarget.swift
-//  VigilantEar
-//
-//  Created by Robert Palmer on 4/13/26.
-//  Reviewed and refined by Grok on 5/2/2026
-//
-
 import Foundation
 import CoreLocation
 import Observation
 import SwiftUI
 
-/// A smoothed, persistent vehicle/target shown on the map with dead-reckoning.
-/// Uses complementary filtering + coasting when new data is sparse.
 @Observable
-@MainActor
 class TrackedTarget: Identifiable {
-    
-    // MARK: - Public Identity & State
     
     let id: UUID
     var currentLabel: String
@@ -25,20 +12,31 @@ class TrackedTarget: Identifiable {
     var smoothedCoordinate: CLLocationCoordinate2D
     var smoothedDistance: Double = 0.0
     
-    // MARK: - Physics State
+    // NEW: Unique color for the inner icon only (SF Symbol)
+    let iconTintColor: Color
     
     private(set) var lastUpdateTime: Date
     private var estimatedHeading: Double = 0.0
     private var estimatedSpeedMPS: Double = 0.0
-    
     private let smoothingFactor = 0.85
-    private let distanceSmoothingFactor = 0.70
-    
-    // MARK: - Dead Reckoning Timer
+    private let distanceSmoothingFactor = 0.7
     
     private var glideTimer: Timer?
     
-    // MARK: - Initialization
+    @MainActor
+    private func startDeadReckoning() {
+        glideTimer = Timer.scheduledTimer(withTimeInterval: 0.03, repeats: true) { [weak self] _ in
+            guard let self = self, self.estimatedSpeedMPS > 0 else { return }
+            Task { @MainActor in
+                let coastedCoordinate = self.projectCoordinate(
+                    from: self.smoothedCoordinate,
+                    heading: self.estimatedHeading,
+                    distanceMeters: self.estimatedSpeedMPS * 0.03
+                )
+                self.smoothedCoordinate = coastedCoordinate
+            }
+        }
+    }
     
     init(initialEvent: SoundEvent) {
         self.id = initialEvent.sessionID
@@ -47,36 +45,18 @@ class TrackedTarget: Identifiable {
             latitude: initialEvent.latitude ?? 0.0,
             longitude: initialEvent.longitude ?? 0.0
         )
-        self.smoothedDistance = initialEvent.distance
+        self.smoothedDistance = initialEvent.distance * 1000.0
         self.lastUpdateTime = initialEvent.timestamp
         
-        startDeadReckoning()
+        // Unique inner-icon tint per long-term tracked vehicle
+        self.iconTintColor = AppGlobals.VehicleColors.iconTint(for: initialEvent.sessionID)
+        
+        self.startDeadReckoning()
     }
     
     @MainActor
     deinit {
         glideTimer?.invalidate()
-    }
-    
-    // MARK: - Dead Reckoning (Coasting)
-    @MainActor
-    private func startDeadReckoning() {
-        glideTimer = Timer.scheduledTimer(withTimeInterval: 0.03, repeats: true) { [weak self] _ in
-            guard let self = self else { return }
-            
-            // Now safely inside a strong reference + @MainActor context
-            Task { @MainActor in
-                guard self.estimatedSpeedMPS > 0 else { return }
-                
-                let coastedCoordinate = self.projectCoordinate(
-                    from: self.smoothedCoordinate,
-                    heading: self.estimatedHeading,
-                    distanceMeters: self.estimatedSpeedMPS * 0.03
-                )
-                
-                self.smoothedCoordinate = coastedCoordinate
-            }
-        }
     }
     
     // MARK: - Main Update

@@ -79,7 +79,7 @@ nonisolated struct AppGlobals {
         set { _logToCloud.withLock { $0 = newValue } }
     }
     
-    private static let _purgeCloudLogsOnStartup = Mutex<Bool>(false)
+    private static let _purgeCloudLogsOnStartup = Mutex<Bool>(true)
     public static var purgeCloudLogsOnStartup: Bool {
         get { _purgeCloudLogsOnStartup.withLock { $0 } }
         set { _purgeCloudLogsOnStartup.withLock { $0 = newValue } }
@@ -226,6 +226,24 @@ nonisolated struct AppGlobals {
         
         /// Fade-out animation duration when labels expire
         static let fadeOutDuration: Double = 0.5
+    }
+
+    // MARK: - Multi-Vehicle Icon Tint (subtle differentiation)
+    enum VehicleColors {
+        /// Distinct tints for the inner SF Symbol only (background circle stays blue)
+        static let palette: [Color] = [
+            .blue,
+            .teal,
+            .cyan,
+            .indigo,
+            .mint,
+            .blue.opacity(0.9),
+        ]
+        
+        static func iconTint(for sessionID: UUID) -> Color {
+            let hash = abs(sessionID.hashValue) % palette.count
+            return palette[hash]
+        }
     }
     
 }

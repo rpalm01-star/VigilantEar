@@ -51,15 +51,21 @@ struct SoundEvent: Identifiable {
     /// Set by `AcousticProcessingPipeline` based on `leadInTime` + `minimumConfidence`.
     public let isRevealed: Bool
     
+    public var trackedTarget: TrackedTarget?   // For multi-vehicle unique icon tinting
     
     // MARK: - Computed Profile Properties
     
     /// Centralized profile lookup. Keeps the struct clean and ensures
-    /// we always use the latest registry values.
+    /// we always use the latest registry values.  but i
     private var profile: SoundProfile {
         return SoundProfile.classify(threatLabel)
     }
     
+    /// Whether this event belongs to an emergency category (siren, alarm, etc.).
+    public var isMusic: Bool {
+        return profile.isMusic
+    }
+
     /// Whether this event belongs to an emergency category (siren, alarm, etc.).
     public var isEmergency: Bool {
         return profile.isEmergency

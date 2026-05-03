@@ -67,32 +67,44 @@ struct SoundProfile {
     // MARK: - Profile Definitions
     
     private static let cuteAndPleasant: [(keywords: [String], icon: String, color: Color, ceiling: Double, maxRange: Double, category: ThreatCategory, snaps: Bool, haptics: Int, cooldown: Double, minConf: Double, leadIn: Double, tail: Double)] = [
-        (["clock", "tick", "tick_tock"], "clock", .brown, 0.55, 100.0, .misc, false, 1, 1.5, 0.80, 1.0, 1.5),
+        (["clock", "tick", "tick_tock"], "clock", .brown, 0.55, 80.0, .misc, false, 1, 1.5, 0.80, 1.0, 1.5),
     ]
     
     private static let emergencyAndSafety: [(keywords: [String], icon: String, color: Color, ceiling: Double, maxRange: Double, category: ThreatCategory, snaps: Bool, haptics: Int, cooldown: Double, minConf: Double, leadIn: Double, tail: Double)] = [
         // Siren: More conservative settings to reduce false positives from echoes
         (["siren", "ambulance_siren", "police_siren", "fire_engine_siren", "civil_defense_siren", "emergency_vehicle", "simulated_fire_truck"], "light.beacon.max.fill", .red, 0.80, 900.0, .emergency, true, 4, 0.4, 0.35, 3.5, 3.0),
-        
         (["fireworks", "gunshot_gunfire", "artillery_fire", "firecracker", "eruption", "boom"], "fireworks", .pink, 0.90, 1000.0, .ignored, false, 2, 0.8, 0.9, 0.0, 4.0),
-        (["smoke_detector", "alarm_clock", "door_bell"], "exclamationmark.triangle.fill", .red, 0.80, 150.0, .emergency, false, 3, 0.4, 0.9, 1.0, 2.0),
+        (["smoke_detector", "alarm_clock"], "exclamationmark.triangle.fill", .red, 0.80, 150.0, .emergency, false, 3, 0.4, 0.9, 1.0, 2.0),
         (["person", "person_running", "person_walking"], "figure.walk.arrival", .red, 0.80, 150.0, .emergency, false, 2, 0.50, 0.60, 0.2, 2.0),
-        (["knock", "door_slam", "door", "doorbell", "door_sliding"], "door.left.hand.closed", .cyan, 0.5, 150.0, .emergency, true, 2, 0.50, 0.92, 0.4, 2.0),
+        (["knock", "door_bell", "doorbell", "door_sliding"], "door.left.hand.closed", .cyan, 0.5, 150.0, .emergency, true, 2, 0.50, 0.92, 0.4, 2.0),
     ]
     
     private static let vehicles: [(keywords: [String], icon: String, color: Color, ceiling: Double, maxRange: Double, category: ThreatCategory, snaps: Bool, haptics: Int, cooldown: Double, minConf: Double, leadIn: Double, tail: Double)] = [
-        (["car", "car_horn", "car_passing_by", "race_car", "truck", "bus", "motorcycle", "traffic_noise", "engine", "engine_accelerating_revving", "engine_starting", "engine_idling", "engine_knocking", "vehicle_skidding"], "car.fill",
+        // Keywords
+        (["passenger car", "car_horn", "car_passing_by", "race_car", "truck", "bus", "motorcycle", "traffic_noise", "engine", "engine_accelerating_revving", "engine_starting", "engine_idling", "engine_knocking", "vehicle_skidding"],
+         // SF Symbol Name
+         "car.fill",
+         // Color
          .blue,
+         // Max expected amplitude
          0.50,
+         // Outer max detection range (ft). Events further away than this are ignored for this type.
          500.0,
+         // Category
         .vehicle,
+         // Should try to snap to map/road?
          true,
+         // Haptic pulse count
          0,
-         0.1,
-         0.20,
-         0.05,
-         2.5),
-        (["train", "rail_transport", "air_horn", "train_whistle", "foghorn", "train_horn", "railroad_car", "train_wheels_squealing", "subway_metro", "aircraft", "helicopter", "airplane", "boat_water_vehicle", "sailing", "rowboat_canoe_kayak", "motorboat_speedboat"], "tram.fill.tunnel", .blue, 0.15, 600.0, .ignored, false, 0, 0.8, 0.50, 1.0, 3.0),
+         // Cooldown period in seconds before it wipes away
+         0.5,
+         // Minimum confidence provided by Sound ML chip
+         0.15,
+         // Lead time prior to doing anything with this event.
+         0.10,
+         // How long to keep it around after it is no longer getting data from the ML chip.
+         2.0),
+        (["train", "rail_transport", "door", "door_slam", "air_horn", "train_whistle", "foghorn", "train_horn", "railroad_car", "train_wheels_squealing", "subway_metro", "aircraft", "helicopter", "airplane", "boat_water_vehicle", "sailing", "rowboat_canoe_kayak", "motorboat_speedboat"], "tram.fill.tunnel", .blue, 0.15, 600.0, .ignored, false, 0, 0.8, 0.50, 1.0, 3.0),
         (["bicycle","bicycle_bell"], "bicycle", .blue, 0.65, 250.0, .medium, true, 0, 1.5, 0.40, 0.5, 0.5),
     ]
     
@@ -118,7 +130,7 @@ struct SoundProfile {
         (["door", "squeak", "keys_jangling", "coin_dropping", "scissors", "ratchet_and_pawl", "power_windows"], "door.left.hand.closed", .mint, 0.60, 30.0, .misc, false, 0, 1.6, 0.60, 0.2, 1.5),
         (["liquid_splashing", "liquid_sloshing", "liquid_squishing", "liquid_dripping", "liquid_trickle_dribble", "liquid_filling_container", "liquid_spraying", "water_pump", "underwater_bubbling", "whoosh_swoosh_swish", "thump_thud", "crushing", "crumpling_crinkling", "tearing", "click"], "drop.fill", .mint, 0.45, 50.0, .ignored, false, 0, 2.2, 0.65, 0.5, 1.5),
         (["sewing_machine", "mechanical_fan", "air_conditioner"], "fan.fill", .gray, 0.20, 20.0, .ignored, false, 0, 1.6, 0.70, 1.0, 2.0),
-        (["toilet_flush", "sink_filling_washing"], "toilet.fill", .white, 0.20, 20.0, .medium, false, 0, 2.0, 0.70, 1.0, 2.0),
+        (["toilet_flush", "sink_filling_washing"], "spigot.fill", .white, 0.20, 20.0, .medium, false, 0, 2.0, 0.70, 1.0, 2.0),
         (["power_tool", "saw", "hammer", "drill", "hedge_trimmer", "chainsaw"], "hammer.fill", .orange, 0.60, 120.0, .ignored, false, 0, 1.2, 0.60, 0.5, 1.5),
         (["glass_breaking"], "light.beacon.min.fill", .orange, 0.70, 100.0, .emergency, false, 1, 1.4, 0.70, 0.0, 3.0),
     ]

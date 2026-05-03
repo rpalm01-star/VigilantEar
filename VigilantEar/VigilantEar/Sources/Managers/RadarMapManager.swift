@@ -26,13 +26,50 @@ class RadarMapManager {
     
     @MainActor
     func processNewEvent(_ event: SoundEvent) {
-        guard event.isRevealed else { return }
+        guard event.isRevealed else {
+            AppGlobals.doLog(message: "EVENT_SKIPPED - isRevealed = false for \(event.threatLabel) Conf:\(String(format: "%.3f", event.confidence))", step: "DEBUG")
+            return
+        }
         
-        if let existingTarget = activeTargets[event.sessionID] {
-            existingTarget.update(with: event)
-        } else {
-            let newTarget = TrackedTarget(initialEvent: event)
-            activeTargets[event.sessionID] = newTarget
+        let distanceFeet = event.distance * 1000.0
+        
+        AppGlobals.doLog(
+            message: "EVENT_RECEIVED [\(event.threatLabel)] Conf:\(String(format: "%.3f", event.confidence)) Dist:\(Int(distanceFeet))ft Revealed:\(event.isRevealed)",
+            step: "DEBUG"
+        )
+        
+        if event.isVehicle {
+            // Tuned for real cars outside your window
+            let shouldCreateTrackedTarget =
+            event.confidence >= 0.21 &&
+            distanceFeet <= 350.0
+            
+            if shouldCreateTrackedTarget {
+                if let existingTarget = activeTargets[event.sessionID] {
+                    existingTarget.update(with: event)
+                } else {
+                    let newTarget = TrackedTarget(initialEvent: event)
+                    activeTargets[event.sessionID] = newTarget
+                    
+                    AppGlobals.doLog(
+                        message: "TRACKED_TARGET_CREATED [car] Conf:\(String(format: "%.3f", event.confidence)) Dist:\(Int(distanceFeet))ft → Persistent tracking started",
+                        step: "VEHICLE_TRACK"
+                    )
+                }
+            } else {
+                AppGlobals.doLog(
+                    message: "VEHICLE_SKIPPED_FOR_TRACKING [car] Conf:\(String(format: "%.3f", event.confidence)) Dist:\(Int(distanceFeet))ft → Too far or too weak for persistent tracking",
+                    step: "VEHICLE_TRACK"
+                )
+            }
+        }
+        else {
+            if let existingTarget = activeTargets[event.sessionID] {
+                existingTarget.update(with: event)
+            } else {
+                let newTarget = TrackedTarget(initialEvent: event)
+                activeTargets[event.sessionID] = newTarget
+            }
         }
     }
     
