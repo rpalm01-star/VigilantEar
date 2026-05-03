@@ -325,6 +325,7 @@ actor AcousticProcessingPipeline {
                     }
                 }
                 
+                // This is a test.
                 let attachedSong = (isMusic) ? songToAttach : nil
                 let dopplerRate = dopplerResult?.shiftHz != nil ? Float(dopplerResult!.shiftHz) : nil
                 let isApproaching = dopplerResult?.isApproaching ?? false

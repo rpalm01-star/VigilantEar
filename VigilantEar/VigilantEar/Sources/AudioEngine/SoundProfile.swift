@@ -14,6 +14,7 @@ enum ThreatCategory: String, Sendable {
 }
 
 // MARK: - SoundProfile
+/// This is a test.
 /// Represents a tuned profile for a specific sound category.
 /// Controls detection sensitivity, how long we wait before showing it to the user (leadInTime),
 /// and how long the icon stays on the radar after the sound stops (tailMemory).
