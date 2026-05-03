@@ -117,7 +117,7 @@ struct ContentView: View {
                                 }
                                 .id(songTitle)
                                 .frame(width: geo.size.width * 0.7, alignment: .leading)
-                                .transition(.asymmetric(
+                                .transition(unsafe .asymmetric(
                                     insertion: .move(edge: .leading).combined(with: .opacity),
                                     removal: .opacity
                                 ))
@@ -239,6 +239,9 @@ struct ContentView: View {
                 if !isPortrait {
                     microphoneManager.startCapturing()
                 }
+            }
+            .onDisappear {
+                microphoneManager.stopCapturing()
             }
         }
     }

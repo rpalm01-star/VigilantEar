@@ -27,14 +27,14 @@ class RadarMapManager {
     @MainActor
     func processNewEvent(_ event: SoundEvent) {
         guard event.isRevealed else {
-            AppGlobals.doLog(message: "EVENT_SKIPPED - isRevealed = false for \(event.threatLabel) Conf:\(String(format: "%.3f", event.confidence))", step: "DEBUG")
+            AppGlobals.doLog(message: unsafe "EVENT_SKIPPED - isRevealed = false for \(event.threatLabel) Conf:\(String(format: "%.3f", event.confidence))", step: "DEBUG")
             return
         }
         
         let distanceFeet = event.distance * 1000.0
         
         AppGlobals.doLog(
-            message: "EVENT_RECEIVED [\(event.threatLabel)] Conf:\(String(format: "%.3f", event.confidence)) Dist:\(Int(distanceFeet))ft Revealed:\(event.isRevealed)",
+            message: unsafe "EVENT_RECEIVED [\(event.threatLabel)] Conf:\(String(format: "%.3f", event.confidence)) Dist:\(Int(distanceFeet))ft Revealed:\(event.isRevealed)",
             step: "DEBUG"
         )
         
@@ -52,13 +52,13 @@ class RadarMapManager {
                     activeTargets[event.sessionID] = newTarget
                     
                     AppGlobals.doLog(
-                        message: "TRACKED_TARGET_CREATED [car] Conf:\(String(format: "%.3f", event.confidence)) Dist:\(Int(distanceFeet))ft → Persistent tracking started",
+                        message: unsafe "TRACKED_TARGET_CREATED [car] Conf:\(String(format: "%.3f", event.confidence)) Dist:\(Int(distanceFeet))ft → Persistent tracking started",
                         step: "VEHICLE_TRACK"
                     )
                 }
             } else {
                 AppGlobals.doLog(
-                    message: "VEHICLE_SKIPPED_FOR_TRACKING [car] Conf:\(String(format: "%.3f", event.confidence)) Dist:\(Int(distanceFeet))ft → Too far or too weak for persistent tracking",
+                    message: unsafe "VEHICLE_SKIPPED_FOR_TRACKING [car] Conf:\(String(format: "%.3f", event.confidence)) Dist:\(Int(distanceFeet))ft → Too far or too weak for persistent tracking",
                     step: "VEHICLE_TRACK"
                 )
             }
@@ -78,6 +78,7 @@ class RadarMapManager {
         activeTargets = activeTargets.filter { now.timeIntervalSince($0.value.lastUpdateTime) < 6.0 }
     }
     
+    @MainActor
     deinit {
         updateTask?.cancel()
     }

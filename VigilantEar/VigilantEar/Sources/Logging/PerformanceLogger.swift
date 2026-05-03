@@ -8,7 +8,7 @@
 import Foundation
 import os.signpost
 import os.log
-import FirebaseFirestore
+@unsafe @preconcurrency import FirebaseFirestore
 
 /// A thread-safe logger for tracking performance metrics and execution time.
 /// Supports both modern OSSignpost intervals and legacy string logging.
@@ -38,7 +38,7 @@ public final class PerformanceLogger: @unchecked Sendable {
         activeSignposts[task] = signpostID
         
         // Begin the signpost interval
-        os_signpost(.begin, log: AppGlobals.performanceLog, name: "TaskExecution", signpostID: signpostID, "Start: %{public}@", task)
+        unsafe os_signpost(.begin, log: AppGlobals.performanceLog, name: "TaskExecution", signpostID: signpostID, "Start: %{public}@", task)
     }
     
     /// Stops a performance tracking interval and logs the duration.
@@ -49,12 +49,12 @@ public final class PerformanceLogger: @unchecked Sendable {
         
         // Retrieve the ID associated with the task
         guard let signpostID = activeSignposts[task] else {
-            os_log("PerformanceLogger: Attempted to stop a task that wasn't started: %{public}@", log: AppGlobals.standardLog, type: .error, task)
+            unsafe os_log("PerformanceLogger: Attempted to stop a task that wasn't started: %{public}@", log: AppGlobals.standardLog, type: .error, task)
             return
         }
         
         // End the signpost interval
-        os_signpost(.end, log: AppGlobals.performanceLog, name: "TaskExecution", signpostID: signpostID, "Stop: %{public}@", task)
+        unsafe os_signpost(.end, log: AppGlobals.performanceLog, name: "TaskExecution", signpostID: signpostID, "Stop: %{public}@", task)
         
         // Remove the task from active tracking
         activeSignposts.removeValue(forKey: task)
@@ -63,7 +63,7 @@ public final class PerformanceLogger: @unchecked Sendable {
     // MARK: - Remote Telemetry
     public func fireStoreTelemetry(step: String, message: String, firestoreCollectionName: String, isError: Bool = false) {
 
-        os_log("%{public}@ %{public}@", log: AppGlobals.standardLog, type: (isError ? .error : .debug), (isError ? "❌" : "🐞"), message)
+        unsafe os_log("%{public}@ %{public}@", log: AppGlobals.standardLog, type: (isError ? .error : .debug), (isError ? "❌" : "🐞"), message)
         
         if (AppGlobals.exceptionsDataStoreName != firestoreCollectionName) {
             guard AppGlobals.logToCloud else { return }
@@ -82,7 +82,7 @@ public final class PerformanceLogger: @unchecked Sendable {
             do {
                 try await self.db.collection(firestoreCollectionName).addDocument(data: logData)
             } catch {
-                os_log("%{public}@ %{public}@ Error: %{public}@", log: AppGlobals.standardLog, type: .error, "⚠️ Telemetry failed to send to:", firestoreCollectionName, error.localizedDescription)
+                unsafe os_log("%{public}@ %{public}@ Error: %{public}@", log: AppGlobals.standardLog, type: .error, "⚠️ Telemetry failed to send to:", firestoreCollectionName, error.localizedDescription)
             }
         }
         

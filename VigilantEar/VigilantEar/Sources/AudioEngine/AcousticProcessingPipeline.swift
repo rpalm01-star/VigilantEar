@@ -97,7 +97,16 @@ actor AcousticProcessingPipeline {
         self.accumulatedFrames = 0
     }
     
-    func processAudio(buffer: AVAudioPCMBuffer, time: AVAudioTime) async {
+    func processAudio(samples: [Float], time: AVAudioTime) async {
+        // Reconstruct a local buffer that lives only on this thread
+        let format = AVAudioFormat(standardFormatWithSampleRate: 44100, channels: 1)!
+        let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: AVAudioFrameCount(samples.count))!
+        buffer.frameLength = buffer.frameCapacity
+        
+        for i in 0..<samples.count {
+            buffer.floatChannelData?[0][i] = samples[i]
+        }
+        
         self.latestBuffer = buffer
         self.sampleRate = buffer.format.sampleRate
         

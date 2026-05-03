@@ -5,6 +5,14 @@ import MapKit
 @MainActor
 struct ThreatSimulator {
     
+    // Internal helper to keep simulation state thread-safe for Swift 6
+    private class SimulationState {
+        var step = 0
+        var previousDistance: Double = 9999.0
+        var isApproaching = true
+        var intersectionStopTicks = 50
+    }
+    
     static func runFireTruckDriveBy(
         location: CLLocation?,
         heading: Double,
@@ -12,20 +20,18 @@ struct ThreatSimulator {
     ) {
         guard let location = location else { return }
         
-        // 1. Clear any old routes before starting a new simulation
         coordinator.simulatedRoute = nil
         
-        Task {
-            // Cast a net (800ft / 243m) to find road-legal coordinates
+        Task { @MainActor in
             let startCoord = location.coordinate.projected(by: 243.8, bearingDegrees: heading + 90)
             let endCoord = location.coordinate.projected(by: 243.8, bearingDegrees: heading - 90)
             
             let request = MKDirections.Request()
             
-            // iOS 26.0 Syntax: Initialize directly with location and explicit nil for address
             let sourceLocation = CLLocation(latitude: startCoord.latitude, longitude: startCoord.longitude)
             let destinationLocation = CLLocation(latitude: endCoord.latitude, longitude: endCoord.longitude)
             
+            // Fixed: Explicitly passing nil for address to satisfy the iOS 26 compiler
             request.source = MKMapItem(location: sourceLocation, address: nil)
             request.destination = MKMapItem(location: destinationLocation, address: nil)
             request.transportType = .automobile
@@ -39,48 +45,39 @@ struct ThreatSimulator {
                     return
                 }
                 
-                // Store the route so MapView draws the geographic line
                 coordinator.simulatedRoute = route
-                
-                // Densely sample the line for smooth movement
                 var pathCoordinates = route.polyline.denselySampled(spacingMeters: 2.0)
                 
-                // Truncate: Only keep points within the 500ft (152.4m) Yellow Circle
                 pathCoordinates = pathCoordinates.filter { coord in
                     let point = CLLocation(latitude: coord.latitude, longitude: coord.longitude)
                     return location.distance(from: point) <= 152.4
                 }
                 
                 guard !pathCoordinates.isEmpty else {
-                    AppGlobals.doLog(message: "⚠️ " + AppGlobals.simulatedFireTruck.capitalized + ": Range truncation resulted in zero points.", step: "FIRESIM")
+                    AppGlobals.doLog(message: "⚠️ " + AppGlobals.simulatedFireTruck.capitalized + ": Range truncation Resulted in zero points.", step: "FIRESIM")
                     coordinator.simulatedRoute = nil
                     return
                 }
                 
-                // SIMULATION STATE
-                var step = 0
-                var previousDistance: Double = 9999.0
-                var isApproaching = true
+                let state = SimulationState()
                 let threatSessionID = UUID()
-                
-                // 🚨 INTERSECTION STOP LOGIC
-                // Find the midpoint of the route to trigger a stop
                 let intersectionIndex = pathCoordinates.count / 2
-                // Timer runs every 0.1s, so 50 ticks = 5 seconds of idling
-                var intersectionStopTicks = 50
                 
-                // DRIVE LOGIC
                 Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { timer in
-                    let currentCoord = pathCoordinates[step]
+                    guard state.step < pathCoordinates.count else {
+                        timer.invalidate()
+                        coordinator.simulatedRoute = nil
+                        return
+                    }
+                    
+                    let currentCoord = pathCoordinates[state.step]
                     let truckLocation = CLLocation(latitude: currentCoord.latitude, longitude: currentCoord.longitude)
                     let distanceInMeters = location.distance(from: truckLocation)
                     let distanceInFeet = distanceInMeters * 3.28084
                     
-                    // Doppler & State
-                    if distanceInFeet > previousDistance { isApproaching = false }
-                    previousDistance = distanceInFeet
+                    if distanceInFeet > state.previousDistance { state.isApproaching = false }
+                    state.previousDistance = distanceInFeet
                     
-                    // Relative Bearing Math (Target vs User Heading)
                     let absoluteBearing = getBearingBetween(location.coordinate, currentCoord)
                     var relativeBearing = absoluteBearing - heading
                     if relativeBearing > 180 { relativeBearing -= 360 }
@@ -90,9 +87,8 @@ struct ThreatSimulator {
                     let simulatedEnergy = max(0.05, 1.0 - (distanceInFeet / 1000.0))
                     let simulatedConfidence = max(0.3, 1.0 - (distanceInFeet / 1000.0))
                     
-                    // 🚨 If we are actively stopped, kill the Doppler shift!
-                    let isCurrentlyStopped = (step == intersectionIndex && intersectionStopTicks > 0)
-                    let activeDoppler = isCurrentlyStopped ? 0.0 : (isApproaching ? 15.6 : -15.6)
+                    let isCurrentlyStopped = (state.step == intersectionIndex && state.intersectionStopTicks > 0)
+                    let activeDoppler = isCurrentlyStopped ? 0.0 : (state.isApproaching ? 15.6 : -15.6)
                     
                     let newEvent = SoundEvent(
                         sessionID: threatSessionID,
@@ -103,40 +99,31 @@ struct ThreatSimulator {
                         distance: normalizedDistance,
                         energy: Float(simulatedEnergy),
                         dopplerRate: Float(activeDoppler),
-                        isApproaching: isApproaching,
+                        isApproaching: state.isApproaching,
                         latitude: truckLocation.coordinate.latitude,
                         longitude: truckLocation.coordinate.longitude,
-                        isRevealed: true, // 🚨 ADD THIS SO THE SIMULATOR STILL WORKS
+                        isRevealed: true,
                         songLabel: nil
                     )
                     
-                    // UI Feed
-                    Task { @MainActor in
-                        coordinator.addEvent(newEvent)
-                        if (step == 1) {
-                            let profile = SoundProfile.classify(AppGlobals.simulatedFireTruck)
-                            if (profile.hapticCount > 0) {
-                                AppGlobals.doLog(message: "🌀 " + AppGlobals.simulatedFireTruck.capitalized + ": Haptic request @start for : \(profile.hapticCount) pulses.", step: "FIRESIM")
-                                HapticManager.shared.trigger(count: profile.hapticCount, sessionID: newEvent.sessionID)
-                            }
+                    coordinator.addEvent(newEvent)
+                    
+                    if (state.step == 1) {
+                        let profile = SoundProfile.classify(AppGlobals.simulatedFireTruck)
+                        if (profile.hapticCount > 0) {
+                            HapticManager.shared.trigger(count: profile.hapticCount, sessionID: newEvent.sessionID)
                         }
                     }
                     
-                    // 🚨 MOVEMENT ADVANCEMENT LOGIC
                     if isCurrentlyStopped {
-                        // Keep burning ticks, but don't move the truck
-                        intersectionStopTicks -= 1
+                        state.intersectionStopTicks -= 1
                     } else {
-                        // Truck is free to move forward
-                        step += 1
+                        state.step += 1
                     }
                     
-                    // Check for completion
-                    if step >= pathCoordinates.count {
+                    if state.step >= pathCoordinates.count {
                         timer.invalidate()
-                        Task { @MainActor in
-                            coordinator.simulatedRoute = nil
-                        }
+                        coordinator.simulatedRoute = nil
                     }
                 }
             } catch {
@@ -163,8 +150,13 @@ struct ThreatSimulator {
 // MARK: - MapKit Extensions
 extension MKPolyline {
     var coordinates: [CLLocationCoordinate2D] {
-        var coords = [CLLocationCoordinate2D](repeating: kCLLocationCoordinate2DInvalid, count: pointCount)
-        getCoordinates(&coords, range: NSRange(location: 0, length: pointCount))
+        let count = self.pointCount
+        var coords = [CLLocationCoordinate2D](repeating: kCLLocationCoordinate2DInvalid, count: count)
+        
+        // Fixed: Swift 6 pointer extraction
+        _ = coords.withUnsafeMutableBufferPointer { buffer in
+            self.getCoordinates(buffer.baseAddress!, range: NSRange(location: 0, length: count))
+        }
         return coords
     }
     

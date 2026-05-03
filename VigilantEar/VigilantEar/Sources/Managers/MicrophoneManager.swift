@@ -36,13 +36,19 @@ class MicrophoneManager: NSObject, CLLocationManagerDelegate {
     private var lastLocationPush: Date = .distantPast
     private var lastHeadingPush: Date = .distantPast
     
-    // MARK: - Init / Deinit
     deinit {
-        UIDevice.current.endGeneratingDeviceOrientationNotifications()
+        // 1. Remove observers synchronously (this is safe in deinit)
         NotificationCenter.default.removeObserver(self)
-        stopCapturing()
+        
+        // 2. Stop capturing immediately if possible.
+        // If stopCapturing() is @MainActor, we have to call the underlying engine directly
+        // or accept that the engine will stop when the manager is deallocated.
+        
+        // 3. Cleanup UIDevice on the MainActor without capturing 'self'
+        Task { @MainActor in
+            UIDevice.current.endGeneratingDeviceOrientationNotifications()
+        }
     }
-
     
     init(acousticCoordinator: AcousticCoordinator, classificationService: ClassificationService, roadManager: RoadManager, acousticPipeline: AcousticProcessingPipeline, capAlertManager: CAPAlertManager) {
         self.capAlertManager = capAlertManager
@@ -181,10 +187,24 @@ class MicrophoneManager: NSObject, CLLocationManagerDelegate {
         inputNode.installTap(onBus: 0, bufferSize: 4096, format: hardwareFormat) { [weak self] buffer, time in
             guard let self = self else { return }
             let now = Date()
+            
             guard now.timeIntervalSince(self.lastProcessTime) > 0.04 else { return }
             self.lastProcessTime = now
+            
+            // 1. Extract the raw audio samples into a Sendable Array
+            // We only need the first channel (mono) for the standard classifier,
+            // or both for TDOA. Let's grab the raw samples.
+            let frameLength = Int(buffer.frameLength)
+            guard let channelData = buffer.floatChannelData else { return }
+            
+            // Create a safe, Sendable copy of the audio samples
+            let audioSamples = Array(UnsafeBufferPointer(start: channelData[0], count: frameLength))
+            
+            // 2. Send the Array (Value Type) across the thread boundary
             Task {
-                await self.acousticPipeline.processAudio(buffer: buffer, time: time)
+                // You'll need to update processAudio in your pipeline to accept [Float]
+                // OR recreate a local buffer inside the pipeline task.
+                await self.acousticPipeline.processAudio(samples: audioSamples, time: time)
             }
         }
         
