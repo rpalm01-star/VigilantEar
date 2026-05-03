@@ -12,6 +12,7 @@ By leveraging on-device machine learning and advanced acoustic physics, the app 
 * **Tactical MapKit HUD**: A real-time, auto-following MapKit display plotting targets dynamically up to a 1,000-foot research horizon. Features visual perimeter anchors at 30ft (Green), 500ft (Yellow), and 1,000ft (Red).
 * **Deep Acoustic Scanning**: The CoreML pipeline actively scans the top 5 confidence results to pull out the background broadband rumble of approaching vehicles hidden underneath environmental foreground noise.
 * **Cloud Telemetry**: Live, real-time spatial and diagnostic telemetry streaming to Google Cloud Firestore for post-test GIS trajectory analysis, acoustic model tuning, and hardware debugging.
+* **Weather Alerts**: Live, real-time alerts are updated on the screen every 15 minutes. It shows an outlined, shaded area on the map and an on-screen text notice.
 
 ## 🧬 The Physics & Math Engine
 VigilantEar operates on a custom Digital Signal Processing (DSP) and geographic fusion foundation built natively in Swift:
@@ -25,16 +26,10 @@ VigilantEar operates on a custom Digital Signal Processing (DSP) and geographic 
 * **Frameworks:** SwiftUI, MapKit, Accelerate (vDSP), SoundAnalysis, AVFoundation, Firebase Firestore
 * **Hardware Required:** iPhone 13 or newer. The app relies heavily on Apple Neural Engine (ANE) acceleration and built-in stereo microphone arrays. (Original development and baseline calibration targeted the iPhone 16 Pro Max).
 
-## 🚀 Getting Started
-1. Clone the repository: `git clone https://github.com/rpalm01-star/VigilantEar.git`
-2. Open the project in Xcode 16+.
-3. Supply your own `GoogleService-Info.plist` to enable Firebase telemetry logging.
-4. Build & run on a **physical device**. (The simulator cannot process the required hardware-level `AVAudioEngine` stereo mic taps or CoreML spatial logic).
-
 ## 📊 Research Goals & Data Privacy
-* **Privacy by Design**: Audio buffers are processed entirely locally on-device in real-time. No raw audio recordings are ever uploaded, recorded, or stored on disc.
-* **Data Availability**: Only mathematical trajectories (bearing, distance, ML labels, confidence scores) are securely transmitted to your designated Firestore database for research and analysis purposes.
+* **Privacy by Design**: Audio buffers are processed entirely locally on-device in real-time. No raw audio recordings are ever uploaded, recorded, or stored on disc. No personally idetifiable information is *ever* transmitted off-device.
+* **Data Availability**: In the future, mathematical trajectories (bearing, distance, ML labels/sound classifications, and confidence scores) will be securely transmitted to a cloud database for research and analysis purposes.
+* **Exception Handling**: In rare instances, a sound classification type label (such as "thunderstorm") are transmitted to a cloud database to assist with application updates for unknown or recently added ML classifications.
 
-## ⚖️ License & Disclaimer
-* **License**: Distributed under the Apache License 2.0.
+## ⚖️ Disclaimer
 * **Disclaimer**: VigilantEar is an experimental research and accessibility aid. It is *not* a certified life-saving device. Tracking accuracy may vary based on environmental factors, wind shear, multipath reflections (echoes), and hardware calibration. Use situational awareness at all times.
