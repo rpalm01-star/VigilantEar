@@ -6,17 +6,18 @@ struct MapView: View {
     @Environment(AcousticCoordinator.self) private var coordinator
     @Environment(CAPAlertManager.self) private var capManager
     
+    @State private var cameraPosition: MapCameraPosition = .automatic
+    @State private var isTrackingUser: Bool = true
+    @State private var hasPerformedAutoZoom: Bool = false
+    
     static let CAMERA_DISTANCE: Double = 400
     
     var events: [SoundEvent]
     var userLocation: CLLocation?
     var userHeading: Double
     
-    @State private var cameraPosition: MapCameraPosition = .automatic
-    @State private var isTrackingUser: Bool = true
-    
     var body: some View {
-        Map(position: $cameraPosition, bounds: MapCameraBounds(minimumDistance: 100, maximumDistance: 800), interactionModes: .all) {
+        Map(position: $cameraPosition, interactionModes: .all) {
             UserAnnotation()
             
             if let route = coordinator.simulatedRoute {
@@ -26,10 +27,30 @@ struct MapView: View {
             userLocationOverlays
         }
         .mapStyle(.standard(elevation: .flat, pointsOfInterest: .excludingAll))
+        
+        // 1. Gesture Break - Stops tracking if the user pans or zooms manually
         .simultaneousGesture(DragGesture().onChanged { _ in isTrackingUser = false })
         .simultaneousGesture(MagnifyGesture().onChanged { _ in isTrackingUser = false })
-        .onChange(of: userLocation) { _, _ in updateCamera() }
-        .onChange(of: userHeading) { _, _ in updateCamera() }
+        
+        // 2. The Cold-Start Kick & Continuous Tracking
+        .onChange(of: userLocation, initial: true) { _, newLoc in
+            guard newLoc != nil else { return }
+            
+            if !hasPerformedAutoZoom {
+                // First lock! Zoom in beautifully.
+                isTrackingUser = true
+                hasPerformedAutoZoom = true
+                updateCamera(animated: true)
+            } else {
+                // Continuous tracking without fighting animations
+                updateCamera(animated: false)
+            }
+        }
+        .onChange(of: userHeading) { _, _ in
+            if hasPerformedAutoZoom { updateCamera(animated: false) }
+        }
+        
+        // 3. The Nav Button Listener
         .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("SnapToUser"))) { _ in
             isTrackingUser = true
             updateCamera(animated: true)
@@ -44,7 +65,6 @@ struct MapView: View {
     // MARK: - Extracted Overlays
     private var userLocationOverlays: some MapContent {
         Group {
-            
             // --- THE SOFTENED EMERGENCY POLYGONS ---
             ForEach(capManager.nearbyAlerts) { alert in
                 MapPolygon(coordinates: alert.polygon)
@@ -115,11 +135,13 @@ struct MapView: View {
         }
     }
     
+    // MARK: - Camera & Coordinate Math
     private func updateCamera(animated: Bool = false) {
         guard isTrackingUser, let loc = userLocation else { return }
         let cam = MapCamera(centerCoordinate: loc.coordinate, distance: MapView.CAMERA_DISTANCE, heading: userHeading)
+        
         if animated {
-            withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
+            withAnimation(.easeInOut(duration: 1.5)) {
                 cameraPosition = .camera(cam)
             }
         } else {
@@ -167,6 +189,7 @@ struct MapView: View {
     }
 }
 
+// MARK: - ThreatMarker Subview
 struct ThreatMarker: View {
     let currentLabel: String
     let smoothedCoordinate: CLLocationCoordinate2D

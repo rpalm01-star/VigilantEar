@@ -95,7 +95,7 @@ struct SoundProfile {
          // Cooldown period in seconds before it wipes away
          0.10,
          // Minimum confidence provided by Sound ML chip
-         0.85,
+         0.70,
          // Lead time prior to doing anything with this event.
          0.50,
          // How long to keep it around after it is no longer getting data from the ML chip.

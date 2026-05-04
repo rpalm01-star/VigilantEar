@@ -95,8 +95,7 @@ struct DebugHUD: View {
         .onAppear { monitor.start() }
         .onTapGesture {
             withAnimation(.easeInOut(duration: 0.15)) {
-                if (UIDevice.current.identifierForVendor?.uuidString == AppGlobals.adminDeviceID)
-                {
+                if (AppGlobals.isDebugDevice) {
                     isCloudLoggingEnabled.toggle()
                     AppGlobals.logToCloud = isCloudLoggingEnabled
                     UIImpactFeedbackGenerator(style: .medium).impactOccurred()

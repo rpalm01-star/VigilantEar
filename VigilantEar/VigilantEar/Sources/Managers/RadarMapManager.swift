@@ -27,16 +27,16 @@ class RadarMapManager {
     @MainActor
     func processNewEvent(_ event: SoundEvent) {
         guard event.isRevealed else {
-            AppGlobals.doLog(message: unsafe "EVENT_SKIPPED - isRevealed = false for \(event.threatLabel) Conf:\(String(format: "%.3f", event.confidence))", step: "DEBUG")
+            //AppGlobals.doLog(message: unsafe "EVENT_SKIPPED - isRevealed = false for \(event.threatLabel) Conf:\(String(format: "%.3f", event.confidence))", step: "DEBUG")
             return
         }
         
         let distanceFeet = event.distance * 1000.0
         
-        AppGlobals.doLog(
-            message: unsafe "EVENT_RECEIVED [\(event.threatLabel)] Conf:\(String(format: "%.3f", event.confidence)) Dist:\(Int(distanceFeet))ft Revealed:\(event.isRevealed)",
-            step: "DEBUG"
-        )
+         AppGlobals.doLog(
+         message: "EVENT_RECEIVED [\(event.threatLabel)] Conf:\(String(format: "%.3f", event.confidence)) Dist:\(Int(distanceFeet))ft Revealed:\(event.isRevealed)",
+         step: "DEBUG"
+         )
         
         if event.isVehicle {
             // Tuned for real cars outside your window
@@ -50,7 +50,6 @@ class RadarMapManager {
                 } else {
                     let newTarget = TrackedTarget(initialEvent: event)
                     activeTargets[event.sessionID] = newTarget
-                    
                     AppGlobals.doLog(
                         message: unsafe "TRACKED_TARGET_CREATED [car] Conf:\(String(format: "%.3f", event.confidence)) Dist:\(Int(distanceFeet))ft → Persistent tracking started",
                         step: "VEHICLE_TRACK"

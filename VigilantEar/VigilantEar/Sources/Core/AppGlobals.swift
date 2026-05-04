@@ -84,7 +84,26 @@ nonisolated struct AppGlobals {
         set { _logToCloud.withLock { $0 = newValue } }
     }
     
-    public static let adminDeviceID = "D0796819-E432-43D6-9436-80B329582323"
+    private static let adminDeviceID = "D0796819-E432-43D6-9436-80B329582323"
+    
+    private static let _currentDeviceID = Mutex<String>("unset")
+    public static var currentDeviceID: String {
+        get { _currentDeviceID.withLock { $0 } }
+        set {
+            _currentDeviceID.withLock { $0 = newValue }
+            if (currentDeviceID == adminDeviceID) {
+                isDebugDevice = true
+            } else {
+                isDebugDevice = false
+            }
+        }
+    }
+    
+    private static let _isDebugDevice = Mutex<Bool>(false)
+    public static var isDebugDevice: Bool {
+        get { _isDebugDevice.withLock { $0 } }
+        set { _isDebugDevice.withLock { $0 = newValue } }
+    }
 
     private static let _purgeCloudLogsOnStartup = Mutex<Bool>(false)
     public static var purgeCloudLogsOnStartup: Bool {
@@ -195,14 +214,14 @@ nonisolated struct AppGlobals {
     enum NeuralTicker {
         
         /// The minimum confidence from the ML before being accepted.  Values greater than this value are accepted.
-        static let minimumConfidence: Double = 0.40
+        static let minimumConfidence: Double = 0.60
         
         /// How long each label stays visible before auto-removing (seconds)
-        static let ttl: TimeInterval = 15.0
+        static let ttl: TimeInterval = 10.0
 
         /// Cooldown period before a timed-out label can re-enter the queue (seconds)
         /// Should be ≥ ttl to prevent rapid re-addition
-        static let cooldown: TimeInterval = 25.0
+        static let cooldown: TimeInterval = 12.0
         
         /// Maximum number of visible rows in the ticker
         static let maxVisibleRows: Int = 12
@@ -223,7 +242,7 @@ nonisolated struct AppGlobals {
         static let fontSize: CGFloat = 11
         
         /// Text opacity for ticker labels
-        static let textOpacity: Double = 0.92
+        static let textOpacity: Double = 0.82
         
         /// Animation response for insertion (spring)
         static let insertResponse: Double = 0.42

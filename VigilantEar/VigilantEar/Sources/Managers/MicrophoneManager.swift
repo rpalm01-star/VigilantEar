@@ -153,9 +153,7 @@ class MicrophoneManager: NSObject {
                 self.isProcessing = false
                 return
             }
-            
-            let tapTime = Date()
-            
+                        
             // 3. Offload to serial queue to get off the high-priority tap thread immediately
             self.audioWorkQueue.async {
                 

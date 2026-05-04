@@ -35,11 +35,11 @@ struct NeuralTickerHUD: View {
                                         // 🚀 OPTIMIZATION: Removed live blur (.ultraThinMaterial).
                                         // Static opacity looks great but costs zero GPU cycles to calculate.
                                         RoundedRectangle(cornerRadius: 5)
-                                            .fill(Color.black.opacity(0.6))
+                                            .fill(Color.black.opacity(0.15))
                                         
                                         // Confidence fill
                                         RoundedRectangle(cornerRadius: 5)
-                                            .fill(Color.cyan.opacity(0.20))
+                                            .fill(Color.cyan.opacity(0.25))
                                             .frame(width: textGeo.size.width * item.confidence)
                                     }
                                 }

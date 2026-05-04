@@ -6,6 +6,7 @@ class AppDelegate: NSObject, UIApplicationDelegate {
     func application(_ application: UIApplication,
                      didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey : Any]? = nil) -> Bool {
         FirebaseApp.configure()
+        AppGlobals.currentDeviceID = UIDevice.current.identifierForVendor?.uuidString ?? "unset"
         Task {
             await CloudLogger.shared.purgeOldLogs()
         }
