@@ -18,7 +18,6 @@ actor AcousticProcessingPipeline {
     private let songContinuation: AsyncStream<String?>.Continuation
     
     private let fftProcessor: FFTProcessor
-    
     private let roadManager: RoadManager
     private let soundEventManager: SoundLabelEventManager
     
@@ -59,6 +58,9 @@ actor AcousticProcessingPipeline {
     private var shazamDelegate: ShazamResultsObserver?
     private var signatureGenerator = SHSignatureGenerator()
     
+    private var shazamConverter: AVAudioConverter?
+    private var shazamMonoBuffer: AVAudioPCMBuffer?
+    
     init(roadManager: RoadManager, soundEventManager: SoundLabelEventManager) {
         let (stream, cont) = AsyncStream.makeStream(of: SoundEvent.self)
         self.eventStream = stream
@@ -81,37 +83,28 @@ actor AcousticProcessingPipeline {
         self.lastKnownHeading = heading
     }
     
-    // MARK: - Shazam Helpers
     func startShazamAccumulation() {
         guard !isAccumulatingForShazam else { return }
         
-        isMusicCurrentlyPlaying = true
-        lastMusicDetectedTime = Date()
+        // Just reset the buckets and open the gate
         isAccumulatingForShazam = true
-        
-        if hasMatchedCurrentSong && Date().timeIntervalSince(lastSongUpdate) < 180 {
-            return
-        }
-        
         self.signatureGenerator = SHSignatureGenerator()
         self.accumulatedFrames = 0
     }
     
-    func processAudio(samples: [Float], time: AVAudioTime) async {
-        // Reconstruct a local buffer that lives only on this thread
-        let format = AVAudioFormat(standardFormatWithSampleRate: 44100, channels: 1)!
-        let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: AVAudioFrameCount(samples.count))!
-        buffer.frameLength = buffer.frameCapacity
-        
-        for i in 0..<samples.count {
-            buffer.floatChannelData?[0][i] = samples[i]
+    func processAudio(buffer: AVAudioPCMBuffer, time: AVAudioTime) async {
+        // 1. Ensure setup is called only ONCE.
+        if !isAnalyzerSetup {
+            try? setupAnalyzer(format: buffer.format)
         }
         
         self.latestBuffer = buffer
         self.sampleRate = buffer.format.sampleRate
         
+        // 2. 🚨 THE CRITICAL ML CALL: Feed the model continuously!
         streamAnalyzer?.analyze(buffer, atAudioFramePosition: time.sampleTime)
         
+        // 3. Shazam Timeout Logic
         if isMusicCurrentlyPlaying && Date().timeIntervalSince(lastMusicDetectedTime) > 25.0 {
             isMusicCurrentlyPlaying = false
             isAccumulatingForShazam = false
@@ -121,22 +114,32 @@ actor AcousticProcessingPipeline {
             return
         }
         
-        guard isAccumulatingForShazam else { return }
+        // 4. Pre-allocated Shazam Processing
+        guard isAccumulatingForShazam,
+                let converter = shazamConverter,
+                let monoBuffer = shazamMonoBuffer else { return }
         
-        let shazamFormat = AVAudioFormat(standardFormatWithSampleRate: buffer.format.sampleRate, channels: 1)!
-        let converter = AVAudioConverter(from: buffer.format, to: shazamFormat)
-        let monoBuffer = AVAudioPCMBuffer(pcmFormat: shazamFormat, frameCapacity: buffer.frameLength)!
+        // --- Inside processAudio() ---
+        monoBuffer.frameLength = buffer.frameLength
         
+        var hasProvidedBuffer = false
         var error: NSError?
-        converter?.convert(to: monoBuffer, error: &error) { _, outStatus in
+        
+        converter.convert(to: monoBuffer, error: &error) { _, outStatus in
+            // Only feed the buffer once per conversion pass!
+            if hasProvidedBuffer {
+                outStatus.pointee = .noDataNow
+                return nil
+            }
+            hasProvidedBuffer = true
             outStatus.pointee = .haveData
             return buffer
         }
         
-        try? signatureGenerator.append(monoBuffer, at: time)
+        try? signatureGenerator.append(monoBuffer, at: nil)
         accumulatedFrames += monoBuffer.frameLength
         
-        if accumulatedFrames >= AVAudioFrameCount(shazamFormat.sampleRate * 8) {
+        if accumulatedFrames >= AVAudioFrameCount(monoBuffer.format.sampleRate * 8) {
             let signature = signatureGenerator.signature()
             if signature.duration > 3.0, let session = shazamSession {
                 session.match(signature)
@@ -165,7 +168,6 @@ actor AcousticProcessingPipeline {
         }
     }
     
-    // MARK: - Main Threat Processing (Optimized)
     func confirmThreatAndTrack(profile: SoundProfile, confidence: Double) async {
         let now = Date()
         
@@ -182,18 +184,30 @@ actor AcousticProcessingPipeline {
         let effectiveLabel = profile.canonicalLabel
         let effectiveConfidence = confidence
         
+        // 🚨 NEW LOGIC: The Music Heartbeat & Cooldown
+        if isMusic {
+            // Keep the heartbeat alive so the HUD doesn't clear the song
+            self.lastMusicDetectedTime = now
+            self.isMusicCurrentlyPlaying = true
+            
+            // Only fire up Shazam if we haven't identified a song in the last 3 minutes
+            if !self.hasMatchedCurrentSong || now.timeIntervalSince(self.lastSongUpdate) > 180 {
+                self.startShazamAccumulation()
+            }
+        }
+        
         if AppGlobals.filteredCategories.contains(categoryRawValue) { return }
         
         guard let buffer = latestBuffer, let channelData = buffer.floatChannelData else { return }
-        
         let safeCount = min(Int(buffer.frameLength), 4096)
-        let peak = Array(UnsafeBufferPointer(start: channelData[0], count: safeCount)).map(abs).max() ?? 0.0
+        
+        // Zero-allocation hardware peak detection
+        var maxVal: Float = 0.0
+        vDSP_maxmgv(channelData[0], 1, &maxVal, vDSP_Length(safeCount))
+        let peak = maxVal
         
         guard peak > minimumPeak else { return }
         
-        // ─────────────────────────────────────────────────────────────
-        // OFFLOAD HEAVY DSP (FFT + TDOA) TO DETACHED TASK
-        // ─────────────────────────────────────────────────────────────
         let localSampleRate = self.sampleRate
         let exactMicDistance = await HardwareCalibration.micBaseline
         let currentLoc = self.lastKnownLocation
@@ -234,9 +248,6 @@ actor AcousticProcessingPipeline {
         let (targets, currentBearing) = analysisResult
         if targets.isEmpty { return }
         
-        // ─────────────────────────────────────────────────────────────
-        // LIGHTWEIGHT TRACKING LOGIC (on actor)
-        // ─────────────────────────────────────────────────────────────
         let safeTailMemory = max(tailMemory, profile.cooldown + 1.0)
         activeThreats.removeAll { now.timeIntervalSince($0.lastSeen) > safeTailMemory }
         
@@ -270,16 +281,9 @@ actor AcousticProcessingPipeline {
                 dopplerResult = newTracker.update(with: currentFreq, confidence: target.confidence)
                 
                 activeThreats.append(ActiveThreat(
-                    sessionID: newID,
-                    dopplerTracker: newTracker,
-                    lastFrequency: currentFreq,
-                    lastBearing: currentBearing,
-                    firstSeen: now,
-                    lastSeen: now,
-                    category: categoryRawValue,
-                    label: effectiveLabel,
-                    hitCount: 1,
-                    tailMemory: safeTailMemory
+                    sessionID: newID, dopplerTracker: newTracker, lastFrequency: currentFreq,
+                    lastBearing: currentBearing, firstSeen: now, lastSeen: now,
+                    category: categoryRawValue, label: effectiveLabel, hitCount: 1, tailMemory: safeTailMemory
                 ))
                 threatSessionID = newID
                 threatFirstSeen = now
@@ -288,7 +292,6 @@ actor AcousticProcessingPipeline {
             let timeAlive = now.timeIntervalSince(threatFirstSeen)
             let hasMetLeadIn = timeAlive >= leadInTime
             
-            // Final lightweight work in detached task
             Task.detached(priority: .userInitiated) { [weak self, threatSessionID, currentBearing, currentLoc, currentHead, effectiveLabel, effectiveConfidence, songToAttach, isVehicle, isMusic, shouldSnapToRoad, ceiling, maxRange, minConf, hasMetLeadIn] in
                 guard let self = self else { return }
                 
@@ -313,7 +316,6 @@ actor AcousticProcessingPipeline {
                     let originLatRad = origin.latitude * .pi / 180.0
                     let originLonRad = origin.longitude * .pi / 180.0
                     
-                    // Correct spherical destination point formula
                     let destLatRad = asin(sin(originLatRad) * cos(angularDist) + cos(originLatRad) * sin(angularDist) * cos(bearingRad))
                     let destLonRad = originLonRad + atan2(
                         sin(bearingRad) * sin(angularDist) * cos(originLatRad),
@@ -334,47 +336,17 @@ actor AcousticProcessingPipeline {
                     }
                 }
                 
-                // This is a test.
                 let attachedSong = (isMusic) ? songToAttach : nil
                 let dopplerRate = dopplerResult?.shiftHz != nil ? Float(dopplerResult!.shiftHz) : nil
                 let isApproaching = dopplerResult?.isApproaching ?? false
                 let isRevealed = (hasMetLeadIn && effectiveConfidence >= minConf) || effectiveConfidence >= 0.42
                 
                 let newEvent = SoundEvent(
-                    sessionID: threatSessionID,
-                    timestamp: Date(),
-                    threatLabel: effectiveLabel,
-                    confidence: effectiveConfidence,
-                    bearing: currentBearing,
-                    distance: normalizedUI_Distance,
-                    energy: Float(safePeak),
-                    dopplerRate: dopplerRate,
-                    isApproaching: isApproaching,
-                    latitude: targetLat,
-                    longitude: targetLon,
-                    isRevealed: isRevealed,
-                    songLabel: attachedSong,
+                    sessionID: threatSessionID, timestamp: Date(), threatLabel: effectiveLabel,
+                    confidence: effectiveConfidence, bearing: currentBearing, distance: normalizedUI_Distance,
+                    energy: Float(safePeak), dopplerRate: dopplerRate, isApproaching: isApproaching,
+                    latitude: targetLat, longitude: targetLon, isRevealed: isRevealed, songLabel: attachedSong
                 )
-                
-                let outputLat = String(format: "%.3f", targetLat ?? 0.00)
-                let outputLon = String(format: "%.3f", targetLon ?? 0.00)
-                let outputPeak = String(format: "%.3f", safePeak)
-                let outputDopp = String(format: "%.3f", dopplerRate ?? 0.00)
-                
-                // Current phone (user) location
-                let userLat = await String(format: "%.3f", DependencyContainer.shared.microphoneManager.currentLocation?.coordinate.latitude ?? 0.0)
-                let userLon = await String(format: "%.3f", DependencyContainer.shared.microphoneManager.currentLocation?.coordinate.longitude ?? 0.0)
-                
-                if isVehicle {
-                    AppGlobals.doLog(
-                        message: "VEHICLE [\(effectiveLabel)] Sess:\(threatSessionID) Conf:\(String(format: "%.3f", effectiveConfidence)) Reveal:\(isRevealed) Dist:\(Int(estimatedFeet))ft UserLat:\(userLat) UserLon:\(userLon) TargetLat:\(outputLat) TargetLon:\(outputLon) Peak:\(outputPeak) Dopp:\(outputDopp) Approach:\(isApproaching)",
-                        step: "VEHICLE_TRACK"
-                    )
-                    AppGlobals.doLog(
-                        message: "VEHICLE REVEAL_DECISION [\(effectiveLabel)] Conf:\(String(format: "%.3f", effectiveConfidence)) >= \(minConf) ? \(effectiveConfidence >= minConf) | LeadIn:\(hasMetLeadIn) (alive \(String(format: "%.2f", timeAlive))s) → Revealed:\(isRevealed)",
-                        step: "REVEAL_DEBUG"
-                    )
-                }
                 
                 await MainActor.run {
                     if isRevealed && isEmergency {
@@ -388,6 +360,7 @@ actor AcousticProcessingPipeline {
     
     func setupAnalyzer(format: AVAudioFormat) throws {
         guard !isAnalyzerSetup else { return }
+        // 🚨 CRITICAL: Set to true immediately so we don't get trapped in an infinite re-setup loop
         isAnalyzerSetup = true
         
         self.sampleRate = format.sampleRate
@@ -401,11 +374,16 @@ actor AcousticProcessingPipeline {
         self.resultsObserver = observer
         try streamAnalyzer?.add(request, withObserver: observer)
         
-        self.signatureGenerator = SHSignatureGenerator()
+        let shazamFormat = AVAudioFormat(standardFormatWithSampleRate: format.sampleRate, channels: 1)!
+        self.shazamConverter = AVAudioConverter(from: format, to: shazamFormat)
+        self.shazamMonoBuffer = AVAudioPCMBuffer(pcmFormat: shazamFormat, frameCapacity: 8192)
         
+        self.signatureGenerator = SHSignatureGenerator()
         let shazamObs = ShazamResultsObserver(pipeline: self)
         self.shazamDelegate = shazamObs
         self.shazamSession = SHSession()
         self.shazamSession?.delegate = shazamObs
+        
+        AppGlobals.doLog(message: "ML Analyzer & Shazam Initialized Successfully", step: "ML")
     }
 }

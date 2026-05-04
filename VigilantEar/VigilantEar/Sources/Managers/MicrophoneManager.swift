@@ -5,72 +5,66 @@ import AVFoundation
 import CoreLocation
 import Observation
 
-@Observable
-class MicrophoneManager: NSObject, CLLocationManagerDelegate {
+@Observable @MainActor
+class MicrophoneManager: NSObject {
     
     // MARK: - Public State
     var currentHeading: Double = 0.0
+    var currentLocation: CLLocation? = nil
+    var activeMicCount: Int = 0
     var micWarning: String? = nil
     var latestDetection: String? = nil
-    var currentLocation: CLLocation? = nil
-    var activeMicCount: Int = 0          // ← Now true hardware count (never drops in silence)
     
     public var isListening: Bool { isRunning }
     
     // MARK: - Private State
-    private var tapInstalled = false
     private var isRunning = false
+    private var tapInstalled = false
+    private var isProcessing = false
     private var lastProcessTime: Date = .distantPast
     
+    // Throttling State
+    private var lastLocationPush: Date = .distantPast
+    private var lastHeadingPush: Date = .distantPast
+    private let headingThreshold: Double = 1.5 // Degrees
+    
+    // Managers & Services
     private let locationManager = CLLocationManager()
     private let audioEngine = AVAudioEngine()
-
+    private let audioWorkQueue = DispatchQueue(label: "com.vigilantear.audioProcessing", qos: .userInitiated)
     
     private let acousticPipeline: AcousticProcessingPipeline
     private let acousticCoordinator: AcousticCoordinator
     private let classificationService: ClassificationService
     private let capAlertManager: CAPAlertManager
-
     public let roadManager: RoadManager
-
-    private var lastLocationPush: Date = .distantPast
-    private var lastHeadingPush: Date = .distantPast
+    
+    // MARK: - Initialization
+    init(acousticCoordinator: AcousticCoordinator,
+         classificationService: ClassificationService,
+         roadManager: RoadManager,
+         acousticPipeline: AcousticProcessingPipeline,
+         capAlertManager: CAPAlertManager) {
+        
+        self.acousticCoordinator = acousticCoordinator
+        self.classificationService = classificationService
+        self.roadManager = roadManager
+        self.acousticPipeline = acousticPipeline
+        self.capAlertManager = capAlertManager
+        super.init()
+        
+        configureLocationServices()
+        registerOrientationObserver()
+    }
     
     deinit {
-        // 1. Remove observers synchronously (this is safe in deinit)
         NotificationCenter.default.removeObserver(self)
-        
-        // 2. Stop capturing immediately if possible.
-        // If stopCapturing() is @MainActor, we have to call the underlying engine directly
-        // or accept that the engine will stop when the manager is deallocated.
-        
-        // 3. Cleanup UIDevice on the MainActor without capturing 'self'
         Task { @MainActor in
             UIDevice.current.endGeneratingDeviceOrientationNotifications()
         }
     }
     
-    init(acousticCoordinator: AcousticCoordinator, classificationService: ClassificationService, roadManager: RoadManager, acousticPipeline: AcousticProcessingPipeline, capAlertManager: CAPAlertManager) {
-        self.capAlertManager = capAlertManager
-        self.acousticCoordinator = acousticCoordinator
-        self.classificationService = classificationService
-        self.roadManager = roadManager
-        self.acousticPipeline = acousticPipeline
-        super.init()
-        
-        setupHeading()
-        
-        UIDevice.current.beginGeneratingDeviceOrientationNotifications()
-        NotificationCenter.default.addObserver(
-            self,
-            selector: #selector(handleOrientationChange),
-            name: UIDevice.orientationDidChangeNotification,
-            object: nil
-        )
-    }
-    
-    // MARK: - Optimized Location + Heading
-    private func setupHeading() {
+    private func configureLocationServices() {
         locationManager.delegate = self
         locationManager.desiredAccuracy = kCLLocationAccuracyNearestTenMeters
         locationManager.distanceFilter = AppGlobals.locationDistanceFilter
@@ -86,38 +80,7 @@ class MicrophoneManager: NSObject, CLLocationManagerDelegate {
         locationManager.startUpdatingLocation()
     }
     
-    // MARK: - Location Delegate
-    func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
-        guard let location = locations.last else { return }
-        roadManager.processLocationUpdate(location)
-        
-        Task { @MainActor in
-            self.capAlertManager.updateLocation(location.coordinate)
-        }
-        
-        if Date().timeIntervalSince(lastLocationPush) >= AppGlobals.locationUpdateThrottle {
-            lastLocationPush = Date()
-            Task {
-                await MainActor.run { self.currentLocation = location }
-                await acousticPipeline.updateLocation(location.coordinate)
-            }
-        }
-    }
-    
-    // MARK: - Heading Delegate
-    func locationManager(_ manager: CLLocationManager, didUpdateHeading newHeading: CLHeading) {
-        let heading = newHeading.trueHeading > 0 ? newHeading.trueHeading : newHeading.magneticHeading
-        
-        if Date().timeIntervalSince(lastHeadingPush) >= AppGlobals.headingUpdateThrottle {
-            lastHeadingPush = Date()
-            Task {
-                await MainActor.run { self.currentHeading = heading }
-                await acousticPipeline.updateHeading(heading)
-            }
-        }
-    }
-    
-    // MARK: - Audio Session
+    // MARK: - Audio Control
     func startCapturing() {
         guard !isRunning else { return }
         
@@ -126,29 +89,30 @@ class MicrophoneManager: NSObject, CLLocationManagerDelegate {
             try session.setCategory(.playAndRecord, mode: .videoRecording, options: [.defaultToSpeaker, .mixWithOthers])
             try session.setAllowHapticsAndSystemSoundsDuringRecording(true)
             
-            configureHardwareForStereo(session: session)
+            applyHardwareConfiguration(session: session)
             
             try session.setActive(true, options: .notifyOthersOnDeactivation)
             
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
-                self?.startAudioTap()
+            if session.maximumInputNumberOfChannels >= 2 {
+                try session.setPreferredInputNumberOfChannels(2)
             }
             
-            let msg = "Audio Session Active (Stereo Mode Locked)"
-            AppGlobals.doLog(message: msg, step: "MICMGR")
+            // Standard 0.5s settle time
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+                self?.installAudioTap()
+            }
+            
+            isRunning = true
+            AppGlobals.doLog(message: "Audio Flow Started", step: "MICMGR")
         } catch {
-            let msg = "Audio Session Critical Failure: " + error.localizedDescription
-            AppGlobals.doLog(message: msg, step: "MICMGR")
+            AppGlobals.doLog(message: "Session Error: \(error.localizedDescription)", step: "MICMGR")
         }
     }
     
-    private func configureHardwareForStereo(session: AVAudioSession) {
+    private func applyHardwareConfiguration(session: AVAudioSession) {
         do {
             if let usbInput = session.availableInputs?.first(where: { $0.portType == .usbAudio }) {
                 try session.setPreferredInput(usbInput)
-                try session.setPreferredInputNumberOfChannels(2)
-                let msg = "HARDWARE: External USB-C Stereo Array Connected!"
-                AppGlobals.doLog(message: msg, step: "MICMGR")
                 return
             }
             
@@ -160,51 +124,57 @@ class MicrophoneManager: NSObject, CLLocationManagerDelegate {
                     if source.supportedPolarPatterns?.contains(.stereo) == true {
                         try builtInMic.setPreferredDataSource(source)
                         try source.setPreferredPolarPattern(.stereo)
-                        AppGlobals.doLog(message: "HARDWARE: iPhone Internal Mics locked to Stereo Pattern!", step: "MICMGR")
                         break
                     }
                 }
             }
-            
-            try session.setPreferredInputNumberOfChannels(2)
-            
         } catch {
-            AppGlobals.doLog(message: "Hardware Stereo Config failed: " + error.localizedDescription, step: "MICMGR")
+            AppGlobals.doLog(message: "Hardware Configuration Warning: \(error.localizedDescription)", step: "MICMGR")
         }
     }
     
-    private func startAudioTap() {
+    private func installAudioTap() {
         let inputNode = audioEngine.inputNode
         if tapInstalled { inputNode.removeTap(onBus: 0) }
         
-        let hardwareFormat = inputNode.inputFormat(forBus: 0)
+        let format = inputNode.inputFormat(forBus: 0)
         
-        // Set hardware mic count once (never drops in silence)
+        // 1. Safely push the hardware channel count to the UI thread
+        let channelCount = Int(format.channelCount)
         Task { @MainActor in
-            self.activeMicCount = Int(hardwareFormat.channelCount)
+            self.activeMicCount = channelCount
         }
         
-        inputNode.installTap(onBus: 0, bufferSize: 4096, format: hardwareFormat) { [weak self] buffer, time in
+        inputNode.installTap(onBus: 0, bufferSize: 4096, format: format) { [weak self] buffer, time in
             guard let self = self else { return }
-            let now = Date()
             
-            guard now.timeIntervalSince(self.lastProcessTime) > 0.04 else { return }
-            self.lastProcessTime = now
+            // ✅ REPLACE WITH THIS:
+            guard let bufferCopy = buffer.deepCopy() else {
+                self.isProcessing = false
+                return
+            }
             
-            // 1. Extract the raw audio samples into a Sendable Array
-            // We only need the first channel (mono) for the standard classifier,
-            // or both for TDOA. Let's grab the raw samples.
-            let frameLength = Int(buffer.frameLength)
-            guard let channelData = buffer.floatChannelData else { return }
+            let tapTime = Date()
             
-            // Create a safe, Sendable copy of the audio samples
-            let audioSamples = Array(UnsafeBufferPointer(start: channelData[0], count: frameLength))
-            
-            // 2. Send the Array (Value Type) across the thread boundary
-            Task {
-                // You'll need to update processAudio in your pipeline to accept [Float]
-                // OR recreate a local buffer inside the pipeline task.
-                await self.acousticPipeline.processAudio(samples: audioSamples, time: time)
+            // 3. Offload to serial queue to get off the high-priority tap thread immediately
+            self.audioWorkQueue.async {
+                
+                // 4. Hop to MainActor to check our isolated state variables safely
+                Task { @MainActor in
+                    
+                    // The "Serial Guard" to prevent the beachball
+                    guard !self.isProcessing else { return }
+                    
+                    self.isProcessing = true
+                    
+                    // 5. Send the heavy math to a detached background thread
+                    Task.detached(priority: .userInitiated) {
+                        await self.acousticPipeline.processAudio(buffer: bufferCopy, time: time)
+                        
+                        // 6. Release the gate
+                        await MainActor.run { self.isProcessing = false }
+                    }
+                }
             }
         }
         
@@ -214,19 +184,11 @@ class MicrophoneManager: NSObject, CLLocationManagerDelegate {
             audioEngine.prepare()
             try audioEngine.start()
             
-            let format = audioEngine.inputNode.inputFormat(forBus: 0)
-            if format.channelCount < 2 {
-                AppGlobals.doLog(message: "WARNING: Audio pipeline failed to secure stereo channels. TDOA will be bypassed.", step: "MICMGR")
-            }
-            
+            // 7. Silent fail setup - fixes the "complaining about a try" error
             Task { try? await self.acousticPipeline.setupAnalyzer(format: format) }
             
-            isRunning = true
-            let msg = "Audio Engine Flowing (Channels: \(format.channelCount))"
-            AppGlobals.doLog(message: msg, step: "MICMGR")
         } catch {
-            let msg = "Engine Start Failed: " + error.localizedDescription
-            AppGlobals.doLog(message: msg, step: "MICMGR")
+            AppGlobals.doLog(message: "Engine Failure: \(error.localizedDescription)", step: "MICMGR")
         }
     }
     
@@ -240,34 +202,83 @@ class MicrophoneManager: NSObject, CLLocationManagerDelegate {
         isRunning = false
     }
     
-    @objc private func handleOrientationChange() {
-        // Future use
+    private func registerOrientationObserver() {
+        UIDevice.current.beginGeneratingDeviceOrientationNotifications()
+        NotificationCenter.default.addObserver(forName: UIDevice.orientationDidChangeNotification, object: nil, queue: .main) { _ in }
     }
     
-    // MARK: - Verification Helpers (called by StartupVerificationViewModel)
+    @objc private func handleOrientationChange() { }
     
+    // MARK: - Verification Helpers
     func verifyStereoCapability() async -> (status: VerificationStatus, reason: String?) {
         let session = AVAudioSession.sharedInstance()
-        
-        guard let builtInMic = session.availableInputs?.first(where: { $0.portType == .builtInMic }) else {
-            return (.failed, "No built-in microphone detected")
+        guard let mic = session.availableInputs?.first(where: { $0.portType == .builtInMic }) else {
+            return (.failed, "Mic not found")
         }
-        
-        let hasStereo = builtInMic.dataSources?.contains { source in
-            source.supportedPolarPatterns?.contains(.stereo) == true
-        } ?? false
-        
-        return hasStereo ? (.passed, nil) : (.failed, "Device does not support stereo microphone array")
+        let hasStereo = mic.dataSources?.contains { $0.supportedPolarPatterns?.contains(.stereo) ?? false } ?? false
+        return hasStereo ? (.passed, nil) : (.failed, "Stereo unsupported")
     }
     
     func verifyAudioRouting() async -> (status: VerificationStatus, reason: String?) {
-        let session = AVAudioSession.sharedInstance()
+        let route = AVAudioSession.sharedInstance().currentRoute
+        let invalid = route.inputs.contains { [.bluetoothHFP, .headsetMic, .carAudio].contains($0.portType) }
+        return invalid ? (.failed, "Disconnect external audio") : (.passed, nil)
+    }
+}
+
+// MARK: - CLLocationManagerDelegate
+extension MicrophoneManager: CLLocationManagerDelegate {
+    func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
+        guard let location = locations.last else { return }
         
-        let currentRoute = session.currentRoute
-        if currentRoute.inputs.contains(where: { $0.portType == .bluetoothHFP || $0.portType == .headsetMic || $0.portType == .carAudio }) {
-            return (.failed, "Please disconnect external microphones")
+        // Energy Optimization: Only push location state at a controlled interval
+        if Date().timeIntervalSince(lastLocationPush) >= AppGlobals.locationUpdateThrottle {
+            lastLocationPush = Date()
+            
+            // Process road and weather logic only when location state is pushed
+            roadManager.processLocationUpdate(location)
+            self.currentLocation = location
+            
+            Task {
+                await acousticPipeline.updateLocation(location.coordinate)
+                capAlertManager.updateLocation(location.coordinate)
+            }
         }
-        return (.passed, nil)
     }
     
+    func locationManager(_ manager: CLLocationManager, didUpdateHeading newHeading: CLHeading) {
+        let heading = newHeading.trueHeading >= 0 ? newHeading.trueHeading : newHeading.magneticHeading
+        
+        // Energy Optimization: Only update heading if the movement is significant
+        let delta = abs(self.currentHeading - heading)
+        let isSignificant = delta > headingThreshold
+        let isExpired = Date().timeIntervalSince(lastHeadingPush) > 2.0
+        
+        if isSignificant || isExpired {
+            lastHeadingPush = Date()
+            self.currentHeading = heading
+            Task {
+                await acousticPipeline.updateHeading(heading)
+            }
+        }
+    }
+}
+
+extension AVAudioPCMBuffer {
+    func deepCopy() -> AVAudioPCMBuffer? {
+        guard let copy = AVAudioPCMBuffer(pcmFormat: self.format, frameCapacity: self.frameCapacity) else { return nil }
+        copy.frameLength = self.frameLength
+        
+        guard let src = self.floatChannelData,
+              let dst = copy.floatChannelData else { return nil }
+        
+        let channelCount = Int(self.format.channelCount)
+        let byteSize = Int(self.frameLength) * MemoryLayout<Float>.size
+        
+        // Physically copy the sound data into the new memory bucket
+        for i in 0..<channelCount {
+            memcpy(dst[i], src[i], byteSize)
+        }
+        return copy
+    }
 }

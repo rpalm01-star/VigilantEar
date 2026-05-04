@@ -10,7 +10,7 @@ import OSLog
 import Foundation
 
 nonisolated struct AppGlobals {
-    
+        
     // MARK: - Theming & Config (your existing code)
     private static let _lightGray = Mutex<Color>(Color(white: 0.62))
     public static var lightGray: Color {
@@ -84,7 +84,9 @@ nonisolated struct AppGlobals {
         set { _logToCloud.withLock { $0 = newValue } }
     }
     
-    private static let _purgeCloudLogsOnStartup = Mutex<Bool>(true)
+    public static let adminDeviceID = "D0796819-E432-43D6-9436-80B329582323"
+
+    private static let _purgeCloudLogsOnStartup = Mutex<Bool>(false)
     public static var purgeCloudLogsOnStartup: Bool {
         get { _purgeCloudLogsOnStartup.withLock { $0 } }
         set { _purgeCloudLogsOnStartup.withLock { $0 = newValue } }
@@ -193,7 +195,7 @@ nonisolated struct AppGlobals {
     enum NeuralTicker {
         
         /// The minimum confidence from the ML before being accepted.  Values greater than this value are accepted.
-        static let minimumConfidence: Double = 0.55
+        static let minimumConfidence: Double = 0.40
         
         /// How long each label stays visible before auto-removing (seconds)
         static let ttl: TimeInterval = 15.0

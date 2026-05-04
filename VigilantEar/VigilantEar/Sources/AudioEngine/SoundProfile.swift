@@ -77,12 +77,34 @@ struct SoundProfile {
         (["fireworks", "gunshot_gunfire", "artillery_fire", "firecracker", "eruption", "boom"], "fireworks", .pink, 0.90, 1000.0, .ignored, false, 2, 0.8, 0.9, 0.0, 4.0),
         (["smoke_detector", "alarm_clock"], "exclamationmark.triangle.fill", .red, 0.80, 150.0, .emergency, false, 3, 0.4, 0.9, 1.0, 2.0),
         (["person", "person_running", "person_walking"], "figure.walk.arrival", .red, 0.80, 150.0, .emergency, false, 2, 0.50, 0.60, 0.2, 2.0),
-        (["knock", "door_bell", "doorbell", "door_sliding"], "door.left.hand.closed", .cyan, 0.5, 150.0, .emergency, true, 2, 0.50, 0.92, 0.4, 2.0),
+        (["knock", "door_bell", "doorbell", "door_sliding"],
+         // SF Symbol Name
+         "hand.tap",
+         // Color
+         .cyan,
+         // Max expected amplitude
+         0.90,
+         // Outer max detection range (ft). Events further away than this are ignored for this type.
+         150.0,
+         // Category
+         .emergency,
+         // Should try to snap to map/road?
+         true,
+         // Haptic pulse count
+         2,
+         // Cooldown period in seconds before it wipes away
+         0.10,
+         // Minimum confidence provided by Sound ML chip
+         0.85,
+         // Lead time prior to doing anything with this event.
+         0.50,
+         // How long to keep it around after it is no longer getting data from the ML chip.
+         0.10),
     ]
     
     private static let vehicles: [(keywords: [String], icon: String, color: Color, ceiling: Double, maxRange: Double, category: ThreatCategory, snaps: Bool, haptics: Int, cooldown: Double, minConf: Double, leadIn: Double, tail: Double)] = [
         // Keywords
-        (["passenger car", "car_horn", "car_passing_by", "race_car", "truck", "bus", "motorcycle", "traffic_noise", "engine", "engine_accelerating_revving", "engine_starting", "engine_idling", "engine_knocking", "vehicle_skidding"],
+        (["car", "car_horn", "car_passing_by", "race_car", "truck", "bus", "motorcycle", "traffic_noise", "engine", "engine_accelerating_revving", "engine_starting", "engine_idling", "engine_knocking", "vehicle_skidding"],
          // SF Symbol Name
          "car.fill",
          // Color
@@ -92,7 +114,7 @@ struct SoundProfile {
          // Outer max detection range (ft). Events further away than this are ignored for this type.
          500.0,
          // Category
-        .vehicle,
+         .vehicle,
          // Should try to snap to map/road?
          true,
          // Haptic pulse count
@@ -126,9 +148,9 @@ struct SoundProfile {
     ]
     
     private static let household: [(keywords: [String], icon: String, color: Color, ceiling: Double, maxRange: Double, category: ThreatCategory, snaps: Bool, haptics: Int, cooldown: Double, minConf: Double, leadIn: Double, tail: Double)] = [
+        (["jingle", "squeak", "keys_jangling", "coin_dropping", "scissors", "ratchet_and_pawl", "power_windows"], "door.left.hand.closed", .mint, 0.60, 30.0, .misc, false, 0, 1.6, 0.65, 0.05, 1.5),
         (["lawn_mower", "cutlery_silverware", "dishes_pots_pans", "chopping_food", "frying_food", "blender", "water_tap_faucet", "bathtub_filling_washing", "hair_dryer", "drawer_open_close", "toothbrush", "vacuum_cleaner", "electric_shaver", "zipper"], "house.fill", .mint, 0.40, 40.0, .ignored, false, 0, 1.6, 0.65, 0.8, 1.5),
         (["typing", "tap", "typewriter", "typing_computer_keyboard", "writing", "camera", "printer"], "keyboard", .mint, 0.35, 40.0, .ignored, false, 0, 2.2, 0.65, 0.5, 1.5),
-        (["door", "squeak", "keys_jangling", "coin_dropping", "scissors", "ratchet_and_pawl", "power_windows"], "door.left.hand.closed", .mint, 0.60, 30.0, .misc, false, 0, 1.6, 0.60, 0.2, 1.5),
         (["liquid_splashing", "liquid_sloshing", "liquid_squishing", "liquid_dripping", "liquid_trickle_dribble", "liquid_filling_container", "liquid_spraying", "water_pump", "underwater_bubbling", "whoosh_swoosh_swish", "thump_thud", "crushing", "crumpling_crinkling", "tearing", "click"], "drop.fill", .mint, 0.45, 50.0, .ignored, false, 0, 2.2, 0.65, 0.5, 1.5),
         (["sewing_machine", "mechanical_fan", "air_conditioner"], "fan.fill", .gray, 0.20, 20.0, .ignored, false, 0, 1.6, 0.70, 1.0, 2.0),
         (["toilet_flush", "sink_filling_washing"], "spigot.fill", .white, 0.20, 20.0, .medium, false, 0, 2.0, 0.70, 1.0, 2.0),
@@ -137,11 +159,33 @@ struct SoundProfile {
     ]
     
     private static let musicAndEntertainment: [(keywords: [String], icon: String, color: Color, ceiling: Double, maxRange: Double, category: ThreatCategory, snaps: Bool, haptics: Int, cooldown: Double, minConf: Double, leadIn: Double, tail: Double)] = [
-        (["music", "glass_clink", "singing", "choir_singing", "yodeling", "rapping", "humming", "whistling", "plucked_string_instrument", "guitar", "electric_guitar", "bass_guitar", "acoustic_guitar", "steel_guitar_slide_guitar", "guitar_tapping", "guitar_strum", "banjo", "sitar", "mandolin", "zither", "ukulele", "keyboard_musical", "piano", "electric_piano", "organ", "electronic_organ", "hammond_organ", "synthesizer", "harpsichord", "percussion", "drum_kit", "drum", "snare_drum", "bass_drum", "timpani", "tabla", "cymbal", "hi_hat", "tambourine", "rattle_instrument", "gong", "mallet_percussion", "marimba_xylophone", "glockenspiel", "vibraphone", "steelpan", "orchestra", "brass_instrument", "french_horn", "trumpet", "trombone", "bowed_string_instrument", "violin_fiddle", "cello", "double_bass", "wind_instrument", "flute", "saxophone", "clarinet", "oboe", "bassoon", "harp", "bell", "church_bell", "cowbell", "tuning_fork", "harmonica", "accordion", "bagpipes", "didgeridoo", "shofar", "theremin", "disc_scratching"], "music.quarternote.3", .purple, 0.55, 150.0, .music, false, 0, 0.8, 0.45, 0.5, 2.0),
+        (["music", "glass_clink", "door", "singing", "choir_singing", "yodeling", "rapping", "humming", "whistling", "plucked_string_instrument", "guitar", "electric_guitar", "bass_guitar", "acoustic_guitar", "steel_guitar_slide_guitar", "guitar_tapping", "guitar_strum", "banjo", "sitar", "mandolin", "zither", "ukulele", "keyboard_musical", "piano", "electric_piano", "organ", "electronic_organ", "hammond_organ", "synthesizer", "harpsichord", "percussion", "drum_kit", "drum", "snare_drum", "bass_drum", "timpani", "tabla", "cymbal", "hi_hat", "tambourine", "rattle_instrument", "gong", "mallet_percussion", "marimba_xylophone", "glockenspiel", "vibraphone", "steelpan", "orchestra", "brass_instrument", "french_horn", "trumpet", "trombone", "bowed_string_instrument", "violin_fiddle", "cello", "double_bass", "wind_instrument", "flute", "saxophone", "clarinet", "oboe", "bassoon", "harp", "bell", "church_bell", "cowbell", "tuning_fork", "harmonica", "accordion", "bagpipes", "didgeridoo", "shofar", "theremin", "disc_scratching"], "music.quarternote.3", .purple, 0.55, 150.0, .music, false, 0, 0.8, 0.45, 0.5, 2.0),
     ]
     
     private static let sports: [(keywords: [String], icon: String, color: Color, ceiling: Double, maxRange: Double, category: ThreatCategory, snaps: Bool, haptics: Int, cooldown: Double, minConf: Double, leadIn: Double, tail: Double)] = [
-        (["sport", "skateboard", "playing_badminton", "playing_hockey", "playing_squash", "playing_table_tennis", "playing_tennis", "playing_volleyball", "rope_skipping", "scuba_diving", "skiing", "basketball_bounce", "slap_smack", "bowling_impact"], "figure.baseball.circle.fill", .mint, 0.40, 80.0, .misc, false, 0, 1.5, 0.60, 0.2, 1.5),
+        (["sport", "skateboard", "playing_badminton", "playing_hockey", "playing_squash", "playing_table_tennis", "playing_tennis", "playing_volleyball", "rope_skipping", "scuba_diving", "skiing", "basketball_bounce", "slap_smack", "bowling_impact"],
+         // SF Symbol Name
+         "figure.baseball",
+         // Color
+         .mint,
+         // Max expected amplitude
+         0.50,
+         // Outer max detection range (ft). Events further away than this are ignored for this type.
+         100.0,
+         // Category
+         .misc,
+         // Should try to snap to map/road?
+         false,
+         // Haptic pulse count
+         0,
+         // Cooldown period in seconds before it wipes away
+         0.5,
+         // Minimum confidence provided by Sound ML chip
+         0.70,
+         // Lead time prior to doing anything with this event.
+         0.25,
+         // How long to keep it around after it is no longer getting data from the ML chip.
+         0.05),
     ]
     
     private static let ignored: [(keywords: [String], icon: String, color: Color, ceiling: Double, maxRange: Double, category: ThreatCategory, snaps: Bool, haptics: Int, cooldown: Double, minConf: Double, leadIn: Double, tail: Double)] = [

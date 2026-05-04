@@ -24,7 +24,6 @@ struct NeuralTickerHUD: View {
                     
                     ForEach(feed.prefix(AppGlobals.NeuralTicker.maxVisibleRows)) { item in
                         
-                        // Label with confidence-filled background
                         Text(item.label.uppercased())
                             .font(.system(size: AppGlobals.NeuralTicker.fontSize, weight: .black, design: .monospaced))
                             .foregroundColor(.cyan.opacity(AppGlobals.NeuralTicker.textOpacity))
@@ -33,11 +32,12 @@ struct NeuralTickerHUD: View {
                             .background(
                                 GeometryReader { textGeo in
                                     ZStack(alignment: .trailing) {
-                                        // Base background (subtle)
+                                        // 🚀 OPTIMIZATION: Removed live blur (.ultraThinMaterial).
+                                        // Static opacity looks great but costs zero GPU cycles to calculate.
                                         RoundedRectangle(cornerRadius: 5)
-                                            .fill(.ultraThinMaterial)
+                                            .fill(Color.black.opacity(0.6))
                                         
-                                        // Confidence fill (right to left)
+                                        // Confidence fill
                                         RoundedRectangle(cornerRadius: 5)
                                             .fill(Color.cyan.opacity(0.20))
                                             .frame(width: textGeo.size.width * item.confidence)
@@ -49,8 +49,11 @@ struct NeuralTickerHUD: View {
                                 insertion: .move(edge: .top).combined(with: .opacity),
                                 removal: .move(edge: .bottom).combined(with: .opacity)
                             ))
-                            .onAppear {
-                                DispatchQueue.main.asyncAfter(deadline: .now() + AppGlobals.NeuralTicker.ttl) {
+                            .task {
+                                // 🚀 OPTIMIZATION: Swift Concurrency prevents memory leaks from old timers
+                                try? await Task.sleep(nanoseconds: UInt64(AppGlobals.NeuralTicker.ttl * 1_000_000_000))
+                                
+                                if !Task.isCancelled {
                                     withAnimation(.easeOut(duration: AppGlobals.NeuralTicker.fadeOutDuration)) {
                                         feed.removeAll { $0.id == item.id }
                                     }
@@ -62,22 +65,28 @@ struct NeuralTickerHUD: View {
                 }
                 .frame(height: geo.size.height * AppGlobals.NeuralTicker.heightMultiplier)
                 .padding(.trailing, 2)
+                // 🚀 OPTIMIZATION: Now that the blur is gone, this works perfectly to flatten the UI
+                .drawingGroup()
             }
         }
         .task {
-            Timer.scheduledTimer(withTimeInterval: 25, repeats: true) { _ in
-                let cutoff = Date().addingTimeInterval(-90)
-                lastAddedTime = lastAddedTime.filter { $0.value > cutoff }
+            // 🚀 OPTIMIZATION: Safe background cleanup loop
+            Task {
+                while !Task.isCancelled {
+                    try? await Task.sleep(nanoseconds: 25_000_000_000) // 25 seconds
+                    let cutoff = Date().addingTimeInterval(-90)
+                    lastAddedTime = lastAddedTime.filter { $0.value > cutoff }
+                }
             }
             
+            // Stream listener
             for await newEvent in manager.newEvents() {
-                await MainActor.run {
-                    pushToFeed(with: newEvent)
-                }
+                pushToFeed(with: newEvent)
             }
         }
     }
     
+    @MainActor
     private func pushToFeed(with event: SoundLabelEvent) {
         let fullLabel = event.rawMLSoundLabel
         

@@ -36,6 +36,7 @@ struct MapView: View {
         }
         .overlay(alignment: .trailing) {
             NeuralTickerHUD()
+                .drawingGroup()
                 .allowsHitTesting(false)
         }
     }

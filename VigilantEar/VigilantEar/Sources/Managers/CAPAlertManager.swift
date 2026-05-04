@@ -22,12 +22,9 @@ class CAPAlertManager: NSObject {
     // The Global CAP Feeds Array
     private let feedURLs: [URL] = [
         URL(string: "https://api.weather.gov/alerts/active.atom")!,                        // US: National Weather Service
-        URL(string: "https://feeds.meteoalarm.org/feeds/meteoalarm-legacy-atom-spain")!,   // EU: Spain (Meteoalarm)
-        URL(string: "https://feeds.meteoalarm.org/feeds/meteoalarm-legacy-atom-germany")!, // EU: Germany (Meteoalarm)
-        URL(string: "https://feeds.meteoalarm.org/feeds/meteoalarm-legacy-atom-ireland")!  // EU: Ireland (Meteoalarm)
-        
-        // (You can add more European countries just by copying the URL
-        // and changing the country name at the very end!)
+        //URL(string: "https://feeds.meteoalarm.org/feeds/meteoalarm-legacy-atom-spain")!,   // EU: Spain (Meteoalarm)
+        //URL(string: "https://feeds.meteoalarm.org/feeds/meteoalarm-legacy-atom-germany")!, // EU: Germany (Meteoalarm)
+        //URL(string: "https://feeds.meteoalarm.org/feeds/meteoalarm-legacy-atom-ireland")!  // EU: Ireland (Meteoalarm)
     ]
     
     func startPolling() {
@@ -53,10 +50,9 @@ class CAPAlertManager: NSObject {
         for url in feedURLs {
             do {
                 var request = URLRequest(url: url)
-                request.setValue("\(AppGlobals.appTitle)/\(AppGlobals.appVersion) (\(AppGlobals.appEmail))", forHTTPHeaderField: "User-Agent")
-                request.setValue("application/cap+xml", forHTTPHeaderField: "Accept")
-                
-                // Don't let a dead international server hang the other feeds
+                request.setValue("application/atom+xml, application/xml", forHTTPHeaderField: "Accept")
+                request.setValue("VigilantEar/1.0 (iOS; Robert Palmer)", forHTTPHeaderField: "User-Agent")
+                request.setValue("\(AppGlobals.appTitle)/\(AppGlobals.appVersion) (iOS; \(AppGlobals.appEmail))", forHTTPHeaderField: "User-Agent")
                 request.timeoutInterval = 10
                 
                 let (data, response) = try await URLSession.shared.data(for: request)

@@ -100,9 +100,9 @@ struct ContentView: View {
                     
                     // BOTTOM OVERLAY AREA (Threats, Shazam, Legal, & CAP Banner)
                     HStack(alignment: .bottom) {
-                        VStack(alignment: .leading, spacing: 12) {
+                        VStack(alignment: .leading, spacing: 2) {
                             ThreatHUD(events: coordinator.activeEvents)
-                                .frame(width: geo.size.width * 0.7, height: 100)
+                                .frame(width: geo.size.width * 0.8, height: 84)
                                 .allowsHitTesting(false)
                             
                             if let songTitle = coordinator.activeSong,
@@ -117,21 +117,21 @@ struct ContentView: View {
                                 }
                                 .id(songTitle)
                                 .frame(width: geo.size.width * 0.7, alignment: .leading)
-                                .transition(unsafe .asymmetric(
+                                .transition(.asymmetric(
                                     insertion: .move(edge: .leading).combined(with: .opacity),
                                     removal: .opacity
                                 ))
                             }
                             
                             // --- LEGAL BUTTON & CAP BANNER GROUP ---
-                            HStack(spacing: 12) {
+                            HStack(spacing: 6) {
                                 // 1. Legal Button (Always visible)
                                 Button {
                                     showLegalSheet = true
                                 } label: {
                                     Text("Legal")
-                                        .font(.system(size: 11, weight: .semibold, design: .monospaced))
-                                        .foregroundColor(.gray.opacity(0.7))
+                                        .font(.system(size: 11, weight: .bold, design: .monospaced))
+                                        .foregroundColor(.gray.opacity(0.95))
                                         .padding(.horizontal, 10)
                                         .padding(.vertical, 4)
                                         .underline()
@@ -155,8 +155,6 @@ struct ContentView: View {
                                 
                                 // 2. CAP Emergency Banner
                                 if let activeAlert = capManager.nearbyAlerts.first {
-                                    // NO MORE STRING HACKING HERE
-                                    
                                     HStack(spacing: 8) {
                                         Image(systemName: "exclamationmark.triangle.fill")
                                             .font(.system(size: 14, weight: .bold))
@@ -176,11 +174,11 @@ struct ContentView: View {
                                 }
                             }
                         }
-                        .padding(.leading, 10)
+                        .padding(.leading, -48)
                         
                         Spacer()
                     }
-                    .padding(.bottom, 15)
+                    .padding(.bottom, 8)
                 }
                 .animation(.easeInOut, value: coordinator.activeSong)
                 .animation(.easeInOut, value: capManager.nearbyAlerts.count)
@@ -214,8 +212,8 @@ struct ContentView: View {
             }
             .overlay(alignment: .bottomTrailing) {
                 DebugHUD(manager: microphoneManager, roadManager: microphoneManager.roadManager)
-                    .padding(.bottom, 12)
-                    .padding(.trailing, 12)
+                    .padding(.bottom, 0)
+                    .padding(.trailing, 20)
             }
             .sheet(isPresented: $showLegalSheet) {
                 LegalView()
