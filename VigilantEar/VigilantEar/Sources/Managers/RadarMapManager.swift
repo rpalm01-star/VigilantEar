@@ -26,48 +26,29 @@ class RadarMapManager {
     
     @MainActor
     func processNewEvent(_ event: SoundEvent) {
-        guard event.isRevealed else {
-            //AppGlobals.doLog(message: unsafe "EVENT_SKIPPED - isRevealed = false for \(event.threatLabel) Conf:\(String(format: "%.3f", event.confidence))", step: "DEBUG")
-            return
-        }
+        // 1. The Gatekeeper: Respects your SoundProfile registry!
+        guard event.isRevealed else { return }
         
         let distanceFeet = event.distance * 1000.0
         
-         AppGlobals.doLog(
-         message: "EVENT_RECEIVED [\(event.threatLabel)] Conf:\(String(format: "%.3f", event.confidence)) Dist:\(Int(distanceFeet))ft Revealed:\(event.isRevealed)",
-         step: "DEBUG"
-         )
+        AppGlobals.doLog(
+            message: "EVENT_RECEIVED [\(event.threatLabel)] Conf:\(String(format: "%.3f", event.confidence)) Dist:\(Int(distanceFeet))ft Revealed:true",
+            step: "DEBUG"
+        )
         
-        if event.isVehicle {
-            // Tuned for real cars outside your window
-            let shouldCreateTrackedTarget =
-            event.confidence >= 0.21 &&
-            distanceFeet <= 350.0
+        // 2. Target Creation (Unified for ALL sounds)
+        if let existingTarget = activeTargets[event.sessionID] {
+            existingTarget.update(with: event)
+        } else {
+            let newTarget = TrackedTarget(initialEvent: event)
+            activeTargets[event.sessionID] = newTarget
             
-            if shouldCreateTrackedTarget {
-                if let existingTarget = activeTargets[event.sessionID] {
-                    existingTarget.update(with: event)
-                } else {
-                    let newTarget = TrackedTarget(initialEvent: event)
-                    activeTargets[event.sessionID] = newTarget
-                    AppGlobals.doLog(
-                        message: unsafe "TRACKED_TARGET_CREATED [car] Conf:\(String(format: "%.3f", event.confidence)) Dist:\(Int(distanceFeet))ft → Persistent tracking started",
-                        step: "VEHICLE_TRACK"
-                    )
-                }
-            } else {
+            // 3. Keep your custom logging for vehicle debugging
+            if event.isVehicle {
                 AppGlobals.doLog(
-                    message: unsafe "VEHICLE_SKIPPED_FOR_TRACKING [car] Conf:\(String(format: "%.3f", event.confidence)) Dist:\(Int(distanceFeet))ft → Too far or too weak for persistent tracking",
+                    message: "TRACKED_TARGET_CREATED [\(event.threatLabel)] Conf:\(String(format: "%.3f", event.confidence)) Dist:\(Int(distanceFeet))ft → Persistent tracking started",
                     step: "VEHICLE_TRACK"
                 )
-            }
-        }
-        else {
-            if let existingTarget = activeTargets[event.sessionID] {
-                existingTarget.update(with: event)
-            } else {
-                let newTarget = TrackedTarget(initialEvent: event)
-                activeTargets[event.sessionID] = newTarget
             }
         }
     }

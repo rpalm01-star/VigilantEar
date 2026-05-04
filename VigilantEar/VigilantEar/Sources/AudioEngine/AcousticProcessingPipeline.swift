@@ -204,8 +204,15 @@ actor AcousticProcessingPipeline {
         // Zero-allocation hardware peak detection
         var maxVal: Float = 0.0
         vDSP_maxmgv(channelData[0], 1, &maxVal, vDSP_Length(safeCount))
-        let peak = maxVal
+        var w_peak = maxVal
         
+        // 🚨 THE FIX: The Vehicle Bypass
+        // Cars get a free pass on volume so distant rumbles clear the hardware gate.
+        if isVehicle {
+            w_peak = max(w_peak, minimumPeak + 0.01)
+        }
+        
+        let peak = w_peak
         guard peak > minimumPeak else { return }
         
         let localSampleRate = self.sampleRate
@@ -213,7 +220,14 @@ actor AcousticProcessingPipeline {
         let currentLoc = self.lastKnownLocation
         let currentHead = self.lastKnownHeading
         let songToAttach = self.currentSongLabel
-        let minConf = profile.minimumConfidence
+        
+        // 🚨 THE FIX: Dynamic Bass Thresholding
+        // If music is playing, heavy bass will generate fake car detections at ~20% confidence.
+        // We temporarily raise the required confidence to 40% to force real cars to prove themselves.
+        var minConf = profile.minimumConfidence
+        if isVehicle && self.isMusicCurrentlyPlaying {
+            minConf = max(0.40, profile.minimumConfidence)
+        }
         
         let analysisResult = await Task.detached(priority: .userInitiated) { [weak self] in
             guard let self = self else { return ([(frequency: Double, confidence: Float)](), 0.0) }
