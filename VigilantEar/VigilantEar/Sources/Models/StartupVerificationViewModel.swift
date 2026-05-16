@@ -86,11 +86,14 @@ final class StartupVerificationViewModel {
     func runDiagnostics() async {
         resetSteps()
         
+        // Set all to running initially for visual feedback
         for i in steps.indices {
             steps[i].status = .running
         }
         
         for (index, step) in steps.enumerated() {
+            let startTime = Date()
+            
             let result: (status: VerificationStatus, reason: LocalizedStringResource?)
             
             switch step.type {
@@ -106,6 +109,13 @@ final class StartupVerificationViewModel {
                 result = await checkStorage()
             case .orientation:
                 result = checkOrientation()
+            }
+            
+            // Minimum 0.25 seconds display time for the running spinner
+            let elapsed = Date().timeIntervalSince(startTime)
+            let minimumDisplayTime: TimeInterval = 0.25
+            if elapsed < minimumDisplayTime {
+                try? await Task.sleep(for: .seconds(minimumDisplayTime - elapsed))
             }
             
             steps[index].status = result.status
