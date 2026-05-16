@@ -13,7 +13,6 @@
 		3023882F2FB243D000BDF685 /* FirebaseFirestore in Frameworks */ = {isa = PBXBuildFile; productRef = 3023882E2FB243D000BDF685 /* FirebaseFirestore */; };
 		3053DCBF2F83718A00241892 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 3053DCAC2F83718A00241892 /* Assets.xcassets */; };
 		3085368C2FAD99B600E7AC60 /* SoundML in Frameworks */ = {isa = PBXBuildFile; productRef = 3085368B2FAD99B600E7AC60 /* SoundML */; };
-		30A396432F908D4800D441A0 /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = 30A396422F908D4800D441A0 /* GoogleService-Info.plist */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -21,7 +20,6 @@
 		304F73C52F830A8800F67563 /* VigilantEar.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = VigilantEar.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		3053DCAC2F83718A00241892 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		308EF3EB2F875A9400885DCB /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
-		30A396422F908D4800D441A0 /* GoogleService-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "GoogleService-Info.plist"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -129,7 +127,6 @@
 			isa = PBXGroup;
 			children = (
 				30227F962FB0E88C0000C3B4 /* Localizable.xcstrings */,
-				30A396422F908D4800D441A0 /* GoogleService-Info.plist */,
 				308EF3EB2F875A9400885DCB /* Info.plist */,
 				3053DCAB2F83718A00241892 /* Sources */,
 				3053DCAC2F83718A00241892 /* Assets.xcassets */,
@@ -144,6 +141,7 @@
 			isa = PBXNativeTarget;
 			buildConfigurationList = 304F73D02F830A8900F67563 /* Build configuration list for PBXNativeTarget "VigilantEar" */;
 			buildPhases = (
+				306AFEF72FB85591001B2112 /* Copy GoogleService-Info.plist from template */,
 				304F73C12F830A8800F67563 /* Sources */,
 				304F73C22F830A8800F67563 /* Frameworks */,
 				304F73C32F830A8800F67563 /* Resources */,
@@ -222,12 +220,33 @@
 			buildActionMask = 2147483647;
 			files = (
 				3053DCBF2F83718A00241892 /* Assets.xcassets in Resources */,
-				30A396432F908D4800D441A0 /* GoogleService-Info.plist in Resources */,
 				30227F972FB0E88C0000C3B4 /* Localizable.xcstrings in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		306AFEF72FB85591001B2112 /* Copy GoogleService-Info.plist from template */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "Copy GoogleService-Info.plist from template";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "# Inject real GoogleService-Info.plist from Xcode Cloud secret (base64)\n# Falls back to template for local builds\n\nif [ -n \"$GOOGLE_SERVICE_INFO_PLIST_BASE64\" ]; then\n    echo \"$GOOGLE_SERVICE_INFO_PLIST_BASE64\" | base64 -d > \"${SRCROOT}/VigilantEar/GoogleService-Info.plist\"\n    echo \"✅ Injected real GoogleService-Info.plist from Xcode Cloud secret\"\nelse\n    cp \"${SRCROOT}/VigilantEar/GoogleService-Info.plist.template\" \"${SRCROOT}/VigilantEar/GoogleService-Info.plist\"\n    echo \"ℹ️  Using local template (normal for local builds)\"\nfi\n";
+		};
+/* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		304F73C12F830A8800F67563 /* Sources */ = {
