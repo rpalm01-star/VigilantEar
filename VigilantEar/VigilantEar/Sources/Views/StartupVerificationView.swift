@@ -181,32 +181,36 @@ struct StartupVerificationView: View {
     }
 }
 
-// MARK: - Individual Row (Unchanged)
+// MARK: - Individual Row (Updated)
 struct VerificationRow: View {
     let step: VerificationTask
     
     var body: some View {
-        HStack(spacing: 12) {
-            Text(step.type.rawValue)
-                .font(.system(size: 14, weight: .semibold, design: .monospaced))
-                .foregroundStyle(.white.opacity(0.9))
-                .minimumScaleFactor(0.8)
-                .lineLimit(1)
+        HStack(alignment: .center, spacing: 16) {
+            statusIcon
             
-            Spacer()
-            
-            if let reason = step.failureReason, step.status == .failed {
-                Text(reason)
-                    .font(.system(size: 11, weight: .medium, design: .monospaced))
-                    .foregroundStyle(.red.opacity(0.9))
+            VStack(alignment: .leading, spacing: 4) {
+                Text(step.type.rawValue)
+                    .font(.system(size: 18, weight: .semibold, design: .monospaced))
+                    .foregroundStyle(
+                        step.status == .failed ? .red.opacity(0.9) : .green.opacity(0.75)
+                    )
+                    .minimumScaleFactor(0.8)
                     .lineLimit(1)
-                    .minimumScaleFactor(0.7)
+                
+                if let reason = step.failureReason, step.status == .failed {
+                    Text(reason)
+                        .font(.system(size: 13, weight: .medium, design: .monospaced))
+                        .foregroundStyle(.red.opacity(0.9))
+                        .minimumScaleFactor(0.8)
+                        .lineLimit(nil)
+                }
             }
             
-            statusIcon
+            Spacer()
         }
         .padding(.horizontal, 16)
-        .padding(.vertical, 14)
+        .padding(.vertical, 16)
         .background(Color.white.opacity(0.05))
         .cornerRadius(8)
         .overlay(
@@ -230,19 +234,20 @@ struct VerificationRow: View {
         case .pending, .notDetermined:
             Image(systemName: "circle.dotted")
                 .foregroundStyle(.gray)
-                .font(.system(size: 16))
+                .font(.system(size: 22))
         case .running:
             ProgressView()
                 .controlSize(.small)
                 .tint(.cyan)
+                .frame(width: 22, height: 22)
         case .passed:
             Image(systemName: "checkmark.circle.fill")
                 .foregroundStyle(.green)
-                .font(.system(size: 16))
+                .font(.system(size: 22))
         case .failed:
             Image(systemName: "exclamationmark.triangle.fill")
                 .foregroundStyle(.red)
-                .font(.system(size: 16))
+                .font(.system(size: 22))
         }
     }
 }
