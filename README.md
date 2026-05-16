@@ -31,12 +31,12 @@ All tactical overlays, HUD alerts, and preference menus adjust dynamically to sy
 
 VigilantEar utilizes a custom **SoundML Push Architecture** built entirely around the performance and concurrency guarantees of modern iOS hardware.
 
-```mermaid
-flowchart TD
+::: mermaid
+graph TD
     A["Raw Audio Ingestion"] --> B["16kHz Downsampling Gate"]
     B --> C["Apple Neural Engine (ANE)"]
     C -- "81% Raw Data Reduction" --> D["Detached Actor Tasks: FFT/TDOA"]
-```
+:::
 
 ## ⚡ Architectural Decoupling
 
