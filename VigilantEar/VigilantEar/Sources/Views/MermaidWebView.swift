@@ -72,7 +72,7 @@ struct MermaidWebView: UIViewRepresentable {
     // 4. THE KILL SWITCH: This guarantees the memory is freed when SwiftUI destroys the view
     static func dismantleUIView(_ uiView: WKWebView, coordinator: ()) {
         uiView.stopLoading()
-        uiView.loadHTMLString("", baseURL: nil)
+        uiView.loadHTMLString(String.empty, baseURL: nil)
         uiView.removeFromSuperview()
     }
 }

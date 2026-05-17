@@ -165,7 +165,7 @@ class NotificationManager {
 extension String {
     var formatLabelForAlert: String {
         let firstPart = split(separator: "_").first.map(String.init)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? self
-        guard !firstPart.isEmpty else { return "" }
+        guard !firstPart.isEmpty else { return String.empty }
         return firstPart.count > 3 ? firstPart.capitalized : firstPart.uppercased()
     }
 }

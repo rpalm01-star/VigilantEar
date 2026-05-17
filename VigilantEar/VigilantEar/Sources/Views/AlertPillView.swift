@@ -11,7 +11,7 @@ struct AlertPillView: View {
     let capManager = DependencyContainer.shared.capAlertManager
     
     var body: some View {
-        let rawAlert = capManager.nearbyAlerts.first?.event.uppercased() ?? ""
+        let rawAlert = capManager.nearbyAlerts.first?.event.uppercased() ?? String.empty
         let activeAlertText = rawAlert.trimmingCharacters(in: .whitespacesAndNewlines)
         let isAlertActive = !activeAlertText.isEmpty
         

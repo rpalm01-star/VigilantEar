@@ -9,7 +9,7 @@ extension Theme {
         // Overwrite its code block renderer
             .codeBlock { configuration in
                 // Safely unwrap and clean the language string
-                let lang = configuration.language ?? ""
+                let lang = configuration.language ?? String.empty
                 let cleanLang = lang.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
                 
                 if cleanLang == "mermaid" || configuration.content.contains("graph TD") {
@@ -48,7 +48,7 @@ struct LegalDocumentView: View {
     
     @AppStorage("preferredLanguage") private var preferredLanguage = "en"
     
-    @State private var markdownContent: String = ""
+    @State private var markdownContent: String = String.empty
     @State private var isLoading = true
     @State private var loadFailed = false
     

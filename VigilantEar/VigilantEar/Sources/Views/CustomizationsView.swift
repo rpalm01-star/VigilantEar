@@ -154,8 +154,8 @@ struct CustomizationsView: View {
     
     private func legalGlassLink(title: LocalizedStringResource, icon: String, filename: String, addLanguageSuffix: Bool = true) -> some View {
         let baseURL = "https://rpalm01-star.github.io/VigilantEar/"
-        var langSuffix = preferredLanguage == "en" ? "" : "_\(preferredLanguage)"
-        if (!addLanguageSuffix) { langSuffix = "" }
+        var langSuffix = preferredLanguage == "en" ? String.empty : "_\(preferredLanguage)"
+        if (!addLanguageSuffix) { langSuffix = String.empty }
         let fullURL = "\(baseURL)\(filename)\(langSuffix).md"
         let url = URL(string: fullURL)!
         

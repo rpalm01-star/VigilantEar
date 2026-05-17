@@ -29,7 +29,7 @@ struct MapView: View {
                 
                 // 🛠 Custom Throttled User Annotation
                 if let loc = userLocation {
-                    Annotation("", coordinate: loc.coordinate) {
+                    Annotation(String.empty, coordinate: loc.coordinate) {
                         ZStack {
                             Image(systemName: "location.north.line.fill")
                                 .font(.system(size: AppGlobals.userArrowFontSize, weight: .bold))
@@ -148,7 +148,7 @@ struct MapView: View {
                 
                 // Traveling red ring
                 if hasEmergencyInside500ft {
-                    Annotation("", coordinate: center) {
+                    Annotation(String.empty, coordinate: center) {
                         PulsingEmergencyRing()
                     }
                 }
@@ -160,7 +160,7 @@ struct MapView: View {
                 
                 // Smoothed Targets – rim-only tint for consistency with ThreatHUD
                 ForEach(coordinator.mapManager.visibleTargets) { target in
-                    Annotation("", coordinate: target.smoothedCoordinate) {
+                    Annotation(String.empty, coordinate: target.smoothedCoordinate) {
                         ThreatMarker(
                             currentLabel: target.currentLabel,
                             smoothedCoordinate: target.smoothedCoordinate,

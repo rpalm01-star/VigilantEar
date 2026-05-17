@@ -72,6 +72,7 @@ nonisolated struct AppGlobals {
     public static let wingdingsInc                  : LocalizedStringResource = "© 2026 Wingdings, Inc."
     public static let ONLINE                        : LocalizedStringResource = "ONLINE"
     public static let OFFLINE                       : LocalizedStringResource = "OFFLINE"
+    public static let soundProfiles                 : LocalizedStringResource = "Sound Profiles"
     
     // Do not localize
     public static let appEmail = "vigilantear@wingdingssocial.com"
@@ -277,4 +278,8 @@ nonisolated struct AppGlobals {
         return String(localized: a)
     }
 
+}
+
+extension String {
+    static let empty = ""
 }

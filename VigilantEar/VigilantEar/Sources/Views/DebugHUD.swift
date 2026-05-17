@@ -54,7 +54,7 @@ struct DebugHUD: View {
     @StateObject private var network = NetworkMonitor()
     
     @State private var isCloudLoggingEnabled: Bool = AppGlobals.logToCloud
-    @State private var currentTime = ""
+    @State private var currentTime = String.empty
     
     @AppStorage("preferredLanguage") private var preferredLanguage = "en"
     

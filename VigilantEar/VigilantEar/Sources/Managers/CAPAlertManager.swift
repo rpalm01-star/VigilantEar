@@ -267,10 +267,10 @@ class CAPAlertManager: ObservableObject {
 class CAPFeedParser: NSObject, XMLParserDelegate {
     private var alerts: [CAPAlert] = []
     
-    private var currentElement = ""
-    private var currentEvent = ""
-    private var currentHeadline = ""
-    private var currentPolygonStr = ""
+    private var currentElement = String.empty
+    private var currentEvent = String.empty
+    private var currentHeadline = String.empty
+    private var currentPolygonStr = String.empty
     
     func parse(data: Data) -> [CAPAlert] {
         alerts.removeAll()
@@ -299,7 +299,7 @@ class CAPFeedParser: NSObject, XMLParserDelegate {
     
     func parser(_ parser: XMLParser, didEndElement elementName: String, namespaceURI: String?, qualifiedName qName: String?) {
         if elementName == currentElement {
-            currentElement = ""
+            currentElement = String.empty
         }
         
         if elementName == "entry" || elementName == "info" {
@@ -322,9 +322,9 @@ class CAPFeedParser: NSObject, XMLParserDelegate {
                 }
             }
             
-            currentEvent = ""
-            currentHeadline = ""
-            currentPolygonStr = ""
+            currentEvent = String.empty
+            currentHeadline = String.empty
+            currentPolygonStr = String.empty
         }
     }
 }

@@ -59,8 +59,8 @@ struct ContentView: View {
                                     
                                     // Stripping the music note character (if present)
                                     let cleanTitle = songTitle
-                                        .replacingOccurrences(of: "♫", with: "")
-                                        .replacingOccurrences(of: "🎵", with: "")
+                                        .replacingOccurrences(of: "♫", with: String.empty)
+                                        .replacingOccurrences(of: "🎵", with: String.empty)
                                         .trimmingCharacters(in: .whitespacesAndNewlines)
                                     
                                     Text(cleanTitle)

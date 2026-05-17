@@ -29,14 +29,14 @@ struct SoundProfilesPanelView: View {
             VStack(spacing: 0) {
                 // Header row with Done button
                 HStack {
-                    Text("SOUND PROFILES")
+                    Text(AppGlobals.soundProfiles)
                         .font(.system(size: 22, weight: .bold, design: .monospaced))
                         .foregroundColor(.yellow)
                         .tracking(4)
                     
                     Spacer()
                     
-                    Button("DONE") {
+                    Button(AppGlobals.done) {
                         dismiss()
                     }
                     .font(.system(size: 16, weight: .bold, design: .monospaced))
@@ -77,7 +77,7 @@ struct SoundProfilesPanelView: View {
                 }
             }
         }
-        .navigationTitle("Sound Profiles")
+        .navigationTitle(AppGlobals.soundProfiles)
         .navigationBarTitleDisplayMode(.inline)
     }
 }
@@ -137,7 +137,7 @@ struct LCARSCardView: View {
                 
                 VStack(alignment: .leading, spacing: 4) {
                     HStack {
-                        Text("HAPTICS")
+                        Text(verbatim: "HAPTICS")
                             .font(.system(size: 11, design: .monospaced))
                             .foregroundColor(.orange.opacity(0.8))
                         Spacer()
@@ -152,11 +152,11 @@ struct LCARSCardView: View {
                 }
                 
                 HStack {
-                    Text("SNAP TO ROAD")
+                    Text(verbatim: "SNAP TO ROAD")
                         .font(.system(size: 11, design: .monospaced))
                         .foregroundColor(.orange.opacity(0.8))
                     Spacer()
-                    Toggle("", isOn: $shouldSnapToRoad)
+                    Toggle(String.empty, isOn: $shouldSnapToRoad)
                         .labelsHidden()
                         .tint(.orange)
                 }
