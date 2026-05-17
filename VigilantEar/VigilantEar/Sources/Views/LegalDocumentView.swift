@@ -17,10 +17,10 @@ extension Theme {
                     // 👇 INVOKING YOUR CUSTOM WKWEBVIEW HERE 👇
                     VStack {
                         MermaidWebView(mermaidCode: configuration.content)
-                            .frame(minHeight: 350) // Bumped up slightly to ensure no SVG clipping
+                            .frame(minHeight: 600, maxHeight: .infinity) // Bumped up slightly to ensure no SVG clipping
                             .padding(.vertical, 8)
                     }
-                    .markdownMargin(top: 8, bottom: 16)
+                    .markdownMargin(top: 8, bottom: 4)
                     
                 } else {
                     // Render standard code block for anything else
@@ -35,7 +35,7 @@ extension Theme {
                     }
                     .background(Color(white: 0.1)) // Dark grey background
                     .clipShape(RoundedRectangle(cornerRadius: 6))
-                    .markdownMargin(top: 0, bottom: 16)
+                    .markdownMargin(top: 0, bottom: 4)
                 }
             }
     }

@@ -22,13 +22,16 @@ struct VerificationTask: Identifiable {
     let type: VerificationType
     var status: VerificationStatus = .pending
     var failureReason: LocalizedStringResource? = nil
+    
+    // 👇 The new flag to determine if the "Open Settings" text should be appended
+    var isPermissionRelated: Bool = false
 }
 
 /// The different checks performed during app startup.
 enum VerificationType: LocalizedStringResource {
     case locationAuthorization = "Location Authorization"
     case stereoAudio = "Stereo Microphone Array"
-    case audioRouting = "Audio Routing (Built-in Mic)"
+    case audioRouting = "Microphone Authorization"
     case neuralEngine = "Neural Engine (CoreML)"
     case storage = "Storage Availability"
     case orientation = "Landscape Orientation"
@@ -59,12 +62,14 @@ final class StartupVerificationViewModel {
     // MARK: - Private Helpers
     private func resetSteps() {
         steps = [
-            VerificationTask(type: .locationAuthorization),
-            VerificationTask(type: .stereoAudio),
-            VerificationTask(type: .audioRouting),
-            VerificationTask(type: .neuralEngine),
-            VerificationTask(type: .storage),
-            VerificationTask(type: .orientation),
+            // 👇 Flagging the iOS permission checks as true
+            VerificationTask(type: .locationAuthorization, isPermissionRelated: true),
+            VerificationTask(type: .audioRouting, isPermissionRelated: true),
+            // 👇 Hardware and environment checks remain false
+            //VerificationTask(type: .stereoAudio, isPermissionRelated: false),
+            VerificationTask(type: .neuralEngine, isPermissionRelated: false),
+            VerificationTask(type: .storage, isPermissionRelated: false),
+            VerificationTask(type: .orientation, isPermissionRelated: false),
         ]
         isFinished = false
     }
@@ -133,7 +138,18 @@ final class StartupVerificationViewModel {
             // This loop inherently runs on the @MainActor, making UI updates safe.
             for await (index, status, reason) in group {
                 self.steps[index].status = status
-                self.steps[index].failureReason = reason
+                
+                if let unwrappedReason = reason {
+                    // 👇 Check the flag before appending the settings prompt
+                    if self.steps[index].isPermissionRelated {
+                        let combinedString: LocalizedStringResource = "\(String(localized: unwrappedReason))\n\(String(localized: AppGlobals.openSystemSettingsForApp))"
+                        self.steps[index].failureReason = combinedString
+                    } else {
+                        self.steps[index].failureReason = unwrappedReason
+                    }
+                } else {
+                    self.steps[index].failureReason = nil
+                }
             }
         }
         

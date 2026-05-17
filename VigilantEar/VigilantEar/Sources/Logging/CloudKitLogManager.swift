@@ -7,7 +7,7 @@ class CloudKitLogManager {
     
     // 👇 Switch to the PUBLIC database so you can actually read the logs
     private static let database = CKContainer(identifier: "iCloud.com.rpalm01-star.VigilantEar").publicCloudDatabase
-    private static var isEmptied : Bool = false
+    private static var hasPurgeRun : Bool = false
     
     // Define your tables (Schema-on-Write will create these automatically)
     private enum Table: String {
@@ -21,29 +21,56 @@ class CloudKitLogManager {
         return logger
     }
     
-    public static func deleteAllRecords(in tableName: String = Table.logs.rawValue) {
-        guard !isEmptied else { return }
-        isEmptied = true
+    public static func purgeLogTable(in tableName: String = Table.logs.rawValue) {
+        guard !hasPurgeRun else { return }
+        hasPurgeRun = true
+        
         Task.detached(priority: .background) {
-            var done = false
-            while !done {
-                let query = CKQuery(recordType: tableName, predicate: NSPredicate(value: true))
-                do {
-                    let (matchResults, _) = try await database.records(matching: query, desiredKeys: ["recordID"])
-                    let recordIDs = matchResults.compactMap { (id, result) in
-                        return id
-                    }
-                    guard !recordIDs.isEmpty else {
-                        await logger().debug("✅ Table \(tableName) is already empty.")
+            // 1. Only query records where the expiration date has passed
+            let predicate = NSPredicate(format: "expireAt < %@", NSDate())
+            let query = CKQuery(recordType: tableName, predicate: predicate)
+            
+            do {
+                // 2. Initial fetch
+                var (matchResults, cursor) = try await database.records(matching: query, desiredKeys: ["recordID"])
+                
+                var done = false
+                var doCount = 0
+                let doCountMax = 3
+                
+                while !done {
+                    
+                    doCount += 1
+                    if (doCount > doCountMax) {
+                        await logger().debug("✅ Table \(tableName) purge loops exceeded \(doCount-1). Stopping.")
                         done = true
-                        return
+                        break
                     }
+                    
+                    let recordIDs = matchResults.compactMap { (id, _) in return id }
+                    
+                    guard !recordIDs.isEmpty else {
+                        await logger().debug("✅ Table \(tableName) found no expired rows to purge.")
+                        done = true
+                        break
+                    }
+                    
+                    // Delete the current batch of IDs
                     let (_, deleteResults) = try await database.modifyRecords(saving: [], deleting: recordIDs)
-                    await logger().debug("✅ Successfully deleted \(deleteResults.count) records from \(tableName).")
-                } catch {
-                    await logger().error("❌ Failed to delete records from \(tableName): \(error.localizedDescription)")
-                    done = true
+                    await logger().debug("✅ Successfully deleted \(deleteResults.count) expired records from \(tableName).")
+                    
+                    // 3. If CloudKit provided a cursor, there are more pages to fetch and delete
+                    if let nextCursor = cursor {
+                        let nextBatch = try await database.records(continuingMatchFrom: nextCursor)
+                        matchResults = nextBatch.matchResults
+                        cursor = nextBatch.queryCursor
+                    } else {
+                        // No cursor means we have reached the end of the expired records
+                        done = true
+                    }
                 }
+            } catch {
+                await logger().error("❌ Failed to purge records from \(tableName): \(error.localizedDescription)")
             }
         }
     }
@@ -72,7 +99,7 @@ class CloudKitLogManager {
             if !AppGlobals.isDebugDevice {
                 guard !UserDefaults.standard.bool(forKey: firstRunKey) else { return }
             } else {
-                await deleteAllRecords()
+                await purgeLogTable()
             }
             UserDefaults.standard.set(true, forKey: firstRunKey)
             let record = CKRecord(recordType: Table.installations.rawValue)

@@ -26,30 +26,46 @@ struct MermaidWebView: UIViewRepresentable {
     }
     
     func updateUIView(_ webView: WKWebView, context: Context) {
-        // 3. Inject the raw Mermaid code into a clean HTML template
-        // Using the official Mermaid CDN ensures we get the latest stable renderer
         let html = """
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <meta name="viewport" content="width=device-width, initial-scale=1">
-            <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
-            <script>
-                mermaid.initialize({ startOnLoad: true, theme: 'dark' });
-            </script>
-            <style>
-                body { margin: 0; display: flex; justify-content: center; align-items: center; height: 100vh; background-color: transparent; color: white; font-family: -apple-system, sans-serif; }
-                .mermaid { display: flex; justify-content: center; }
-            </style>
-        </head>
-        <body>
-            <div class="mermaid">
-                \(mermaidCode)
-            </div>
-        </body>
-        </html>
-        """
-        
+<!DOCTYPE html>
+<html>
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+    <script>
+        mermaid.initialize({ startOnLoad: true, theme: 'dark' });
+    </script>
+    <style>
+        body { 
+            margin: 4px; 
+            padding: 4px;
+            display: flex; 
+            justify-content: center; 
+            /* anchor to top to prevent top-clipping */
+            align-items: flex-start; 
+            background-color: transparent; 
+            color: white; 
+            font-family: -apple-system, sans-serif; 
+        }
+        .mermaid { 
+            width: 100%;
+            display: flex; 
+            justify-content: center; 
+        }
+        /* Force SVG to respect bounds while maintaining aspect ratio */
+        .mermaid svg {
+            max-width: 100% !important;
+            height: auto !important;
+        }
+    </style>
+</head>
+<body>
+    <div class="mermaid">
+        \(mermaidCode)
+    </div>
+</body>
+</html>
+"""
         webView.loadHTMLString(html, baseURL: nil)
     }
     
