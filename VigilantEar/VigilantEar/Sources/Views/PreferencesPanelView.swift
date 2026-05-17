@@ -33,6 +33,9 @@ struct PreferencesPanelView: View {
                         Text(verbatim: "English").tag("en")
                         Text(verbatim: "Español").tag("es")
                         Text(verbatim: "中文").tag("zh-Hans")
+                        Text(verbatim: "Français").tag("fr")
+                        Text(verbatim: "Deutsch").tag("de")
+                        Text(verbatim: "日本語").tag("ja")
                     }
                     .pickerStyle(.segmented)
                     .padding(.horizontal, 16)
