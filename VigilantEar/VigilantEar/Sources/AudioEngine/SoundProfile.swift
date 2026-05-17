@@ -289,10 +289,7 @@ struct SoundProfile {
             }
         }
         
-        AppGlobals.doLog(message: "⚠️ UNEXPECTED: Sound label [\(lowerLabel)] was not in the registry.",
-                         step: "SOUNDPROFILE_CLASSIFY",
-                         firestoreCollectionName: AppGlobals.exceptionsDataStoreName,
-                         isError: true)
+        CloudKitLogManager.logException(description: "⚠️ UNEXPECTED: Sound label [\(lowerLabel)] was not in the registry.")
         
         let fallback = SoundProfile(
             icon: "waveform",

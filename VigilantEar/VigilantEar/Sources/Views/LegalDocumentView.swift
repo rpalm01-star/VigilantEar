@@ -1,6 +1,5 @@
 import SwiftUI
 import MarkdownUI
-import BeautifulMermaid
 
 // MARK: - Custom Theme Extension
 extension Theme {
@@ -14,14 +13,12 @@ extension Theme {
                 let cleanLang = lang.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
                 
                 if cleanLang == "mermaid" || configuration.content.contains("graph TD") {
-                    // Render Mermaid Diagram
+                    
+                    // 👇 INVOKING YOUR CUSTOM WKWEBVIEW HERE 👇
                     VStack {
-                        MermaidDiagramView(
-                            source: configuration.content,
-                            theme: .dracula
-                        )
-                        .frame(minHeight: 250) // Prevent collapse
-                        .padding(.vertical, 8)
+                        MermaidWebView(mermaidCode: configuration.content)
+                            .frame(minHeight: 350) // Bumped up slightly to ensure no SVG clipping
+                            .padding(.vertical, 8)
                     }
                     .markdownMargin(top: 8, bottom: 16)
                     
@@ -36,7 +33,7 @@ extension Theme {
                             }
                             .padding(16)
                     }
-                    .background(.black)
+                    .background(Color(white: 0.1)) // Dark grey background
                     .clipShape(RoundedRectangle(cornerRadius: 6))
                     .markdownMargin(top: 0, bottom: 16)
                 }
@@ -62,7 +59,6 @@ struct LegalDocumentView: View {
                     Image(systemName: "doc.text.magnifyingglass")
                         .font(.largeTitle)
                         .foregroundColor(.red)
-                    // Assuming AppGlobals is defined elsewhere in your project
                     Text(AppGlobals.synchronizationFailed)
                         .font(.headline)
                 }
@@ -75,7 +71,7 @@ struct LegalDocumentView: View {
             } else {
                 ScrollView {
                     Markdown(markdownContent)
-                    // Apply your new injected theme directly
+                    // Apply your injected theme directly
                         .markdownTheme(.vigilantTheme)
                         .markdownTextStyle {
                             BackgroundColor(.black)

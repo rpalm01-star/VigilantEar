@@ -86,7 +86,7 @@ nonisolated struct AppGlobals {
     public static let appLabel : String = "APP"
     public static let meteoGateKey = "d187be71400ecd90df5e396f44c75f03a8f2281fc116d15f52830a702149133b"
     
-    // This is just a default value until the application sets it during initialization in InstallationsManager.
+    // This is just a default value until the application sets it during initialization.
     public static let version : String = "unset"
     public static let sessionID = UUID()
     public static let defaultCameraDistance : Double = 400.0
@@ -179,9 +179,9 @@ nonisolated struct AppGlobals {
     
     // MARK: - Global Logging
     /// Fire-and-forget log that can be called from **any** context safely.
-    nonisolated static func doLog(message: String, step: String = appLabel, firestoreCollectionName: String = AppGlobals.logDataStoreName, isError: Bool = false) {
-        Task.detached(priority: .background) {
-            await PerformanceLogger.shared.fireStoreTelemetry(step: step, message: message, firestoreCollectionName: firestoreCollectionName, isError: isError)
+    nonisolated static func doLog(message: String, step: String = appLabel, isError: Bool = false) {
+        Task { @MainActor in
+            CloudKitLogManager.log(step: step, message: message, isError: isError)
         }
     }
     
@@ -275,5 +275,5 @@ nonisolated struct AppGlobals {
         a.locale = Locale(identifier: langCode)
         return String(localized: a)
     }
-    
+
 }

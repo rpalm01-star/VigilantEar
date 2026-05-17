@@ -1,23 +1,16 @@
 import SwiftUI
 import SwiftData
-import FirebaseCore
 
 // A test for git to push.
 class AppDelegate: NSObject, UIApplicationDelegate {
     
     func application(_ application: UIApplication,
                      didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey : Any]? = nil) -> Bool {
-        
-        FirebaseApp.configure()
-        
         AppGlobals.currentDeviceID = PersistentAttributesManager.shared.staticDeviceIdentifierFromKeychain
         AppGlobals.appVersion = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "Unknown"
-        
         let deviceLocale = Locale.current.identifier
         let appLanguage = Bundle.main.preferredLocalizations.first ?? "Unknown"
-        
-        AppGlobals.doLog(message: "📱 Startup Language - System: \(deviceLocale), App: \(appLanguage)", step: "Startup")
-        
+        CloudKitLogManager.log(step: "AppDelegate.application", message: "📱 Startup Language - System: \(deviceLocale), App: \(appLanguage)")
         return true
     }
 }
@@ -46,9 +39,8 @@ struct VigilantEarApp: App {
                         .environment(deps.capAlertManager)
                         .environmentObject(uiManager)
                         .onAppear {
-                            // ←←← FULL BACKEND STARTS HERE (only after verification passes)
-                            InstallationsManager.shared.executeFirstRunTelemetryIfNeeded()
-                            deps.microphoneManager.startCapturing()   // ← new
+                            CloudKitLogManager.logInstallation()
+                            deps.microphoneManager.startCapturing()
                             AppGlobals.doLog(message: "🚀 All verification passed — starting full backend", step: "VigilantEarApp")
                         }
                 } else {
