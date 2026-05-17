@@ -22,19 +22,22 @@ struct VerificationTask: Identifiable {
     let type: VerificationType
     var status: VerificationStatus = .pending
     var failureReason: LocalizedStringResource? = nil
+    
+    // 👇 The new flag to determine if the "Open Settings" text should be appended
+    var isPermissionRelated: Bool = false
 }
 
 /// The different checks performed during app startup.
 enum VerificationType: LocalizedStringResource {
     case locationAuthorization = "Location Authorization"
     case stereoAudio = "Stereo Microphone Array"
-    case audioRouting = "Audio Routing (Built-in Mic)"
+    case audioRouting = "Microphone Authorization"
     case neuralEngine = "Neural Engine (CoreML)"
     case storage = "Storage Availability"
     case orientation = "Landscape Orientation"
 }
 
-/// ViewModel that runs all startup diagnostics **sequentially** and reports results to the UI.
+/// ViewModel that runs all startup diagnostics **concurrently** and reports results to the UI.
 @Observable
 @MainActor
 final class StartupVerificationViewModel {
@@ -59,12 +62,14 @@ final class StartupVerificationViewModel {
     // MARK: - Private Helpers
     private func resetSteps() {
         steps = [
-            VerificationTask(type: .locationAuthorization),
-            VerificationTask(type: .stereoAudio),
-            VerificationTask(type: .audioRouting),
-            VerificationTask(type: .neuralEngine),
-            VerificationTask(type: .storage),
-            VerificationTask(type: .orientation),
+            // 👇 Flagging the iOS permission checks as true
+            VerificationTask(type: .locationAuthorization, isPermissionRelated: true),
+            VerificationTask(type: .audioRouting, isPermissionRelated: true),
+            // 👇 Hardware and environment checks remain false
+            //VerificationTask(type: .stereoAudio, isPermissionRelated: false),
+            VerificationTask(type: .neuralEngine, isPermissionRelated: false),
+            VerificationTask(type: .storage, isPermissionRelated: false),
+            VerificationTask(type: .orientation, isPermissionRelated: false),
         ]
         isFinished = false
     }
@@ -86,30 +91,66 @@ final class StartupVerificationViewModel {
     func runDiagnostics() async {
         resetSteps()
         
+        // Set all to running initially for visual feedback
         for i in steps.indices {
             steps[i].status = .running
         }
         
-        for (index, step) in steps.enumerated() {
-            let result: (status: VerificationStatus, reason: LocalizedStringResource?)
+        // Create a TaskGroup to run all verification steps concurrently
+        await withTaskGroup(of: (Int, VerificationStatus, LocalizedStringResource?).self) { group in
             
-            switch step.type {
-            case .locationAuthorization:
-                result = await checkLocation()
-            case .stereoAudio:
-                result = await checkStereoAudio()
-            case .audioRouting:
-                result = await checkAudioRouting()
-            case .neuralEngine:
-                result = await checkNeuralEngine()
-            case .storage:
-                result = await checkStorage()
-            case .orientation:
-                result = checkOrientation()
+            for (index, step) in steps.enumerated() {
+                group.addTask {
+                    let startTime = Date()
+                    let result: (status: VerificationStatus, reason: LocalizedStringResource?)
+                    
+                    // Await the check. Because these tasks run concurrently, long-running
+                    // suspensions (like permission prompts or sleep polling) won't block the others.
+                    switch step.type {
+                    case .locationAuthorization:
+                        result = await self.checkLocation()
+                    case .stereoAudio:
+                        result = await self.checkStereoAudio()
+                    case .audioRouting:
+                        result = await self.checkAudioRouting()
+                    case .neuralEngine:
+                        result = await self.checkNeuralEngine()
+                    case .storage:
+                        result = await self.checkStorage()
+                    case .orientation:
+                        // Still requires 'await' because self is strictly bound to @MainActor
+                        result = await self.checkOrientation()
+                    }
+                    
+                    let elapsed = Date().timeIntervalSince(startTime)
+                    let minimumDisplayTime: TimeInterval = Double.random(in: 0.5...2.0)
+                    
+                    if elapsed < minimumDisplayTime {
+                        try? await Task.sleep(for: .seconds(minimumDisplayTime - elapsed))
+                    }
+                    
+                    // Return the index alongside the payload so we know which task to update
+                    return (index, result.status, result.reason)
+                }
             }
             
-            steps[index].status = result.status
-            steps[index].failureReason = result.reason
+            // As each concurrent task finishes, update the specific step's state.
+            // This loop inherently runs on the @MainActor, making UI updates safe.
+            for await (index, status, reason) in group {
+                self.steps[index].status = status
+                
+                if let unwrappedReason = reason {
+                    // 👇 Check the flag before appending the settings prompt
+                    if self.steps[index].isPermissionRelated {
+                        let combinedString: LocalizedStringResource = "\(String(localized: unwrappedReason))\n\(String(localized: AppGlobals.openSystemSettingsForApp))"
+                        self.steps[index].failureReason = combinedString
+                    } else {
+                        self.steps[index].failureReason = unwrappedReason
+                    }
+                } else {
+                    self.steps[index].failureReason = nil
+                }
+            }
         }
         
         isFinished = true

@@ -1,7 +1,5 @@
 import SoundML
 import SoundAnalysis
-import FirebaseCore
-import FirebaseFirestore
 import os.log
 
 @MainActor
@@ -22,14 +20,7 @@ final class DependencyContainer {
     let notificationManager: NotificationManager
     let persistentAttributesManager: PersistentAttributesManager
     let acousticEngine: AcousticEngine
-    
-    // ⭐️ The lazy Firestore variable
-    // This closure does absolutely nothing until the first time you call DependencyContainer.shared.db
-    lazy var db: Firestore = {
-        // By the time this runs, FirebaseApp.configure() will have already finished.
-        let firestore = Firestore.firestore()
-        return firestore
-    }()
+    let cloudKitLogManager: CloudKitLogManager
     
     init() {
         self.persistentAttributesManager = PersistentAttributesManager()
@@ -41,6 +32,7 @@ final class DependencyContainer {
         self.roadManager = RoadManager()
         self.debugSimulationManager = DebugSimulationManager()
         self.notificationManager = NotificationManager()
+        self.cloudKitLogManager = CloudKitLogManager()
         
         // Do these last
         self.acousticPipeline = AcousticProcessingPipeline(soundMLAnalyzer: self.soundMLAnalyzer)

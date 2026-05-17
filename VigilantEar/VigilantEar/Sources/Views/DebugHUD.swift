@@ -142,7 +142,6 @@ struct DebugHUD: View {
         .padding(.horizontal, 8)
         .padding(.vertical, 5)
         .frame(width: (preferredLanguage == "en" || preferredLanguage == "es" ? 140 : 160), alignment: .leading)
-        
         .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 7))
         .overlay(
             RoundedRectangle(cornerRadius: 7)
@@ -150,7 +149,7 @@ struct DebugHUD: View {
                     DependencyContainer.shared.debugSimulationManager.isEmergencySimulationRunning
                     ? Color.red.opacity(0.65)
                     : (isCloudLoggingEnabled ? Color.cyan.opacity(0.65) : Color.clear),
-                    lineWidth: 1
+                    lineWidth: 3
                 )
                 .fill(
                     DependencyContainer.shared.debugSimulationManager.isEmergencySimulationRunning
@@ -161,11 +160,9 @@ struct DebugHUD: View {
         .compositingGroup()
         .drawingGroup(opaque: true)
         .clipShape(RoundedRectangle(cornerRadius: 7))
-        
         .opacity(ui.isMenuOpen ? 0 : 0.35)     // ← now matches the bottom button bar dimness
         .shadow(radius: 3)
         .environment(\.locale, Locale(identifier: preferredLanguage))
-        
         .onAppear {
             monitor.start()
             startClock()
