@@ -540,7 +540,7 @@
       "localizations" : {
         "en" : { "stringUnit" : { "state" : "translated", "value" : "Terms of Service" } },
         "es" : { "stringUnit" : { "state" : "translated", "value" : "Términos de servicio" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "服务条款" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "サービス利用規約" } },
         "fr" : { "stringUnit" : { "state" : "translated", "value" : "Conditions d'utilisation" } },
         "de" : { "stringUnit" : { "state" : "translated", "value" : "Nutzungsbedingungen" } },
         "ja" : { "stringUnit" : { "state" : "translated", "value" : "利用規約" } }
