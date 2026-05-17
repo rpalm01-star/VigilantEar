@@ -77,7 +77,7 @@ struct StartupVerificationView: View {
                 
                 // Left Column (First 4 items, safely directly under the header)
                 VStack(spacing: 10) {
-                    ForEach(Array(viewModel.steps.prefix(4))) { step in
+                    ForEach(Array(viewModel.steps.prefix(3))) { step in
                         VerificationRow(step: step)
                     }
                 }
@@ -85,7 +85,7 @@ struct StartupVerificationView: View {
                 
                 // Right Column (Remaining 3 items, sitting next to it)
                 VStack(spacing: 10) {
-                    ForEach(Array(viewModel.steps.dropFirst(4))) { step in
+                    ForEach(Array(viewModel.steps.dropFirst(3))) { step in
                         VerificationRow(step: step)
                     }
                 }
@@ -106,7 +106,7 @@ struct StartupVerificationView: View {
     // MARK: - REUSABLE UI COMPONENTS
     
     private var header: some View {
-        VStack(alignment: isLandscape ? .leading : .center, spacing: 6) {
+        VStack(alignment: isLandscape ? .leading : .center, spacing: 2) {
             
             VStack(alignment: .center, spacing: 2) {
                 
@@ -130,6 +130,7 @@ struct StartupVerificationView: View {
                                 .stroke(Color.cyan.opacity(0.5), lineWidth: 1)
                         )
                 }
+                .frame(minHeight: 36, maxHeight: 36)
             }
             
             Text(AppGlobals.systemInitialization)

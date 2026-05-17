@@ -34,7 +34,7 @@ enum VerificationType: LocalizedStringResource {
     case orientation = "Landscape Orientation"
 }
 
-/// ViewModel that runs all startup diagnostics **sequentially** and reports results to the UI.
+/// ViewModel that runs all startup diagnostics **concurrently** and reports results to the UI.
 @Observable
 @MainActor
 final class StartupVerificationViewModel {
@@ -91,35 +91,50 @@ final class StartupVerificationViewModel {
             steps[i].status = .running
         }
         
-        for (index, step) in steps.enumerated() {
-            let startTime = Date()
+        // Create a TaskGroup to run all verification steps concurrently
+        await withTaskGroup(of: (Int, VerificationStatus, LocalizedStringResource?).self) { group in
             
-            let result: (status: VerificationStatus, reason: LocalizedStringResource?)
-            
-            switch step.type {
-            case .locationAuthorization:
-                result = await checkLocation()
-            case .stereoAudio:
-                result = await checkStereoAudio()
-            case .audioRouting:
-                result = await checkAudioRouting()
-            case .neuralEngine:
-                result = await checkNeuralEngine()
-            case .storage:
-                result = await checkStorage()
-            case .orientation:
-                result = checkOrientation()
+            for (index, step) in steps.enumerated() {
+                group.addTask {
+                    let startTime = Date()
+                    let result: (status: VerificationStatus, reason: LocalizedStringResource?)
+                    
+                    // Await the check. Because these tasks run concurrently, long-running
+                    // suspensions (like permission prompts or sleep polling) won't block the others.
+                    switch step.type {
+                    case .locationAuthorization:
+                        result = await self.checkLocation()
+                    case .stereoAudio:
+                        result = await self.checkStereoAudio()
+                    case .audioRouting:
+                        result = await self.checkAudioRouting()
+                    case .neuralEngine:
+                        result = await self.checkNeuralEngine()
+                    case .storage:
+                        result = await self.checkStorage()
+                    case .orientation:
+                        // Still requires 'await' because self is strictly bound to @MainActor
+                        result = await self.checkOrientation()
+                    }
+                    
+                    let elapsed = Date().timeIntervalSince(startTime)
+                    let minimumDisplayTime: TimeInterval = Double.random(in: 0.5...2.0)
+                    
+                    if elapsed < minimumDisplayTime {
+                        try? await Task.sleep(for: .seconds(minimumDisplayTime - elapsed))
+                    }
+                    
+                    // Return the index alongside the payload so we know which task to update
+                    return (index, result.status, result.reason)
+                }
             }
             
-            // Minimum 0.25 seconds display time for the running spinner
-            let elapsed = Date().timeIntervalSince(startTime)
-            let minimumDisplayTime: TimeInterval = 0.25
-            if elapsed < minimumDisplayTime {
-                try? await Task.sleep(for: .seconds(minimumDisplayTime - elapsed))
+            // As each concurrent task finishes, update the specific step's state.
+            // This loop inherently runs on the @MainActor, making UI updates safe.
+            for await (index, status, reason) in group {
+                self.steps[index].status = status
+                self.steps[index].failureReason = reason
             }
-            
-            steps[index].status = result.status
-            steps[index].failureReason = result.reason
         }
         
         isFinished = true
