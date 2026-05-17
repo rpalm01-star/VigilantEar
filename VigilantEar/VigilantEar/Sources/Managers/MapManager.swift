@@ -28,10 +28,9 @@ class MapManager {
         // 1. The Gatekeeper: Respects your SoundProfile registry!
         guard event.isRevealed else { return }
         
-        let distanceFeet = event.distance * 1000.0
+        //let distanceFeet = event.distance * 1000.0
         
-        AppGlobals.doLog(message: "🚗 Revealed: [\(event.threatLabel)] Conf:\(String(format: "%.3f", event.confidence)) Dist:\(Int(distanceFeet))ft Revealed:true",
-                         step: "MapManager.processNewEvent")
+        //AppGlobals.doLog(message: "🚗 Revealed: [\(event.threatLabel)] Conf:\(String(format: "%.3f", event.confidence)) Dist:\(Int(distanceFeet))ft Revealed:true", step: "MapManager.processNewEvent")
         
         // 2. Target Creation (Unified for ALL sounds)
         if let existingTarget = activeTargets[event.sessionID] {
@@ -42,8 +41,7 @@ class MapManager {
             
             // 3. Keep your custom logging for vehicle debugging
             if event.isVehicle {
-                AppGlobals.doLog(message: "🚗 New Tracked Target: [\(event.threatLabel)] Conf:\(String(format: "%.3f", event.confidence)) Dist:\(Int(distanceFeet))ft → Persistent tracking started", step: "MapManager.processNewEvent"
-                )
+                //AppGlobals.doLog(message: "🚗 New Tracked Target: [\(event.threatLabel)] Conf:\(String(format: "%.3f", event.confidence)) Dist:\(Int(distanceFeet))ft → Persistent tracking started", step: "MapManager.processNewEvent")
             }
         }
     }

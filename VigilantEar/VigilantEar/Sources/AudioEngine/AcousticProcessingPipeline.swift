@@ -118,7 +118,7 @@ actor AcousticProcessingPipeline {
         Task.detached(priority: .background) {
             await DependencyContainer.shared.soundLabelEventManager.addOrUpdateDetached(label, confidence: confidence)
         }
-        AppGlobals.doLog(message: "🚨 SoundML Gatekeeper detected: \(label) (\(confidence)) → \(profile.category)", step: "SoundML.handleMLMatch")
+        //AppGlobals.doLog(message: "🚨 SoundML Gatekeeper detected: \(label) (\(confidence)) → \(profile.category)", step: "SoundML.handleMLMatch")
         await self.confirmThreatAndTrack(profile: profile, confidence: confidence)
     }
     

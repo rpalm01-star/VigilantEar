@@ -67,20 +67,13 @@ final class RoadManager {
         let dynamicPenalty = min(highSpeedTicks * 2, 60)
         let waitTimeInSeconds = 3 + dynamicPenalty
         
-        AppGlobals.doLog(
-            message: "🌍 RoadManager: Out of bounds. Settling for \(waitTimeInSeconds)s before network fetch...",
-            step: "ROADMGR"
-        )
-        
+        CloudKitLogManager.log(step: "ROADMGR", message: "🌍 RoadManager: Out of bounds. Settling for \(waitTimeInSeconds)s before network fetch...")
         settleTask = Task {
             do {
                 try await Task.sleep(for: .seconds(waitTimeInSeconds))
                 fetchRoadSector(at: location)
             } catch {
-                AppGlobals.doLog(
-                    message: "🌍 RoadManager: Settling interrupted. User resumed moving.",
-                    step: "ROADMGR"
-                )
+                CloudKitLogManager.log(step: "ROADMGR", message: "🌍 RoadManager: Settling interrupted. User resumed moving.")
             }
         }
     }
@@ -135,12 +128,9 @@ final class RoadManager {
                     return
                 } catch {
                     if attempt == maxAttempts {
-                        AppGlobals.doLog(
-                            message: "🌍⚠️ RoadManager: Sector fetch failed after 3 attempts: \(error.localizedDescription)",
-                            step: "ROADMGR"
-                        )
                         session.invalidateAndCancel()
                         await self.resetFetchState()
+                        await CloudKitLogManager.log(step: "ROADMGR", message: "🌍 RoadManager: Sector fetch failed after 3 attempts: \(error.localizedDescription)")
                         return
                     } else {
                         try? await Task.sleep(for: .seconds(2))
@@ -159,11 +149,7 @@ final class RoadManager {
         
         // 🚀 OPTIMIZATION: Clear the snap cache when we move to a new sector
         self.snapCache.removeAll()
-        
-        AppGlobals.doLog(
-            message: "✅ RoadManager: New \(self.range)m sector cached. (\(segments.count) roads found).",
-            step: "ROADMGR"
-        )
+        CloudKitLogManager.log(step: "ROADMGR", message: "✅ RoadManager: New \(self.range)m sector cached. (\(segments.count) roads found).")
     }
     
     private func resetFetchState() {
