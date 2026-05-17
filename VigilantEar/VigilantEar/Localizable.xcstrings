@@ -14342,7 +14342,11 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
+<<<<<<< HEAD
             "value" : "Wachsames Ohr"
+=======
+            "value" : "WACHSAMES OHR"
+>>>>>>> 45cd2a9 (Localizations and code cleanup)
           }
         },
         "en" : {
@@ -14354,13 +14358,21 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
+<<<<<<< HEAD
             "value" : "Oído Vigilante"
+=======
+            "value" : "OÍDO VIGILANTE"
+>>>>>>> 45cd2a9 (Localizations and code cleanup)
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
+<<<<<<< HEAD
             "value" : "Oreille Vigilante"
+=======
+            "value" : "OREILLE VIGILANTE"
+>>>>>>> 45cd2a9 (Localizations and code cleanup)
           }
         },
         "ja" : {
