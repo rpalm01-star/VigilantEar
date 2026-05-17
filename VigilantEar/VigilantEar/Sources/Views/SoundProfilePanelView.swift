@@ -134,14 +134,14 @@ struct LCARSCardView: View {
                 ParameterRow(title: "COOLDOWN", value: $cooldown, format: "%.1fs", range: 0...5)
                 ParameterRow(title: "MAX RANGE", value: $maxRange, format: "%.0f ft", range: 0...1500)
                 ParameterRow(title: "CEILING", value: $ceiling, format: "%.2f", range: 0...1)
-                
+                                
                 VStack(alignment: .leading, spacing: 4) {
                     HStack {
                         Text(verbatim: "HAPTICS")
                             .font(.system(size: 11, design: .monospaced))
                             .foregroundColor(.orange.opacity(0.8))
                         Spacer()
-                        Text("\(hapticCount)")
+                        Text(verbatim: "\(hapticCount)")
                             .font(.system(size: 14, weight: .bold, design: .monospaced))
                             .foregroundColor(.yellow)
                     }
