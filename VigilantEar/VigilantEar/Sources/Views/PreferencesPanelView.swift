@@ -83,10 +83,11 @@ struct PreferencesPanelView: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.vertical, 16)
-            .environment(\.locale, Locale(identifier: preferredLanguage))
             .navigationTitle(AppGlobals.alertPreferences)
             .navigationBarTitleDisplayMode(.inline)
-            
+            .environment(\.locale, Locale(identifier: preferredLanguage))
+            .id(preferredLanguage)
+
             // MARK: - Logic
             .onChange(of: pushNotificationsMasterEnabled) { _, newValue in
                 handleMasterToggleChange(newValue)
