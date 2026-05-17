@@ -10,16 +10,16 @@
 		30014A702FB8E139008508C5 /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = 30014A6F2FB8E139008508C5 /* GoogleService-Info.plist */; };
 		302387CB2FB2266F00BDF685 /* MarkdownUI in Frameworks */ = {isa = PBXBuildFile; productRef = 302387CA2FB2266F00BDF685 /* MarkdownUI */; };
 		3053DCBF2F83718A00241892 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 3053DCAC2F83718A00241892 /* Assets.xcassets */; };
-		306718692FBA7639004708C2 /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = 306718682FBA7639004708C2 /* Localizable.xcstrings */; };
 		3085368C2FAD99B600E7AC60 /* SoundML in Frameworks */ = {isa = PBXBuildFile; productRef = 3085368B2FAD99B600E7AC60 /* SoundML */; };
+		3096747F2FBA7CB600642111 /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = 3096747E2FBA7CB600642111 /* Localizable.xcstrings */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
 		30014A6F2FB8E139008508C5 /* GoogleService-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "GoogleService-Info.plist"; sourceTree = "<group>"; };
 		304F73C52F830A8800F67563 /* VigilantEar.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = VigilantEar.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		3053DCAC2F83718A00241892 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
-		306718682FBA7639004708C2 /* Localizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = Localizable.xcstrings; sourceTree = "<group>"; };
 		308EF3EB2F875A9400885DCB /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		3096747E2FBA7CB600642111 /* Localizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = Localizable.xcstrings; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -91,8 +91,8 @@
 		304F73BC2F830A8800F67563 = {
 			isa = PBXGroup;
 			children = (
-				306718682FBA7639004708C2 /* Localizable.xcstrings */,
 				30014A6F2FB8E139008508C5 /* GoogleService-Info.plist */,
+				3096747E2FBA7CB600642111 /* Localizable.xcstrings */,
 				3053DCAD2F83718A00241892 /* VigilantEar */,
 				304F73C62F830A8800F67563 /* Products */,
 			);
@@ -220,7 +220,7 @@
 			files = (
 				3053DCBF2F83718A00241892 /* Assets.xcassets in Resources */,
 				30014A702FB8E139008508C5 /* GoogleService-Info.plist in Resources */,
-				306718692FBA7639004708C2 /* Localizable.xcstrings in Resources */,
+				3096747F2FBA7CB600642111 /* Localizable.xcstrings in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
