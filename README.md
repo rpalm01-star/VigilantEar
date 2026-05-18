@@ -13,6 +13,9 @@ To support users worldwide, the platform features a complete native localization
 - **English**
 - **Spanish (Español)**
 - **Chinese (简体中文)**
+- **French (Français)**
+- **German (Deutsch)**
+- **Japanese (日本語)**
 
 All tactical overlays, HUD alerts, and preference menus adjust dynamically to system locales.
 
