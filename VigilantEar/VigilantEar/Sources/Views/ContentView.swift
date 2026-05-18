@@ -53,26 +53,15 @@ struct ContentView: View {
                                 ThreatHUD(events: coordinator.activeEvents)
                                     .frame(width: geo.size.width * 0.75, height: 84, alignment: .leading)
                                     .allowsHitTesting(false)
-                                
-                                if let songTitle = coordinator.activeSong,
-                                   coordinator.activeEvents.contains(where: { $0.threatLabel.lowercased() == "music" }) {
-                                    
-                                    // Stripping the music note character (if present)
-                                    let cleanTitle = songTitle
-                                        .replacingOccurrences(of: "♫", with: String.empty)
-                                        .replacingOccurrences(of: "🎵", with: String.empty)
-                                        .trimmingCharacters(in: .whitespacesAndNewlines)
-                                    
-                                    Text(cleanTitle)
-                                        .font(.system(size: 14, weight: .semibold, design: .monospaced))
-                                        .foregroundColor(.white)
-                                        .lineLimit(2) // 🚨 Your updated line limit
-                                        .multilineTextAlignment(.leading)
-                                        .padding(.leading, 4)
-                                    // Keep it from pushing into the Action Bar's space
-                                        .frame(maxWidth: geo.size.width * 0.4, alignment: .leading)
-                                        .transition(.asymmetric(insertion: .move(edge: .leading).combined(with: .opacity), removal: .opacity))
-                                }
+                                                                
+                                Text(coordinator.getCurrentSongName())
+                                    .font(.system(size: 14, weight: .semibold, design: .monospaced))
+                                    .foregroundColor(.white)
+                                    .lineLimit(2) // 🚨 Your updated line limit
+                                    .multilineTextAlignment(.leading)
+                                    .padding(.leading, 4)
+                                    .frame(maxWidth: geo.size.width * 0.4, alignment: .leading)
+                                    .transition(.asymmetric(insertion: .move(edge: .leading).combined(with: .opacity), removal: .opacity))
                             }
                             .padding(.leading, 8)
                             .padding(.bottom, 32)

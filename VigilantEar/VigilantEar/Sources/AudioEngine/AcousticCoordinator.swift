@@ -23,9 +23,6 @@ class AcousticCoordinator {
     // THE FIX: Add this to hold the simulation path
     var simulatedRoute: MKRoute? = nil
     
-    // The new variable your SwiftUI views will read from
-    var activeSong: String? = nil
-    
     // 🚀 OPTIMIZATION: Replaced Timer with a self-canceling Task
     private var streamTask: Task<Void, Never>?
     private var songTask: Task<Void, Never>?
@@ -67,8 +64,15 @@ class AcousticCoordinator {
     }
     
     func startListeningToPipeline(_ pipeline: AcousticProcessingPipeline) {
-        isTracking = true
+        if (isTracking) {
+            AppGlobals.doLog(message: "Bypassed pipeline listener start attempt because it was already started.", step: "AcousticCoordinator")
+            return
+        }
         
+        isTracking = true
+        AppGlobals.doLog(message: "Started listening to pipeline", step: "AcousticCoordinator")
+        
+        // Listen for regular streaming sound events.
         streamTask = Task {
             for await event in pipeline.eventStream {
                 activeEvents.append(event)
@@ -82,8 +86,6 @@ class AcousticCoordinator {
             for await songTitle in pipeline.songStream {
                 // Task inherits @MainActor from the class, so we don't need MainActor.run here
                 withAnimation(.spring()) {
-                    self.activeSong = songTitle
-                    
                     // Bind the song title directly to the latest music SoundEvent
                     if let index = self.activeEvents.lastIndex(where: { $0.isMusic }) {
                         self.activeEvents[index].songLabel = songTitle
@@ -93,12 +95,20 @@ class AcousticCoordinator {
         }
     }
     
+    func getCurrentSongName() -> String {
+        var songName = activeEvents.last(where: { $0.isMusic })?.songLabel ?? String.empty
+        songName = songName
+            .replacingOccurrences(of: "♫", with: String.empty)
+            .replacingOccurrences(of: "🎵", with: String.empty)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        return songName
+    }
+    
     func stopListening() {
         streamTask?.cancel()
         streamTask = nil
         songTask?.cancel()
         songTask = nil
-        
         isTracking = false
         activeEvents.removeAll()
         mapManager = MapManager()

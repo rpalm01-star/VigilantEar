@@ -57,9 +57,7 @@ actor AcousticProcessingPipeline {
     // MARK: - Shazam State
     @Published var currentSongLabel: String?
     private var expireTask: Task<Void, Never>?
-    private let shazamCooldown: TimeInterval = 300 // 5 minutes
     private var isAnalyzerSetup = false
-    private var isMusicCurrentlyPlaying = false
     private var isShazamRequestInFlight: Bool = false
     private var hasMatchedCurrentSong = false
     private var lastSongUpdate: Date = .distantPast
@@ -243,12 +241,11 @@ actor AcousticProcessingPipeline {
         let currentHead = self.lastKnownHeading
         let songToAttach = self.currentSongLabel
         
+        
         if isMusic {
-            self.isMusicCurrentlyPlaying = true
             if !self.isShazamRequestInFlight {
-                let timeSinceLastMatch = now.timeIntervalSince(self.lastSongUpdate)
-                // 🚀 OPTIMIZATION: Use the 5-minute cooldown, not the 15-second threshold
-                if !self.hasMatchedCurrentSong || timeSinceLastMatch > self.shazamCooldown {
+                let timeSinceLastShazamCall = now.timeIntervalSince(self.lastSongUpdate)
+                if !self.hasMatchedCurrentSong || timeSinceLastShazamCall > AppGlobals.Timing.shazamCooldown {
                     self.isShazamRequestInFlight = true
                     self.startShazamAccumulation()
                 }
@@ -257,7 +254,7 @@ actor AcousticProcessingPipeline {
         
         if AppGlobals.filteredCategories.contains(categoryRawValue) { return }
         
-        if isVehicle && effectiveConfidence < 0.35 {
+        if isVehicle && effectiveConfidence < 0.25 {
             let isMusicPresent = activeThreats.contains { $0.label == "music" && now.timeIntervalSince($0.lastSeen) < 5.0 }
             if isMusicPresent { return }
         }
@@ -512,36 +509,26 @@ actor AcousticProcessingPipeline {
         // Release the master lock so we can try again later
         self.isShazamRequestInFlight = false
         self.isAccumulatingForShazam = false
-        
-        // Optional: Log it so you can see network drops in the console
-        AppGlobals.doLog(message: "SHAZAM ⚠️ Match failed or timed out. Lock released.", step: "SHAZAM")
     }
     
     func registerShazamResponse(title: String, artist: String) async {
         self.isShazamRequestInFlight = false
-        
+        isAccumulatingForShazam = false
+
+        // ← Always reset the cooldown clock on EVERY Shazam response
         lastSongUpdate = Date()
         
-        if (artist.isEmpty && title.isEmpty) {
-            // Don't clear the currentSongLabel...let it age off naturally in case there was a gap in detection.
-            isAccumulatingForShazam = false
+        if title.isEmpty && artist.isEmpty {
+            self.currentSongLabel = nil
+            hasMatchedCurrentSong = true          // ← important for cooldown
+            _ = songContinuation.yield("")
             return
         }
-        
-        expireTask?.cancel()
         
         let songLabelConstruction = "♪ \(title) by \(artist)"
         self.currentSongLabel = songLabelConstruction
         hasMatchedCurrentSong = true
-        isAccumulatingForShazam = false
-        expireTask = Task {
-            // Sleep for 3 minutes (180 seconds)
-            try? await Task.sleep(for: .seconds(180))
-            if !Task.isCancelled {
-                self.currentSongLabel = nil
-            }
-        }
-        
         _ = songContinuation.yield(songLabelConstruction)
     }
+    
 }

@@ -36,7 +36,7 @@ struct SoundEvent: Identifiable {
     public let isApproaching: Bool
     public let latitude: Double?
     public let longitude: Double?
-    public let songLabel: String?
+    public var songLabel: String?
     
     // MARK: - Initializer
     

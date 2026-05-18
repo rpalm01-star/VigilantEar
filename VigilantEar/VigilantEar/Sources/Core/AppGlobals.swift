@@ -212,7 +212,7 @@ nonisolated struct AppGlobals {
         static let threatMemoryLifespan: TimeInterval = 5.0
         static let hudEventLifespan: TimeInterval = 15.0
         static let pipelineDebounce: TimeInterval = 0.85
-        static let shazamCooldown: TimeInterval = 120.0
+        static let shazamCooldown: TimeInterval = 45.0
     }
     
     // MARK: - Target Tracking (Dead Reckoning & Smoothing)
