@@ -83,6 +83,11 @@ class AcousticCoordinator {
                 // Task inherits @MainActor from the class, so we don't need MainActor.run here
                 withAnimation(.spring()) {
                     self.activeSong = songTitle
+                    
+                    // Bind the song title directly to the latest music SoundEvent
+                    if let index = self.activeEvents.lastIndex(where: { $0.isMusic }) {
+                        self.activeEvents[index].songLabel = songTitle
+                    }
                 }
             }
         }
