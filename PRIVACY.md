@@ -38,7 +38,7 @@ We do not share any personally identifiable information (PII) or device informat
 
 VigilantEar is designed with privacy in mind. All sound detection, location processing, and map rendering happens locally on your phone. No PII leaves your device.
 
-We *do* log minimal application exceptions to the cloud without any PII data or sound streams. For example, when a new sound type is detected that the ML chip supports but isn't optimized within our app yet. That log consists of the unrecoginized sound type and a date: soundType: "cow_moo", timestamp: "May 11, 2026 at 9:09:56.004 PM UTC-7". That is obviously not an emergency or alertable sound type so we would mark it as excluded - yet still show it on the "live" sound ML list on the right-hand side of the screen for awareness. And, translate it from English ("牛哞" or "niú mōu" in Chinese, in this nonsensical example).
+We *do* log minimal application exceptions to the cloud without any PII data or sound streams. For example, when a new sound type is detected that the ML chip supports but isn't optimized within our app yet. That log consists of the unrecognized sound type and a date: soundType: "cow_moo", timestamp: "May 11, 2026 at 9:09:56.004 PM UTC-7". That is obviously not an emergency or alertable sound type so we would mark it as excluded - yet still show it on the "live" sound ML list on the right-hand side of the screen for awareness. And, translate it from English ("牛哞" or "niú mōu" in Chinese, in this nonsensical example).
 
 ## Your Rights
 

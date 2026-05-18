@@ -1,0 +1,1 @@
+[Full German translation]
